@@ -1,0 +1,651 @@
+Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+Compiler:  
+Build flags: 
+Id flags:  
+
+The output was:
+1
+
+Microsoft Visual Studio 2022 Version 17.3.4.
+Copyright (C) Microsoft Corp. Alle Rechte vorbehalten.
+
+Schwerwiegender Fehler (Ausnahme von HRESULT: 0x8000FFFF (E_UNEXPECTED))
+Der Vorgang konnte nicht abgeschlossen werden. Falscher Parameter. 
+
+Verwendung:
+devenv  [Projektmappendatei | Projektdatei | Ordner | BeliebigeDatei.ext]  [Schalter]
+
+Das erste Argument fr devenv ist i.ÿd.ÿR. eine Projektmappendatei, eine Projektdatei oder ein Ordner.
+Sie k”nnen auch Folgendes verwenden:eine beliebige andere Datei als erstes Argument angeben, wenn die
+Datei automatisch in einem Editor ge”ffnet werden soll. Wenn Sie eine Projektdatei eingeben, sucht die IDE
+in dem Verzeichnis, das der Projektdatei bergeordnet ist,
+nach einer SLN-Datei mit dem gleichen Basisnamen wie die Projektdatei. Wenn keine entsprechende SLN-Datei vorhanden ist, sucht die
+IDE nach einer einzelnen SLN-Datei, die auf das Projekt verweist. Wenn keine entsprechende einzelne
+SLN-Datei vorhanden ist, erstellt die IDE eine nicht gespeicherte Projektmappe mit Der SLN-
+Standarddateiname, der mit dem Basisnamen der Projektdatei bereinstimmt.
+
+Befehlszeilenbuilds:
+devenv Projektmappendatei.sln /build [ solutionconfig ] [ /project ProjektnameOderDatei [ /projectconfig Name ] ]
+Verfgbare Befehlszeilenschalter:
+
+/Build			Erstellt die Projektmappe oder das Projekt mit der angegebenen
+			Projektmappenkonfiguration, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Namen der Plattform enthalten, z.ÿB. "Debug|Win32".
+/Clean			L”scht Buildausgaben.
+/Command		Startet die IDE und fhrt den Befehl aus.
+/Deploy			Erstellt die angegebene Buildkonfiguration und stellt diese bereit.
+/DoNotLoadProjects	™ffnet die angegebene Projektmappe, ohne Projekte zu laden.
+/Edit			™ffnet die angegebenen Dateien in einer laufenden Instanz dieser
+			Anwendung. Wenn keine ausgefhrten Instanzen vorhanden sind, wird
+			eine neue Instanz mit einem vereinfachten Fensterlayout gestartet.
+/LCID			Legt die Standardsprache fr die Benutzeroberfl„che in der IDE fest.
+/Log			Protokolliert IDE-Aktivit„ten fr die Problembehandlung in der angegebenen Datei.
+/NoVSIP			Deaktiviert den Lizenzschlssel fr VSIP-Entwickler zum Testen von VSIP.
+/Out			H„ngt das Buildprotokoll an eine angegebene Datei an.
+/Project		Gibt das Projekt an, das erstellt, bereinigt oder bereitgestellt werden soll.
+			Muss zusammen mit /Build, /Rebuild, /Clean, oder /Deploy verwendet werden.
+/ProjectConfig		šberschreibt die Projektkonfiguration, die in der
+			Projektmappenkonfiguration angegeben wurde, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Plattformnamen enthalten, z.ÿB "Debug|Win32".
+			Muss zusammen mit /Project verwendet werden.
+/Rebuild		Bereinigt und erstellt dann die Projektmappe oder das Projekt mit der
+			angegebenen Konfiguration.
+/ResetSettings		Stellt die Standardeinstellungen der IDE wieder her. Optional k”nnen die
+			Einstellungen der angegebenen VSSettings-Datei wiederhergestellt werden.
+/ResetSkipPkgs		Bereinigt alle SkipLoading-Tags, die VSPackages hinzugefgt wurden.
+/Run			Kompiliert die angegebene Projektmappe und fhrt sie aus.
+/RunExit		Kompiliert die angegebene Projektmappe, fhrt sie aus und schlieát dann die IDE.
+/SafeMode		Startet die IDE im abgesicherten Modus und l„dt die minimale Anzahl von Fenstern.
+/Upgrade		Aktualisiert das Projekt oder die Projektmappe mit allen enthaltenen Projekten.
+			Bei Bedarf werden Sicherungskopien dieser Dateien erstellt. Weitere
+			Informationen zum Sicherungsvorgang finden Sie in der Hilfe zum 
+			Visual Studio-Konvertierungs-Assistenten.
+
+Produktspezifische Schalter:
+
+/debugexe	Angegebene ausfhrbare Datei ”ffnen, die debuggt werden soll. Der Rest der Befehlszeile 
+		wird an die ausfhrbare Datei als Argumente bergeben.
+/diff		Vergleicht zwei Dateien. Ben”tigt vier Parameter:
+		SourceFile, TargetFile, SourceDisplayName(optional),
+		TargetDisplayName(optional)
+/TfsLink	™ffnet Team Explorer und startet einen Viewer fr den 
+		angegebenen Artefakt-URI (sofern registriert).
+/useenv		Verwenden Sie PATH-, INCLUDE-, LIBPATH- und LIB-Umgebungsvariablen
+		anstelle von IDE-Pfaden fr VC++-Builds.
+
+Geben Sie Folgendes ein, um den Debugger ber die Befehlszeile anzuh„ngen:
+	VsJITDebugger.exe -p <PID>
+
+
+Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+Compiler:  
+Build flags: 
+Id flags:  
+
+The output was:
+1
+
+Microsoft Visual Studio 2022 Version 17.3.4.
+Copyright (C) Microsoft Corp. Alle Rechte vorbehalten.
+
+Schwerwiegender Fehler (Ausnahme von HRESULT: 0x8000FFFF (E_UNEXPECTED))
+Der Vorgang konnte nicht abgeschlossen werden. Falscher Parameter. 
+
+Verwendung:
+devenv  [Projektmappendatei | Projektdatei | Ordner | BeliebigeDatei.ext]  [Schalter]
+
+Das erste Argument fr devenv ist i.ÿd.ÿR. eine Projektmappendatei, eine Projektdatei oder ein Ordner.
+Sie k”nnen auch Folgendes verwenden:eine beliebige andere Datei als erstes Argument angeben, wenn die
+Datei automatisch in einem Editor ge”ffnet werden soll. Wenn Sie eine Projektdatei eingeben, sucht die IDE
+in dem Verzeichnis, das der Projektdatei bergeordnet ist,
+nach einer SLN-Datei mit dem gleichen Basisnamen wie die Projektdatei. Wenn keine entsprechende SLN-Datei vorhanden ist, sucht die
+IDE nach einer einzelnen SLN-Datei, die auf das Projekt verweist. Wenn keine entsprechende einzelne
+SLN-Datei vorhanden ist, erstellt die IDE eine nicht gespeicherte Projektmappe mit Der SLN-
+Standarddateiname, der mit dem Basisnamen der Projektdatei bereinstimmt.
+
+Befehlszeilenbuilds:
+devenv Projektmappendatei.sln /build [ solutionconfig ] [ /project ProjektnameOderDatei [ /projectconfig Name ] ]
+Verfgbare Befehlszeilenschalter:
+
+/Build			Erstellt die Projektmappe oder das Projekt mit der angegebenen
+			Projektmappenkonfiguration, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Namen der Plattform enthalten, z.ÿB. "Debug|Win32".
+/Clean			L”scht Buildausgaben.
+/Command		Startet die IDE und fhrt den Befehl aus.
+/Deploy			Erstellt die angegebene Buildkonfiguration und stellt diese bereit.
+/DoNotLoadProjects	™ffnet die angegebene Projektmappe, ohne Projekte zu laden.
+/Edit			™ffnet die angegebenen Dateien in einer laufenden Instanz dieser
+			Anwendung. Wenn keine ausgefhrten Instanzen vorhanden sind, wird
+			eine neue Instanz mit einem vereinfachten Fensterlayout gestartet.
+/LCID			Legt die Standardsprache fr die Benutzeroberfl„che in der IDE fest.
+/Log			Protokolliert IDE-Aktivit„ten fr die Problembehandlung in der angegebenen Datei.
+/NoVSIP			Deaktiviert den Lizenzschlssel fr VSIP-Entwickler zum Testen von VSIP.
+/Out			H„ngt das Buildprotokoll an eine angegebene Datei an.
+/Project		Gibt das Projekt an, das erstellt, bereinigt oder bereitgestellt werden soll.
+			Muss zusammen mit /Build, /Rebuild, /Clean, oder /Deploy verwendet werden.
+/ProjectConfig		šberschreibt die Projektkonfiguration, die in der
+			Projektmappenkonfiguration angegeben wurde, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Plattformnamen enthalten, z.ÿB "Debug|Win32".
+			Muss zusammen mit /Project verwendet werden.
+/Rebuild		Bereinigt und erstellt dann die Projektmappe oder das Projekt mit der
+			angegebenen Konfiguration.
+/ResetSettings		Stellt die Standardeinstellungen der IDE wieder her. Optional k”nnen die
+			Einstellungen der angegebenen VSSettings-Datei wiederhergestellt werden.
+/ResetSkipPkgs		Bereinigt alle SkipLoading-Tags, die VSPackages hinzugefgt wurden.
+/Run			Kompiliert die angegebene Projektmappe und fhrt sie aus.
+/RunExit		Kompiliert die angegebene Projektmappe, fhrt sie aus und schlieát dann die IDE.
+/SafeMode		Startet die IDE im abgesicherten Modus und l„dt die minimale Anzahl von Fenstern.
+/Upgrade		Aktualisiert das Projekt oder die Projektmappe mit allen enthaltenen Projekten.
+			Bei Bedarf werden Sicherungskopien dieser Dateien erstellt. Weitere
+			Informationen zum Sicherungsvorgang finden Sie in der Hilfe zum 
+			Visual Studio-Konvertierungs-Assistenten.
+
+Produktspezifische Schalter:
+
+/debugexe	Angegebene ausfhrbare Datei ”ffnen, die debuggt werden soll. Der Rest der Befehlszeile 
+		wird an die ausfhrbare Datei als Argumente bergeben.
+/diff		Vergleicht zwei Dateien. Ben”tigt vier Parameter:
+		SourceFile, TargetFile, SourceDisplayName(optional),
+		TargetDisplayName(optional)
+/TfsLink	™ffnet Team Explorer und startet einen Viewer fr den 
+		angegebenen Artefakt-URI (sofern registriert).
+/useenv		Verwenden Sie PATH-, INCLUDE-, LIBPATH- und LIB-Umgebungsvariablen
+		anstelle von IDE-Pfaden fr VC++-Builds.
+
+Geben Sie Folgendes ein, um den Debugger ber die Befehlszeile anzuh„ngen:
+	VsJITDebugger.exe -p <PID>
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_27d0f.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  src.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CMAKE_HAVE_LIBC_PTHREAD /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_27d0f.dir\Debug\\" /Fd"cmTC_27d0f.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue C:\src\covise\build.covise\CMakeFiles\CMakeTmp\src.c
+C:\src\covise\build.covise\CMakeFiles\CMakeTmp\src.c(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "pthread.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_27d0f.vcxproj]
+
+
+Source file was:
+#include <pthread.h>
+
+static void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_1b59d.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  CheckFunctionExists.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_1b59d.dir\Debug\\" /Fd"cmTC_1b59d.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\CheckFunctionExists.c"
+LINK : fatal error LNK1104: Datei "pthreads.lib" kann nicht ge”ffnet werden. [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_1b59d.vcxproj]
+
+
+
+Determining if the function pthread_create exists in the pthread failed with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_2a942.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  CheckFunctionExists.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_2a942.dir\Debug\\" /Fd"cmTC_2a942.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\CheckFunctionExists.c"
+LINK : fatal error LNK1104: Datei "pthread.lib" kann nicht ge”ffnet werden. [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_2a942.vcxproj]
+
+
+
+The MPI test test_mpi for C in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_15274.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_15274.dir\Debug\\" /Fd"cmTC_15274.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c"
+C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_15274.vcxproj]
+
+
+
+The MPI test test_mpi for CXX in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_1ef30.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.cpp
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_1ef30.dir\Debug\\" /Fd"cmTC_1ef30.dir\Debug\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp
+C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_1ef30.vcxproj]
+
+
+
+The MPI test test_mpi for C in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_29b68.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_29b68.dir\Debug\\" /Fd"cmTC_29b68.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c"
+C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_29b68.vcxproj]
+
+
+
+The MPI test test_mpi for CXX in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_8cd0a.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.cpp
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_8cd0a.dir\Debug\\" /Fd"cmTC_8cd0a.dir\Debug\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp
+C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_8cd0a.vcxproj]
+
+
+
+The MPI test test_mpi for C in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_08c7e.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_08c7e.dir\Debug\\" /Fd"cmTC_08c7e.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c"
+C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_08c7e.vcxproj]
+
+
+
+The MPI test test_mpi for CXX in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_aab01.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.cpp
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_aab01.dir\Debug\\" /Fd"cmTC_aab01.dir\Debug\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp
+C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_aab01.vcxproj]
+
+
+
+The MPI test test_mpi for C in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_4b61b.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_4b61b.dir\Debug\\" /Fd"cmTC_4b61b.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c"
+C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_4b61b.vcxproj]
+
+
+
+The MPI test test_mpi for CXX in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_fa3c6.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.cpp
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_fa3c6.dir\Debug\\" /Fd"cmTC_fa3c6.dir\Debug\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp
+C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_fa3c6.vcxproj]
+
+
+
+Determining if the Fortran sgemm exists failed with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/devenv.com CMAKE_TRY_COMPILE.sln /build Debug /project cmTC_4c47e && 
+Microsoft Visual Studio 2022 Version 17.3.4.
+Copyright (C) Microsoft Corp. Alle Rechte vorbehalten.
+
+Ungltiges Projekt
+
+Verwendung:
+devenv  [Projektmappendatei | Projektdatei | Ordner | BeliebigeDatei.ext]  [Schalter]
+
+Das erste Argument fr devenv ist i.ÿd.ÿR. eine Projektmappendatei, eine Projektdatei oder ein Ordner.
+Sie k”nnen auch Folgendes verwenden:eine beliebige andere Datei als erstes Argument angeben, wenn die
+Datei automatisch in einem Editor ge”ffnet werden soll. Wenn Sie eine Projektdatei eingeben, sucht die IDE
+in dem Verzeichnis, das der Projektdatei bergeordnet ist,
+nach einer SLN-Datei mit dem gleichen Basisnamen wie die Projektdatei. Wenn keine entsprechende SLN-Datei vorhanden ist, sucht die
+IDE nach einer einzelnen SLN-Datei, die auf das Projekt verweist. Wenn keine entsprechende einzelne
+SLN-Datei vorhanden ist, erstellt die IDE eine nicht gespeicherte Projektmappe mit Der SLN-
+Standarddateiname, der mit dem Basisnamen der Projektdatei bereinstimmt.
+
+Befehlszeilenbuilds:
+devenv Projektmappendatei.sln /build [ solutionconfig ] [ /project ProjektnameOderDatei [ /projectconfig Name ] ]
+Verfgbare Befehlszeilenschalter:
+
+/Build			Erstellt die Projektmappe oder das Projekt mit der angegebenen
+			Projektmappenkonfiguration, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Namen der Plattform enthalten, z.ÿB. "Debug|Win32".
+/Clean			L”scht Buildausgaben.
+/Command		Startet die IDE und fhrt den Befehl aus.
+/Deploy			Erstellt die angegebene Buildkonfiguration und stellt diese bereit.
+/DoNotLoadProjects	™ffnet die angegebene Projektmappe, ohne Projekte zu laden.
+/Edit			™ffnet die angegebenen Dateien in einer laufenden Instanz dieser
+			Anwendung. Wenn keine ausgefhrten Instanzen vorhanden sind, wird
+			eine neue Instanz mit einem vereinfachten Fensterlayout gestartet.
+/LCID			Legt die Standardsprache fr die Benutzeroberfl„che in der IDE fest.
+/Log			Protokolliert IDE-Aktivit„ten fr die Problembehandlung in der angegebenen Datei.
+/NoVSIP			Deaktiviert den Lizenzschlssel fr VSIP-Entwickler zum Testen von VSIP.
+/Out			H„ngt das Buildprotokoll an eine angegebene Datei an.
+/Project		Gibt das Projekt an, das erstellt, bereinigt oder bereitgestellt werden soll.
+			Muss zusammen mit /Build, /Rebuild, /Clean, oder /Deploy verwendet werden.
+/ProjectConfig		šberschreibt die Projektkonfiguration, die in der
+			Projektmappenkonfiguration angegeben wurde, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Plattformnamen enthalten, z.ÿB "Debug|Win32".
+			Muss zusammen mit /Project verwendet werden.
+/Rebuild		Bereinigt und erstellt dann die Projektmappe oder das Projekt mit der
+			angegebenen Konfiguration.
+/ResetSettings		Stellt die Standardeinstellungen der IDE wieder her. Optional k”nnen die
+			Einstellungen der angegebenen VSSettings-Datei wiederhergestellt werden.
+/ResetSkipPkgs		Bereinigt alle SkipLoading-Tags, die VSPackages hinzugefgt wurden.
+/Run			Kompiliert die angegebene Projektmappe und fhrt sie aus.
+/RunExit		Kompiliert die angegebene Projektmappe, fhrt sie aus und schlieát dann die IDE.
+/SafeMode		Startet die IDE im abgesicherten Modus und l„dt die minimale Anzahl von Fenstern.
+/Upgrade		Aktualisiert das Projekt oder die Projektmappe mit allen enthaltenen Projekten.
+			Bei Bedarf werden Sicherungskopien dieser Dateien erstellt. Weitere
+			Informationen zum Sicherungsvorgang finden Sie in der Hilfe zum 
+			Visual Studio-Konvertierungs-Assistenten.
+
+Produktspezifische Schalter:
+
+/debugexe	Angegebene ausfhrbare Datei ”ffnen, die debuggt werden soll. Der Rest der Befehlszeile 
+		wird an die ausfhrbare Datei als Argumente bergeben.
+/diff		Vergleicht zwei Dateien. Ben”tigt vier Parameter:
+		SourceFile, TargetFile, SourceDisplayName(optional),
+		TargetDisplayName(optional)
+/TfsLink	™ffnet Team Explorer und startet einen Viewer fr den 
+		angegebenen Artefakt-URI (sofern registriert).
+/useenv		Verwenden Sie PATH-, INCLUDE-, LIBPATH- und LIB-Umgebungsvariablen
+		anstelle von IDE-Pfaden fr VC++-Builds.
+
+Geben Sie Folgendes ein, um den Debugger ber die Befehlszeile anzuh„ngen:
+	VsJITDebugger.exe -p <PID>
+
+
+
+The CSharp compiler identification could not be found in "C:/src/covise/build.covise/CMakeFiles/3.24.0-rc1/CompilerIdCSharp/CompilerIdCSharp.csproj"
+
+Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+Compiler:  
+Build flags: -std=legacy
+Id flags:  
+
+The output was:
+1
+
+Microsoft Visual Studio 2022 Version 17.3.4.
+Copyright (C) Microsoft Corp. Alle Rechte vorbehalten.
+
+Schwerwiegender Fehler (Ausnahme von HRESULT: 0x8000FFFF (E_UNEXPECTED))
+Der Vorgang konnte nicht abgeschlossen werden. Falscher Parameter. 
+
+Verwendung:
+devenv  [Projektmappendatei | Projektdatei | Ordner | BeliebigeDatei.ext]  [Schalter]
+
+Das erste Argument fr devenv ist i.ÿd.ÿR. eine Projektmappendatei, eine Projektdatei oder ein Ordner.
+Sie k”nnen auch Folgendes verwenden:eine beliebige andere Datei als erstes Argument angeben, wenn die
+Datei automatisch in einem Editor ge”ffnet werden soll. Wenn Sie eine Projektdatei eingeben, sucht die IDE
+in dem Verzeichnis, das der Projektdatei bergeordnet ist,
+nach einer SLN-Datei mit dem gleichen Basisnamen wie die Projektdatei. Wenn keine entsprechende SLN-Datei vorhanden ist, sucht die
+IDE nach einer einzelnen SLN-Datei, die auf das Projekt verweist. Wenn keine entsprechende einzelne
+SLN-Datei vorhanden ist, erstellt die IDE eine nicht gespeicherte Projektmappe mit Der SLN-
+Standarddateiname, der mit dem Basisnamen der Projektdatei bereinstimmt.
+
+Befehlszeilenbuilds:
+devenv Projektmappendatei.sln /build [ solutionconfig ] [ /project ProjektnameOderDatei [ /projectconfig Name ] ]
+Verfgbare Befehlszeilenschalter:
+
+/Build			Erstellt die Projektmappe oder das Projekt mit der angegebenen
+			Projektmappenkonfiguration, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Namen der Plattform enthalten, z.ÿB. "Debug|Win32".
+/Clean			L”scht Buildausgaben.
+/Command		Startet die IDE und fhrt den Befehl aus.
+/Deploy			Erstellt die angegebene Buildkonfiguration und stellt diese bereit.
+/DoNotLoadProjects	™ffnet die angegebene Projektmappe, ohne Projekte zu laden.
+/Edit			™ffnet die angegebenen Dateien in einer laufenden Instanz dieser
+			Anwendung. Wenn keine ausgefhrten Instanzen vorhanden sind, wird
+			eine neue Instanz mit einem vereinfachten Fensterlayout gestartet.
+/LCID			Legt die Standardsprache fr die Benutzeroberfl„che in der IDE fest.
+/Log			Protokolliert IDE-Aktivit„ten fr die Problembehandlung in der angegebenen Datei.
+/NoVSIP			Deaktiviert den Lizenzschlssel fr VSIP-Entwickler zum Testen von VSIP.
+/Out			H„ngt das Buildprotokoll an eine angegebene Datei an.
+/Project		Gibt das Projekt an, das erstellt, bereinigt oder bereitgestellt werden soll.
+			Muss zusammen mit /Build, /Rebuild, /Clean, oder /Deploy verwendet werden.
+/ProjectConfig		šberschreibt die Projektkonfiguration, die in der
+			Projektmappenkonfiguration angegeben wurde, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Plattformnamen enthalten, z.ÿB "Debug|Win32".
+			Muss zusammen mit /Project verwendet werden.
+/Rebuild		Bereinigt und erstellt dann die Projektmappe oder das Projekt mit der
+			angegebenen Konfiguration.
+/ResetSettings		Stellt die Standardeinstellungen der IDE wieder her. Optional k”nnen die
+			Einstellungen der angegebenen VSSettings-Datei wiederhergestellt werden.
+/ResetSkipPkgs		Bereinigt alle SkipLoading-Tags, die VSPackages hinzugefgt wurden.
+/Run			Kompiliert die angegebene Projektmappe und fhrt sie aus.
+/RunExit		Kompiliert die angegebene Projektmappe, fhrt sie aus und schlieát dann die IDE.
+/SafeMode		Startet die IDE im abgesicherten Modus und l„dt die minimale Anzahl von Fenstern.
+/Upgrade		Aktualisiert das Projekt oder die Projektmappe mit allen enthaltenen Projekten.
+			Bei Bedarf werden Sicherungskopien dieser Dateien erstellt. Weitere
+			Informationen zum Sicherungsvorgang finden Sie in der Hilfe zum 
+			Visual Studio-Konvertierungs-Assistenten.
+
+Produktspezifische Schalter:
+
+/debugexe	Angegebene ausfhrbare Datei ”ffnen, die debuggt werden soll. Der Rest der Befehlszeile 
+		wird an die ausfhrbare Datei als Argumente bergeben.
+/diff		Vergleicht zwei Dateien. Ben”tigt vier Parameter:
+		SourceFile, TargetFile, SourceDisplayName(optional),
+		TargetDisplayName(optional)
+/TfsLink	™ffnet Team Explorer und startet einen Viewer fr den 
+		angegebenen Artefakt-URI (sofern registriert).
+/useenv		Verwenden Sie PATH-, INCLUDE-, LIBPATH- und LIB-Umgebungsvariablen
+		anstelle von IDE-Pfaden fr VC++-Builds.
+
+Geben Sie Folgendes ein, um den Debugger ber die Befehlszeile anzuh„ngen:
+	VsJITDebugger.exe -p <PID>
+
+
+Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+Compiler:  
+Build flags: 
+Id flags:  
+
+The output was:
+1
+
+Microsoft Visual Studio 2022 Version 17.3.4.
+Copyright (C) Microsoft Corp. Alle Rechte vorbehalten.
+
+Schwerwiegender Fehler (Ausnahme von HRESULT: 0x8000FFFF (E_UNEXPECTED))
+Der Vorgang konnte nicht abgeschlossen werden. Falscher Parameter. 
+
+Verwendung:
+devenv  [Projektmappendatei | Projektdatei | Ordner | BeliebigeDatei.ext]  [Schalter]
+
+Das erste Argument fr devenv ist i.ÿd.ÿR. eine Projektmappendatei, eine Projektdatei oder ein Ordner.
+Sie k”nnen auch Folgendes verwenden:eine beliebige andere Datei als erstes Argument angeben, wenn die
+Datei automatisch in einem Editor ge”ffnet werden soll. Wenn Sie eine Projektdatei eingeben, sucht die IDE
+in dem Verzeichnis, das der Projektdatei bergeordnet ist,
+nach einer SLN-Datei mit dem gleichen Basisnamen wie die Projektdatei. Wenn keine entsprechende SLN-Datei vorhanden ist, sucht die
+IDE nach einer einzelnen SLN-Datei, die auf das Projekt verweist. Wenn keine entsprechende einzelne
+SLN-Datei vorhanden ist, erstellt die IDE eine nicht gespeicherte Projektmappe mit Der SLN-
+Standarddateiname, der mit dem Basisnamen der Projektdatei bereinstimmt.
+
+Befehlszeilenbuilds:
+devenv Projektmappendatei.sln /build [ solutionconfig ] [ /project ProjektnameOderDatei [ /projectconfig Name ] ]
+Verfgbare Befehlszeilenschalter:
+
+/Build			Erstellt die Projektmappe oder das Projekt mit der angegebenen
+			Projektmappenkonfiguration, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Namen der Plattform enthalten, z.ÿB. "Debug|Win32".
+/Clean			L”scht Buildausgaben.
+/Command		Startet die IDE und fhrt den Befehl aus.
+/Deploy			Erstellt die angegebene Buildkonfiguration und stellt diese bereit.
+/DoNotLoadProjects	™ffnet die angegebene Projektmappe, ohne Projekte zu laden.
+/Edit			™ffnet die angegebenen Dateien in einer laufenden Instanz dieser
+			Anwendung. Wenn keine ausgefhrten Instanzen vorhanden sind, wird
+			eine neue Instanz mit einem vereinfachten Fensterlayout gestartet.
+/LCID			Legt die Standardsprache fr die Benutzeroberfl„che in der IDE fest.
+/Log			Protokolliert IDE-Aktivit„ten fr die Problembehandlung in der angegebenen Datei.
+/NoVSIP			Deaktiviert den Lizenzschlssel fr VSIP-Entwickler zum Testen von VSIP.
+/Out			H„ngt das Buildprotokoll an eine angegebene Datei an.
+/Project		Gibt das Projekt an, das erstellt, bereinigt oder bereitgestellt werden soll.
+			Muss zusammen mit /Build, /Rebuild, /Clean, oder /Deploy verwendet werden.
+/ProjectConfig		šberschreibt die Projektkonfiguration, die in der
+			Projektmappenkonfiguration angegeben wurde, z.ÿB. "Debug". Wenn mehrere Plattformen
+			zul„ssig sind, muss der Konfigurationsname in Anfhrungszeichen eingeschlossen werden
+			und den Plattformnamen enthalten, z.ÿB "Debug|Win32".
+			Muss zusammen mit /Project verwendet werden.
+/Rebuild		Bereinigt und erstellt dann die Projektmappe oder das Projekt mit der
+			angegebenen Konfiguration.
+/ResetSettings		Stellt die Standardeinstellungen der IDE wieder her. Optional k”nnen die
+			Einstellungen der angegebenen VSSettings-Datei wiederhergestellt werden.
+/ResetSkipPkgs		Bereinigt alle SkipLoading-Tags, die VSPackages hinzugefgt wurden.
+/Run			Kompiliert die angegebene Projektmappe und fhrt sie aus.
+/RunExit		Kompiliert die angegebene Projektmappe, fhrt sie aus und schlieát dann die IDE.
+/SafeMode		Startet die IDE im abgesicherten Modus und l„dt die minimale Anzahl von Fenstern.
+/Upgrade		Aktualisiert das Projekt oder die Projektmappe mit allen enthaltenen Projekten.
+			Bei Bedarf werden Sicherungskopien dieser Dateien erstellt. Weitere
+			Informationen zum Sicherungsvorgang finden Sie in der Hilfe zum 
+			Visual Studio-Konvertierungs-Assistenten.
+
+Produktspezifische Schalter:
+
+/debugexe	Angegebene ausfhrbare Datei ”ffnen, die debuggt werden soll. Der Rest der Befehlszeile 
+		wird an die ausfhrbare Datei als Argumente bergeben.
+/diff		Vergleicht zwei Dateien. Ben”tigt vier Parameter:
+		SourceFile, TargetFile, SourceDisplayName(optional),
+		TargetDisplayName(optional)
+/TfsLink	™ffnet Team Explorer und startet einen Viewer fr den 
+		angegebenen Artefakt-URI (sofern registriert).
+/useenv		Verwenden Sie PATH-, INCLUDE-, LIBPATH- und LIB-Umgebungsvariablen
+		anstelle von IDE-Pfaden fr VC++-Builds.
+
+Geben Sie Folgendes ein, um den Debugger ber die Befehlszeile anzuh„ngen:
+	VsJITDebugger.exe -p <PID>
+
+
+The MPI test test_mpi for C in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_d77bf.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d77bf.dir\Debug\\" /Fd"cmTC_d77bf.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c"
+C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_d77bf.vcxproj]
+
+
+
+The MPI test test_mpi for CXX in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_371cf.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.cpp
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_371cf.dir\Debug\\" /Fd"cmTC_371cf.dir\Debug\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp
+C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_371cf.vcxproj]
+
+
+
+The MPI test test_mpi for C in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_f40da.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_f40da.dir\Debug\\" /Fd"cmTC_f40da.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c"
+C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_f40da.vcxproj]
+
+
+
+The MPI test test_mpi for CXX in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_67ffe.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.cpp
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_67ffe.dir\Debug\\" /Fd"cmTC_67ffe.dir\Debug\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp
+C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_67ffe.vcxproj]
+
+
+
+The MPI test test_mpi for C in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_03925.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.c
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_03925.dir\Debug\\" /Fd"cmTC_03925.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c"
+C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_03925.vcxproj]
+
+
+
+The MPI test test_mpi for CXX in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_61329.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.cpp
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_61329.dir\Debug\\" /Fd"cmTC_61329.dir\Debug\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp
+C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_61329.vcxproj]
+
+
+
+The MPI test test_mpi for C in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_d6348.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  test_mpi.c
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d6348.dir\Debug\\" /Fd"cmTC_d6348.dir\Debug\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c"
+C:\Program Files\CMake\share\cmake-3.24\Modules\FindMPI\test_mpi.c(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_d6348.vcxproj]
+
+
+
+The MPI test test_mpi for CXX in mode normal failed to compile with the following output:
+Change Dir: C:/src/covise/build.covise/CMakeFiles/CMakeTmp
+
+Run Build Command(s):C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_406c4.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:m && MSBuild version 17.3.1+2badb37d1 for .NET Framework
+  Microsoft (R) C/C++-Optimierungscompiler Version 19.33.31630 fr x64
+  test_mpi.cpp
+  Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
+  cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_406c4.dir\Debug\\" /Fd"cmTC_406c4.dir\Debug\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp
+C:\src\covise\build.covise\CMakeFiles\FindMPI\test_mpi.cpp(1,10): fatal  error C1083: Datei (Include) kann nicht ge”ffnet werden: "mpi.h": No such file or directory [C:\src\covise\build.covise\CMakeFiles\CMakeTmp\cmTC_406c4.vcxproj]
+
+
+

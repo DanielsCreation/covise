@@ -1,0 +1,7 @@
+C:\src\covise\build.covise\CMakeFiles\3.24.0-rc1\CompilerIdCSharp\obj\x64\Debug\CompilerIdCSharp.csproj.AssemblyReference.cache
+C:\src\covise\build.covise\CMakeFiles\3.24.0-rc1\CompilerIdCSharp\obj\x64\Debug\CompilerIdCSharp.csproj.SuggestedBindingRedirects.cache
+C:\src\covise\build.covise\CMakeFiles\3.24.0-rc1\CompilerIdCSharp\obj\x64\Debug\CompilerIdCSharp.csproj.CoreCompileInputs.cache
+C:\src\covise\build.covise\CMakeFiles\3.24.0-rc1\CompilerIdCSharp\obj\x64\Debug\CompilerIdCSharp.exe
+C:\src\covise\build.covise\CMakeFiles\3.24.0-rc1\CompilerIdCSharp\obj\x64\Debug\CompilerIdCSharp.pdb
+C:\src\covise\build.covise\CMakeFiles\3.24.0-rc1\CompilerIdCSharp\CompilerIdCSharp.exe
+C:\src\covise\build.covise\CMakeFiles\3.24.0-rc1\CompilerIdCSharp\CompilerIdCSharp.pdb
