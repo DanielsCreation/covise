@@ -29,6 +29,7 @@
 #include <e57/E57Simple.h>
 #endif
 #include <util/unixcompat.h>
+#include <chrono>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #include <parallel/algorithm>
@@ -43,12 +44,6 @@ bool intensityOnly;
 bool readScannerPositions = false;
 uint32_t fileVersion=1;
 
-enum formatTypes
-{
-    FORMAT_IRGB,
-    FORMAT_RGBI,
-    FORMAT_UVRGBI
-};
 
 struct Point
 {
@@ -60,7 +55,7 @@ struct Point
 // ----------------------------------------------------------------------------
 // readE57()
 // ----------------------------------------------------------------------------
-void readE57(char *filename, std::vector<Point> &vec, formatTypes format)
+void readE57(char *filename, std::vector<Point> &vec)
 {
 
 #ifdef HAVE_E57
@@ -75,12 +70,11 @@ void readE57(char *filename, std::vector<Point> &vec, formatTypes format)
 
 		//Get the number of scan images available
 		int data3DCount = eReader.GetData3DCount();
-		e57::Data3D		scanHeader;
+		e57::Data3D	scanHeader;
 		cerr << "Total num of sets is " << data3DCount << endl;
 		for (int scanIndex = 0; scanIndex < data3DCount; scanIndex++)
 		{
 			eReader.ReadData3D(scanIndex, scanHeader);
-			fprintf(stderr, "reading Name: %s\n", scanHeader.name.c_str());
 			osg::Matrix trans;
 			trans.makeTranslate(scanHeader.pose.translation.x, scanHeader.pose.translation.y, scanHeader.pose.translation.z);
 			osg::Matrix rot;
@@ -304,16 +298,14 @@ void writeXYZ(const std::string& filename, std::vector<Point>& vec)
         throw std::runtime_error("Unable to open file: " +
             filename);
 
-    size_t count = 0;
-
-	for (int j = 0; j < count; ++j) {
+	for (int j = 0; j < vec.size(); ++j) {
         xyz_file_stream 
             << vec.at(j).x << " "
             << vec.at(j).y << " "
             << vec.at(j).z << " "
             << int(vec.at(j).r) << " "
             << int(vec.at(j).g) << " "
-            << int(vec.at(j).b) << "\r\n";
+            << int(vec.at(j).b) << " \n";
     }
 
     xyz_file_stream.close();
@@ -331,10 +323,10 @@ void printHelpPage()
     cout << "Usage: PointLOD [options ...] inputfile outputfile" << endl;
     cout << endl;
     cout << "options" << endl;
-	cout << "  -c              convert .e57 to .xyz" << endl; 
+	cout << "-c		-> converts .e57 to .xyz" << endl; 
     cout << endl;
     cout << "examples" << endl;
-    cout << "  PointLOD -c input.ptsb output.ptsb" << endl;
+    cout << "PointLOD -c input.e57 output.xyz" << endl;
     cout << endl;
 }
 
@@ -343,8 +335,8 @@ void printHelpPage()
 // ----------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
-    formatTypes format = FORMAT_IRGB;
-    
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+
     std::vector<Point> vec;
     std::map<int, int> lookUp;
 
@@ -358,37 +350,47 @@ int main(int argc, char **argv)
         
         return -1;
     }
+	printf("argc: %i\n", argc);
 
+	printf("argv[0]: %s\n", argv[0]);
+	printf("argv[1]: %s\n", argv[1]);
+	printf("argv[2]: %s\n", argv[2]);
+	printf("argv[3]: %s\n", argv[3]);
+	printf("argv[4]: %s\n", argv[4]);
 
-	for (int i = 1; i < argc - 1; i++)
-	{
-		if (!argv[i][0] == '-')
-		{
-			return -1;
-		}
-		if (!argv[i][1] == 'c')
-		{
-			return -1;
-		}
-		if (argv[i][1] == 'c')
-		{
-			++i;
-			cout << "Conversion" << endl << endl;
-			int len = strlen(argv[i]);
-			if ((len > 4) && strcasecmp((argv[i] + len - 4), ".e57") == 0)
-			{
-				readE57(argv[i], vec, format);
-			}
-			++i;
-			if ((len > 4) && strcasecmp((argv[i] + len - 4), ".xyz") == 0)
-			{
-				writeXYZ(argv[argc - 1], vec);
-
-			}
-		}
+	if (~argc == 5)	{ 
+		return -1; 
 	}
- 
-    
+	if (!argv[2] == '-c') { 
+		return -1; 
+	}
+	
+	cout << "chosen option: conversion" << endl;
+	
+	char* inputfile = argv[3];
+
+	if (int(strlen(inputfile)) > 4 && strcasecmp((inputfile + int(strlen(inputfile)) - 4), ".e57") == 0) {
+		printf("reading file: %s\n", inputfile);
+		std::chrono::steady_clock::time_point start_reading = std::chrono::steady_clock::now();
+		printf("reading...\n");
+		readE57(inputfile, vec);
+		printf("done reading\n");
+		std::chrono::steady_clock::time_point end_reading = std::chrono::steady_clock::now();
+		std::cout << "Total time reading in s: " << std::chrono::duration_cast<std::chrono::seconds>(end_reading - start_reading).count() << std::endl;
+	}
+	char* ouputfile = argv[4];
+	if (int(strlen(inputfile)) > 4 && strcasecmp((inputfile + int(strlen(inputfile)) - 4), ".e57") == 0) {
+		printf("writing file: %s\n", ouputfile);
+		std::chrono::steady_clock::time_point start_writing = std::chrono::steady_clock::now();
+		printf("writing...\n");
+		writeXYZ(ouputfile, vec);
+		printf("done writing\n");
+		std::chrono::steady_clock::time_point end_writing = std::chrono::steady_clock::now();
+		std::cout << "Total time writing in s: " << std::chrono::duration_cast<std::chrono::seconds>(end_writing - start_writing).count() << std::endl;
+	}
+	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+	std::cout << "Total time in s: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << std::endl;
+
 	return 0; 
 }
 
