@@ -30,6 +30,7 @@
 #endif
 #include <util/unixcompat.h>
 #include <chrono>
+#include <boost/filesystem.hpp>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #include <parallel/algorithm>
@@ -55,7 +56,7 @@ struct Point
 // ----------------------------------------------------------------------------
 // readE57()
 // ----------------------------------------------------------------------------
-void readE57(char *filename, std::vector<Point> &vec)
+void readE57(const char *filename, std::vector<Point> &vec)
 {
 
 #ifdef HAVE_E57
@@ -288,31 +289,6 @@ void readE57(char *filename, std::vector<Point> &vec)
 }
 
 // ----------------------------------------------------------------------------
-// writeData()
-// ----------------------------------------------------------------------------
-void writeXYZ(const std::string& filename, std::vector<Point>& vec)
-{
-    std::ofstream xyz_file_stream(filename);
-
-    if (!xyz_file_stream.is_open())
-        throw std::runtime_error("Unable to open file: " +
-            filename);
-
-	for (int j = 0; j < vec.size(); ++j) {
-        xyz_file_stream 
-            << vec.at(j).x << " "
-            << vec.at(j).y << " "
-            << vec.at(j).z << " "
-            << int(vec.at(j).r) << " "
-            << int(vec.at(j).g) << " "
-            << int(vec.at(j).b) << " \n";
-    }
-
-    xyz_file_stream.close();
-}
-
-
-// ----------------------------------------------------------------------------
 // printHelpPage()
 // ----------------------------------------------------------------------------
 void printHelpPage()
@@ -330,20 +306,83 @@ void printHelpPage()
     cout << endl;
 }
 
+void getFilenames(const boost::filesystem::path &p, std::vector<std::string> &f) {
+	boost::filesystem::directory_iterator end_itr;
+	for (boost::filesystem::directory_iterator itr(p); itr != end_itr; ++itr)
+	{
+		if (is_regular_file(itr->path())) {
+			std::string current_file = itr->path().string();
+			if (current_file.substr(current_file.size() - 3) == std::string("e57")) {
+				f.push_back(current_file);
+				std::cout << current_file << std::endl;
+			}
+		}
+	}
+}
+
+// ----------------------------------------------------------------------------
+// writeData()
+// ----------------------------------------------------------------------------
+
+void writeXYZ(const std::string& filename, std::vector<Point>& vec)
+{
+	std::ofstream xyz_file_stream(filename);
+
+	if (!xyz_file_stream.is_open())
+		throw std::runtime_error("Unable to open file: " +
+			filename);
+
+	for (int j = 0; j < vec.size(); ++j) {
+		xyz_file_stream
+			<< vec.at(j).x << " "
+			<< vec.at(j).y << " "
+			<< vec.at(j).z << " "
+			<< int(vec.at(j).r) << " "
+			<< int(vec.at(j).g) << " "
+			<< int(vec.at(j).b) << " \n";
+	}
+
+	xyz_file_stream.close();
+}
+
+void writeBinary(std::string file, std::vector<Point>& vec)
+{
+	ofstream filestream(file, ios::out | ios::ate | ios::binary);
+
+	if (!filestream.is_open())
+		throw std::runtime_error("Unable to open file: " + file);
+
+	for (int i = 0; i < vec.size(); i++)
+	{
+		filestream.write((char*)&(vec.at(i).x), sizeof(float) * 3);
+		filestream.write((char*)&(vec.at(i).r), sizeof(uint8_t) * 3);
+	}
+
+	filestream.close();
+}
+
+void readBinary(std::string file, std::vector<Point>& vec)
+{
+	ofstream filestream(file, ios::out | ios::ate | ios::binary);
+
+	if (!filestream.is_open())
+		throw std::runtime_error("Unable to open file: " + file);
+
+	for (int i = 0; i < vec.size(); i++)
+	{
+		filestream.write((char*)&(vec.at(i).x), sizeof(float) * 3);
+		filestream.write((char*)&(vec.at(i).r), sizeof(uint8_t) * 3);
+	}
+
+	filestream.close();
+}
+
 // ----------------------------------------------------------------------------
 // main()
 // ----------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
-	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-
-    std::vector<Point> vec;
-    std::map<int, int> lookUp;
-
-    int nread = 0;
-    intensityOnly=false;
-    
-    if (argc < 3) /* argc should be >= 3 for correct execution */
+    if (argc < 3)
     {
         printf("error: minimal two params required\n");
         printHelpPage();
@@ -366,9 +405,44 @@ int main(int argc, char **argv)
 	}
 	
 	cout << "chosen option: conversion" << endl;
-	
-	char* inputfile = argv[3];
 
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+
+	std::vector<std::string> files;
+	std::vector<Point> vec;
+
+	char* inputdir = argv[3];
+	boost::filesystem::path p(inputdir);
+	getFilenames(inputdir, files);
+	cout << files.size() << endl;
+
+	char* outArg = argv[4];
+	string outputfile = string(outArg);
+	
+	// Schleife über alle im definierten Verzeichnis befindlichen .e57-Files
+	//for (auto it = files.begin(); it != files.end(); it++)
+	//cout << *it << endl;
+	
+	// Schleife über eine definierte Anzahl an .e57-Files aus dem hinterlegten Verzeichnis
+	int counter = 0;
+	for (auto it = files.begin(); counter != 5; it++) {
+
+		std::chrono::steady_clock::time_point start_reading = std::chrono::steady_clock::now();
+		printf("reading...\n");
+		const char *file = (*it).c_str();
+		readE57(file, vec);
+		std::chrono::steady_clock::time_point end_reading = std::chrono::steady_clock::now();
+		std::cout << std::chrono::duration_cast<std::chrono::seconds>(end_reading - start_reading).count() << " Sekunden für das Lesen von Nr.: " << counter << endl;
+
+		std::chrono::steady_clock::time_point start_writing = std::chrono::steady_clock::now();
+		printf("writing...\n");
+		writeBinary(outputfile, vec);
+		std::chrono::steady_clock::time_point end_writing = std::chrono::steady_clock::now();
+		std::cout << std::chrono::duration_cast<std::chrono::seconds>(end_writing - start_writing).count() << " Sekunden für das Schreiben von Nr.: " << endl;
+		counter++;
+	}
+
+	/*
 	if (int(strlen(inputfile)) > 4 && strcasecmp((inputfile + int(strlen(inputfile)) - 4), ".e57") == 0) {
 		printf("reading file: %s\n", inputfile);
 		std::chrono::steady_clock::time_point start_reading = std::chrono::steady_clock::now();
@@ -378,6 +452,7 @@ int main(int argc, char **argv)
 		std::chrono::steady_clock::time_point end_reading = std::chrono::steady_clock::now();
 		std::cout << "Total time reading in s: " << std::chrono::duration_cast<std::chrono::seconds>(end_reading - start_reading).count() << std::endl;
 	}
+
 	char* ouputfile = argv[4];
 	if (int(strlen(inputfile)) > 4 && strcasecmp((inputfile + int(strlen(inputfile)) - 4), ".e57") == 0) {
 		printf("writing file: %s\n", ouputfile);
@@ -388,6 +463,7 @@ int main(int argc, char **argv)
 		std::chrono::steady_clock::time_point end_writing = std::chrono::steady_clock::now();
 		std::cout << "Total time writing in s: " << std::chrono::duration_cast<std::chrono::seconds>(end_writing - start_writing).count() << std::endl;
 	}
+	*/
 	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 	std::cout << "Total time in s: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << std::endl;
 
