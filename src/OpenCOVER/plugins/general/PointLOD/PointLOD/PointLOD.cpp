@@ -72,7 +72,7 @@ void readE57(const char *filename, std::vector<Point> &vec)
 		//Get the number of scan images available
 		int data3DCount = eReader.GetData3DCount();
 		e57::Data3D	scanHeader;
-		// cerr << "Total num of sets is " << data3DCount << endl;
+		cerr << "Total num of sets is " << data3DCount << endl;
 		for (int scanIndex = 0; scanIndex < data3DCount; scanIndex++)
 		{
 			eReader.ReadData3D(scanIndex, scanHeader);
@@ -326,75 +326,55 @@ void getFilenames(const boost::filesystem::path &p, std::vector<std::string> &f)
 
 void writeXYZ(const std::string& filename, std::vector<Point>& vec)
 {
-	std::ofstream file(filename);
+	std::ofstream xyz_file_stream(filename);
 
-	if (!file.is_open())
+	if (!xyz_file_stream.is_open())
 		throw std::runtime_error("Unable to open file: " +
 			filename);
 
 	for (int j = 0; j < vec.size(); ++j) {
-		file
+		xyz_file_stream
 			<< vec.at(j).x << " "
 			<< vec.at(j).y << " "
 			<< vec.at(j).z << " "
 			<< int(vec.at(j).r) << " "
 			<< int(vec.at(j).g) << " "
-			<< int(vec.at(j).b) << "\r\n";
+			<< int(vec.at(j).b) << " \n";
 	}
 
-	file.close();
+	xyz_file_stream.close();
 }
 
-void writeBinary(std::string filename, std::vector<Point>& vec)
+void writeBinary(std::string file, std::vector<Point>& vec)
 {
-	ofstream file(filename, ios::out | ios::ate | ios::binary);
+	ofstream filestream(file, ios::out | ios::ate | ios::binary);
 
-	if (!file.is_open())
-		throw std::runtime_error("Unable to open file: " + filename);
+	if (!filestream.is_open())
+		throw std::runtime_error("Unable to open file: " + file);
 
 	for (int i = 0; i < vec.size(); i++)
 	{
-		file.write((char*)&(vec.at(i).x), sizeof(float));
-		file.write((char*)&(vec.at(i).y), sizeof(float));
-		file.write((char*)&(vec.at(i).z), sizeof(float));
-		file.write((char*)&(vec.at(i).r), sizeof(uint8_t));
-		file.write((char*)&(vec.at(i).g), sizeof(uint8_t));
-		file.write((char*)&(vec.at(i).b), sizeof(uint8_t));
+		filestream.write((char*)&(vec.at(i).x), sizeof(float) * 3);
+		filestream.write((char*)&(vec.at(i).r), sizeof(uint8_t) * 3);
 	}
 
-	file.close();
+	filestream.close();
 }
 
-void readBinary(std::string filename, std::vector<Point>& vec)
+void readBinary(std::string file, std::vector<Point>& vec)
 {
-	std::ifstream file(filename.c_str(), std::ios::in | std::ios::binary);
-	
-	if (!file.is_open()) {
-		throw std::runtime_error("unable to open file " + filename);
+	ofstream filestream(file, ios::out | ios::ate | ios::binary);
+
+	if (!filestream.is_open())
+		throw std::runtime_error("Unable to open file: " + file);
+
+	for (int i = 0; i < vec.size(); i++)
+	{
+		filestream.write((char*)&(vec.at(i).x), sizeof(float) * 3);
+		filestream.write((char*)&(vec.at(i).r), sizeof(uint8_t) * 3);
 	}
 
-	file.seekg(std::ios::beg, std::ios::end);
-	size_t file_size = file.tellg();
-	file.seekg(std::ios::beg, std::ios::beg);
-	size_t num_surfels = file_size / 15; //sizeof Point in xyz_bin
-
-
-	for (uint64_t i = 0; i < num_surfels; ++i) {
-
-		Point point;
-		file.read((char*)&point.x, 4);
-		file.read((char*)&point.y, 4);
-		file.read((char*)&point.z, 4);
-		file.read((char*)&point.r, 1);
-		file.read((char*)&point.g, 1);
-		file.read((char*)&point.b, 1);
-
-		printf("x: %f, y: %f, z: %f, r: %i, g: %i, b: %i, \n", point.x, point.y, point.z, point.r, point.g, point.b);
-
-		vec.push_back(point);
-
-	}
-	file.close();
+	filestream.close();
 }
 
 // ----------------------------------------------------------------------------
@@ -430,7 +410,6 @@ int main(int argc, char **argv)
 
 	std::vector<std::string> files;
 	std::vector<Point> vec;
-	std::vector<Point> vecRead;
 
 	char* inputdir = argv[3];
 	boost::filesystem::path p(inputdir);
@@ -444,35 +423,24 @@ int main(int argc, char **argv)
 	//for (auto it = files.begin(); it != files.end(); it++)
 	//cout << *it << endl;
 	
-	/*
 	// Schleife über eine definierte Anzahl an .e57-Files aus dem hinterlegten Verzeichnis
 	int counter = 0;
 	for (auto it = files.begin(); counter != 5; it++) {
 
 		std::chrono::steady_clock::time_point start_reading = std::chrono::steady_clock::now();
-		std::cout << "reading No. " << counter << endl;
+		printf("reading...\n");
 		const char *file = (*it).c_str();
 		readE57(file, vec);
 		std::chrono::steady_clock::time_point end_reading = std::chrono::steady_clock::now();
-		std::cout << std::chrono::duration_cast<std::chrono::seconds>(end_reading - start_reading).count() << " Sekunden" << endl;
+		std::cout << std::chrono::duration_cast<std::chrono::seconds>(end_reading - start_reading).count() << " Sekunden für das Lesen von Nr.: " << counter << endl;
 
 		std::chrono::steady_clock::time_point start_writing = std::chrono::steady_clock::now();
-		std::cout << "writing No. " << counter << endl;
+		printf("writing...\n");
 		writeBinary(outputfile, vec);
 		std::chrono::steady_clock::time_point end_writing = std::chrono::steady_clock::now();
-		std::cout << std::chrono::duration_cast<std::chrono::seconds>(end_writing - start_writing).count() << " Sekunden" << endl;
+		std::cout << std::chrono::duration_cast<std::chrono::seconds>(end_writing - start_writing).count() << " Sekunden für das Schreiben von Nr.: " << endl;
 		counter++;
 	}
-	*/
-
-	string binfile = string("C:\\Users\\Daniel\\Desktop\\Test_Output.bin");
-
-	std::chrono::steady_clock::time_point start_reading = std::chrono::steady_clock::now();
-	printf("reading...\n");
-	readBinary(binfile, vec);
-	std::chrono::steady_clock::time_point end_reading = std::chrono::steady_clock::now();
-	std::cout << "Total time reading in s: " << std::chrono::duration_cast<std::chrono::seconds>(end_reading - start_reading).count() << std::endl;
-
 
 	/*
 	if (int(strlen(inputfile)) > 4 && strcasecmp((inputfile + int(strlen(inputfile)) - 4), ".e57") == 0) {
@@ -480,6 +448,7 @@ int main(int argc, char **argv)
 		std::chrono::steady_clock::time_point start_reading = std::chrono::steady_clock::now();
 		printf("reading...\n");
 		readE57(inputfile, vec);
+		printf("done reading\n");
 		std::chrono::steady_clock::time_point end_reading = std::chrono::steady_clock::now();
 		std::cout << "Total time reading in s: " << std::chrono::duration_cast<std::chrono::seconds>(end_reading - start_reading).count() << std::endl;
 	}
@@ -490,6 +459,7 @@ int main(int argc, char **argv)
 		std::chrono::steady_clock::time_point start_writing = std::chrono::steady_clock::now();
 		printf("writing...\n");
 		writeXYZ(ouputfile, vec);
+		printf("done writing\n");
 		std::chrono::steady_clock::time_point end_writing = std::chrono::steady_clock::now();
 		std::cout << "Total time writing in s: " << std::chrono::duration_cast<std::chrono::seconds>(end_writing - start_writing).count() << std::endl;
 	}
