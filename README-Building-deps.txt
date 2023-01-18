@@ -477,19 +477,33 @@ cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/extern
 ###########
 ###########
 #Lamure
+1. navigate to C:/src/lamure/build
+2. use the following command (important: cmake instead of cmake-gui)
+cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE:STRING="Debug" -Wno-deprecated -DBOOST_ROOT=C:\src\externlibs\zebu\boost\lib\cmake\Boost-1.70.0 -DGLOBAL_EXT_DIR=c:/src/externlibs/zebu -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/lamure -DCMAKE_DEBUG_POSTFIX=d -DSCHISM_INCLUDE_SEARCH_DIR=C:/src/externlibs/zebu/schism 
+-DFREEIMAGE_LIBRARY_DEBUG:FILEPATH=C:/src/externlibs/zebu/FreeImage/lib/FreeImaged.lib -DGLEW_INCLUDE_DIR:PATH=C:/src/externlibs/zebu/glew/include -DGLEW_LIBRARY:FILEPATH=C:/src/externlibs/zebu/glew/lib/glew32.lib -DGMP_LIBRARY:FILEPATH=C:/src/externlibs/zebu/gmp/lib/gmp.lib -DFREEIMAGEPLUS_LIBRARY_DEBUG:FILEPATH=C:/src/externlibs/zebu/FreeImage/lib/FreeImagePlusd.lib -DFREEIMAGEPLUS_LIBRARY:FILEPATH=C:/src/externlibs/zebu/FreeImage/lib/FreeImagePlus.lib 
+-DFREEGLUT_DIR:PATH=C:/src/externlibs/zebu/freeglut -DFREEGLUT_INCLUDE_DIR:PATH=C:/src/externlibs/zebu/freeglut/include -DFREEGLUT_LIBRARY:FILEPATH=C:\src\externlibs\zebu\freeglut\lib\x64\freeglut.lib -DGLUT_glut_LIBRARY_RELEASE:FILEPATH=C:/src/externlibs/zebu/glut/lib/glut.lib -DGLUT_glut_LIBRARY_DEBUG:FILEPATH=C:/src/externlibs/zebu/glut/lib/glutD.lib -DGLFW3_INCLUDE_DIR:PATH=C:/src/externlibs/zebu/glfw/include -DGLFW3_LIBRARY:FILEPATH=C:/src/externlibs/zebu/glfw/lib/glfw3.lib -DGMP_INCLUDE_DIR:PATH=C:\src\externlibs\zebu\gmp\include -DGLFW3_LIBRARY_DEBUG:FILEPATH=C:/src/externlibs/zebu/glfw/lib/glfw3d.lib 
+-DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv;C:\src\externlibs\zebu\glfw\include\GLFW;C:\src\externlibs\zebu\glfw\lib\cmake\glfw3;C:\src\externlibs\zebu\freeimage;C:\src\externlibs\zebu\cgal;c:\src\externlibs\zebu\mpfr;C:\src\externlibs\zebu\glm\include;C:\src\externlibs\zebu\e57;C:\src\externlibs\zebu\OpenSceneGraph;C:\src\externlibs\zebu\xerces;C:\src\externlibs\zebu\freeglut;C:\src\externlibs\zebu\glut
 
-cmake .. -G "Visual Studio 17 2022" -A x64  -DBOOST_ROOT=c:/src/externlibs/zebu/boost -DGLOBAL_EXT_DIR=c:/src/externlibs/zebu -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/lamure -DCMAKE_DEBUG_POSTFIX=d -DSCHISM_INCLUDE_SEARCH_DIR=D:/src/gitbase/schism -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv
+3. now you can watch ur build in cmake-gui typing:
+cmake-gui ..
 
+4. Add missing libs, correct wrong paths and wrong Debug-Postfixes (but should be fixed with command from step 2)
+5. Open Project in Visual Studio 
+6. IMPORTANT: In order to build most project folders correctly you need to deactivate the use of vcpkg (right-click -> options -> vcpkg).
+Otherwise there will likley occure some errors due to import conflicts -> i.e. boost/chrono, etc.).
+7. CMakeLists.txt's have to be fixed in order to use freeglut instead of glut for concerning project folders. Further information: externlibs/freeglut/Readme.txt
+8. Paths to .dll files have to be introduced via system paths or by copying .dll files into build dir (relevant libraries: freeglut, Freeimage, schism, zlib, glew)
+9. further commands I found, but didn't use:
+set(CMAKE_BUILD_TYPE Debug CACHE STRING
+        "Choose the type of build, options are: None Debug Release RelWithDebInfo MinsizeRel."
+        FORCE)
 add -DSCM_STATIC_BUILD
-
 add to lamure_rendering and _app
 
-C:\src\externlibs\zebu\schism\lib\scm_core-gdd.lib
-C:\src\externlibs\zebu\schism\lib\scm_gl_core-gdd.lib
-C:\src\externlibs\zebu\schism\lib\scm_gl_util-gdd.lib
-C:\src\externlibs\zebu\freeglut\lib\x64\freeglut.lib
-C:\src\externlibs\zebu\schism\lib\scm_input-gdd.lib
-opengl32.lib
+cmake .. -G "Visual Studio 17 2022" -A x64  -DBOOST_ROOT=c:/src/externlibs/zebu/boost -DGLOBAL_EXT_DIR=c:/src/externlibs/zebu -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/lamure -DCMAKE_DEBUG_POSTFIX=d -DSCHISM_INCLUDE_SEARCH_DIR=D:/src/gitbase/schism -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv;C:\src\externlibs\zebu\glfw;C:\src\externlibs\zebu\glew;C:\src\externlibs\zebu\freeimage;C:\src\externlibs\zebu\cgal;c:\src\externlibs\zebu\mpfr;
+C:\src\externlibs\zebu\e57;
+C:\src\externlibs\zebu\OpenSceneGraph;
+
 
 #cgal
 https://github.com/CGAL/cgal.git
