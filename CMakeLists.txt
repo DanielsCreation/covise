@@ -33,7 +33,7 @@ set(COVISE_EXPORTS_FILE "covise-exports.cmake")
 
 ########## General setup ##########
 if(WIN32)
-  set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
+  set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Debug)
 ENDIF()
 
 # this is used to override some of cmake's original find-modules
@@ -79,7 +79,7 @@ IF(NOT WIN32 AND "" STREQUAL "${CMAKE_BUILD_TYPE}")
   IF(ARCHSUFFIX STREQUAL DBG_ARCHSUFFIX)
     SET(CMAKE_BUILD_TYPE "Debug")
   ELSE()
-    SET(CMAKE_BUILD_TYPE "RelWithDebInfo")
+    SET(CMAKE_BUILD_TYPE "Release")
   ENDIF()
 ENDIF()
 MESSAGE(CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE})
