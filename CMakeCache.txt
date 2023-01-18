@@ -15,9 +15,6 @@
 ########################
 
 //No help, variable specified on the command line.
-BOOST_ROOT:UNINITIALIZED=C:\src\externlibs\zebu\boost\lib\cmake\Boost-1.70.0
-
-//No help, variable specified on the command line.
 CMAKE_BUILD_TYPE:STRING=Debug
 
 //Value Computed by CMake.
@@ -25,12 +22,6 @@ CMAKE_FIND_PACKAGE_REDIRECTS_DIR:STATIC=C:/src/covise/CMakeFiles/pkgRedirects
 
 //No help, variable specified on the command line.
 GLEW_INCLUDE_DIR:FILEPATH=C:/src/externlibs/zebu/glfw/include
-
-//No help, variable specified on the command line.
-GLOBAL_EXT_DIR:UNINITIALIZED=c:/src/externlibs/zebu
-
-//No help, variable specified on the command line.
-SCHISM_INCLUDE_SEARCH_DIR:UNINITIALIZED=C:/src/externlibs/zebu/schism
 
 
 ########################
