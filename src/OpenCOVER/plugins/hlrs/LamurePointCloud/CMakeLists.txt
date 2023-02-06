@@ -21,6 +21,9 @@ include_directories(${REND_INCLUDE_DIR}
                     ${Boost_INCLUDE_DIR}
 )
 
+include_directories(SYSTEM 
+  ${SCHISM_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIR})
 
 
 cover_add_plugin(LamurePointCloud)

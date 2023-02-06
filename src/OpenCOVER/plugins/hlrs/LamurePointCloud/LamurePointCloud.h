@@ -1,122 +1,163 @@
+
+#ifndef _Lamure_PC_PLUGIN_H
+#define _Lamure_PC_PLUGIN_H
+
 //gl
-#include <GL/glew.h>
+//#include <GL/glew.h>
 
 //boost
-#include <boost/assign/list_of.hpp>
-#include <boost/regex.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/filesystem.hpp>
+//#include <boost/assign/list_of.hpp>
+#include <boost/regex.h>
+//#include <boost/lexical_cast.hpp>
+//#include <boost/filesystem.hpp>
 
 //lamure
-#include <lamure/types.h>
-#include <lamure/ren/config.h>
-#include <lamure/ren/model_database.h>
-#include <lamure/ren/cut_database.h>
-#include <lamure/ren/dataset.h>
-#include <lamure/ren/policy.h>
+//#include <lamure/types.h>
+//#include <lamure/ren/config.h>
+//#include <lamure/ren/model_database.h>
+//#include <lamure/ren/cut_database.h>
+//#include <lamure/ren/dataset.h>
 #include <lamure/ren/controller.h>
-#include <lamure/pvs/pvs_database.h>
-#include <lamure/ren/ray.h>
-#include <lamure/prov/prov_aux.h>
+#include <lamure/ren/policy.h>
+//#include <lamure/pvs/pvs_database.h>
+//#include <lamure/ren/ray.h>
+//#include <lamure/prov/prov_aux.h>
 #include <lamure/prov/octree.h>
-#include <lamure/vt/VTConfig.h>
-#include <lamure/vt/ren/CutDatabase.h>
+//#include <lamure/vt/VTConfig.h>
+//#include <lamure/vt/ren/CutDatabase.h>
 #include <lamure/vt/ren/CutUpdate.h>
-#include <lamure/vt/pre/AtlasFile.h>
+//#include <lamure/vt/pre/AtlasFile.h>
 
 //schism
-#include <scm/core.h>
-#include <scm/core/math.h>
-#include <scm/core/io/tools.h>
-#include <scm/core/pointer_types.h>
-#include <scm/gl_core/gl_core_fwd.h>
-#include <scm/gl_util/primitives/primitives_fwd.h>
-#include <scm/core/platform/platform.h>
-#include <scm/core/utilities/platform_warning_disable.h>
-#include <scm/gl_util/primitives/quad.h>
-#include <scm/gl_util/font/font_face.h>
-#include <scm/gl_util/font/text.h>
-#include <scm/gl_util/font/text_renderer.h>
-#include <scm/core/time/accum_timer.h>
-#include <scm/core/time/high_res_timer.h>
-#include <scm/gl_util/data/imaging/texture_loader.h>
+//#include <scm/high_res_timer.h>
+//#include <scm/time.h>
+//#include <scm/core.h>
+//#include <scm/core/math.h>
+//#include <scm/core/io/tools.h>
+//#include <scm/core/pointer_types.h>
+//#include <scm/core/platform/platform.h>
+//#include <scm/core/utilities/platform_warning_disable.h>
+//#include <scm/gl_core/gl_core_fwd.h>
+//#include <scm/gl_util/primitives/quad.h>
+//#include <scm/gl_util/font/font_face.h>
+//#include <scm/gl_util/font/text.h>
+//#include <scm/gl_util/font/text_renderer.h>
+//#include <scm/gl_util/primitives/primitives_fwd.h>
+//#include <scm/gl_util/data/imaging/texture_loader.h>
 #include <scm/gl_util/primitives/geometry.h>
-#include <scm/gl_util/primitives/box.h>
-
-//std
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <chrono>
-#include <vector>
-#include <algorithm>
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <algorithm>
-#include <list>
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <iostream>
-#include <fstream>
-#include <string.h>
-#include <ctype.h>
-#include <math.h>
+//#include <scm/gl_util/primitives/box.h>
 
 
-#include <cover/coVRConfig.h>
-#include <cover/coVRPlugin.h>
-#include <cover/coVRPluginSupport.h>
+//#include <cover/coVRMSController.h>
+//#include <cover/coVRTui.h>
+//#include <util/coTypes.h>
+#include <PluginUtil/FeedbackManager.h>
+#include <PluginUtil/ModuleInteraction.h>
+#include <OpenVRUI/coButtonInteraction.h>
+#include <config/CoviseConfig.h>
 #include <cover/coVRFileManager.h>
+#include <cover/coVRPluginSupport.h>
 #include <cover/coVRMSController.h>
+#include <cover/coVRPluginList.h>
+#include <cover/coVRCommunication.h>
+#include <cover/coVRConfig.h>
 #include <cover/coVRTui.h>
+#include <cover/VRViewer.h>
+#include <cover/PluginMenu.h>
+#include <cover/ui/ButtonGroup.h>
+#include <cover/ui/Button.h>
+#include <cover/ui/Menu.h>
+#include <cover/ui/Slider.h>
+#include <cover/ui/Action.h>
+#include <cover/ui/Menu.h>
+#include <cover/ui/Manager.h>
+#include <cover/ui/Owner.h>
 
-#include <util/coTypes.h>
 
+namespace opencover {
+namespace ui {
+    class Element;
+    class Group;
+    class Slider;
+    class Menu;
+    class Button;
+}
+}
 
-class LamurePointCloudPlugin : public coVRPlugin
+using namespace covise;
+using namespace opencover;
+
+class LamurePointCloudPlugin : public opencover::coVRPlugin, public ui::Owner
 {
+    class ImageFileEntry
+    {
+    public:
+        string menuName;
+        string fileName;
+        ui::Element* fileMenuItem;
+
+        ImageFileEntry(const char* menu, const char* file, ui::Element* menuitem)
+        {
+            menuName = menu;
+            fileName = file;
+            fileMenuItem = menuitem;
+        }
+    };
+
+public:
+    LamurePointCloudPlugin();
+    ~LamurePointCloudPlugin();
+    bool init();
+    const LamurePointCloudPlugin *instance() const;
+    static int load(const char* filename, osg::Group* parent, const char* ck = "");
+    static int unload(const char* filename, const char* ck = "");
+    ui::Group* FileGroup;
+
 private:
     static LamurePointCloudPlugin* plugin;
+    void selectedMenuButton(ui::Element*);
+    std::vector<ImageFileEntry> pointVec;
+    void clearData();
+    void readMenuConfigData(const char*, std::vector<ImageFileEntry>&, ui::Group*);
+    float pointSizeValue = 4;
+    void createGeodes(osg::Group*, const std::string&);
 
 protected:
+    osg::MatrixTransform* planetTrans;
+    ui::Menu* lamureMenu = nullptr;
+    ui::Menu* loadMenu = nullptr;
+    ui::Group* loadGroup = nullptr;
+    ui::Group* selectionGroup = nullptr;
+    ui::ButtonGroup* selectionButtonGroup = nullptr;
+    ui::ButtonGroup* fileButtonGroup = nullptr;
+    ui::Group* viewGroup = nullptr;
+    ui::Button* adaptLODButton = nullptr;
+    lamure::ren::camera* camera_ = nullptr;
     bool rendering_ = false;
     int32_t render_width_ = 1280;
     int32_t render_height_ = 720;
-
     int32_t num_models_ = 0;
     std::vector<scm::math::mat4d> model_transformations_;
-
     float height_divided_by_top_minus_bottom_ = 0.f;
-
-    lamure::ren::camera* camera_ = nullptr;
-
     scm::shared_ptr<scm::gl::render_device> device_;
     scm::shared_ptr<scm::gl::render_context> context_;
-
     scm::gl::program_ptr vis_xyz_shader_;
     scm::gl::program_ptr vis_xyz_pass1_shader_;
     scm::gl::program_ptr vis_xyz_pass2_shader_;
     scm::gl::program_ptr vis_xyz_pass3_shader_;
-
     scm::gl::program_ptr vis_xyz_lighting_shader_;
     scm::gl::program_ptr vis_xyz_pass2_lighting_shader_;
     scm::gl::program_ptr vis_xyz_pass3_lighting_shader_;
-
     scm::gl::program_ptr vis_xyz_qz_shader_;
     scm::gl::program_ptr vis_xyz_qz_pass1_shader_;
     scm::gl::program_ptr vis_xyz_qz_pass2_shader_;
-
     scm::gl::program_ptr vis_quad_shader_;
     scm::gl::program_ptr vis_line_shader_;
     scm::gl::program_ptr vis_triangle_shader_;
     scm::gl::program_ptr vis_vt_shader_;
-
     scm::gl::frame_buffer_ptr fbo_;
     scm::gl::texture_2d_ptr fbo_color_buffer_;
     scm::gl::texture_2d_ptr fbo_depth_buffer_;
-
     scm::gl::frame_buffer_ptr pass1_fbo_;
     scm::gl::texture_2d_ptr pass1_depth_buffer_;
     scm::gl::frame_buffer_ptr pass2_fbo_;
@@ -124,21 +165,16 @@ protected:
     scm::gl::texture_2d_ptr pass2_normal_buffer_;
     scm::gl::texture_2d_ptr pass2_view_space_pos_buffer_;
     scm::gl::texture_2d_ptr pass2_depth_buffer_;
-
     scm::gl::depth_stencil_state_ptr depth_state_disable_;
     scm::gl::depth_stencil_state_ptr depth_state_less_;
     scm::gl::depth_stencil_state_ptr depth_state_without_writing_;
     scm::gl::rasterizer_state_ptr no_backface_culling_rasterizer_state_;
-
     scm::gl::blend_state_ptr color_blending_state_;
     scm::gl::blend_state_ptr color_no_blending_state_;
-
     scm::gl::sampler_state_ptr filter_linear_;
     scm::gl::sampler_state_ptr filter_nearest_;
-
     scm::gl::sampler_state_ptr vt_filter_linear_;
     scm::gl::sampler_state_ptr vt_filter_nearest_;
-
     scm::gl::texture_2d_ptr bg_texture_;
 
     struct resource {
@@ -154,15 +190,10 @@ protected:
     std::map<uint32_t, resource> frusta_resources_;
     std::map<uint32_t, resource> octree_resources_;
     std::map<uint32_t, resource> image_plane_resources_;
-
     scm::shared_ptr<scm::gl::quad_geometry> screen_quad_;
-    scm::time::accum_timer<scm::time::high_res_timer> frame_time_;
-
     double fps_ = 0.0;
     uint64_t rendered_splats_ = 0;
     uint64_t rendered_nodes_ = 0;
-
-    lamure::ren::Data_Provenance data_provenance_;
 
     struct input {
         float trackball_x_ = 0.f;
@@ -172,10 +203,8 @@ protected:
         bool brush_mode_ = 0;
         bool brush_clear_ = 0;
         bool gui_lock_ = false;
-        lamure::ren::camera::mouse_state mouse_state_;
         bool keys_[3] = { 0, 0, 0 };
     };
-
     input input_;
 
     struct gui {
@@ -185,7 +214,6 @@ protected:
         bool provenance_settings_{ false };
         scm::math::mat4f ortho_matrix_;
     };
-
     gui gui_;
 
     struct xyz {
@@ -210,14 +238,37 @@ protected:
         std::set<uint32_t> selected_views_;
         int64_t brush_end_{ 0 };
     };
-
     selection selection_;
 
     struct provenance {
         uint32_t num_views_{ 0 };
     };
-
     std::map<uint32_t, provenance> provenance_;
+
+    struct vt_info {
+        uint32_t texture_id_;
+        uint16_t view_id_;
+        uint16_t context_id_;
+        uint64_t cut_id_;
+        vt::CutUpdate* cut_update_;
+
+        std::vector<scm::gl::texture_2d_ptr> index_texture_hierarchy_;
+        scm::gl::texture_2d_ptr physical_texture_;
+
+        scm::math::vec2ui physical_texture_size_;
+        scm::math::vec2ui physical_texture_tile_size_;
+        size_t size_feedback_;
+
+        int32_t* feedback_lod_cpu_buffer_;
+        uint32_t* feedback_count_cpu_buffer_;
+
+        scm::gl::buffer_ptr feedback_lod_storage_;
+        scm::gl::buffer_ptr feedback_count_storage_;
+
+        int toggle_visualization_;
+        bool enable_hierarchy_;
+    };
+    vt_info vt_;
 
     struct settings {
         int32_t width_{ 1920 };
@@ -283,50 +334,9 @@ protected:
         std::map<uint32_t, std::string> aux_;
         std::string selection_{ "" };
         float max_radius_{ std::numeric_limits<float>::max() };
-
     };
-
     settings settings_;
-
-    struct vt_info {
-        uint32_t texture_id_;
-        uint16_t view_id_;
-        uint16_t context_id_;
-        uint64_t cut_id_;
-        vt::CutUpdate* cut_update_;
-
-        std::vector<scm::gl::texture_2d_ptr> index_texture_hierarchy_;
-        scm::gl::texture_2d_ptr physical_texture_;
-
-        scm::math::vec2ui physical_texture_size_;
-        scm::math::vec2ui physical_texture_tile_size_;
-        size_t size_feedback_;
-
-        int32_t* feedback_lod_cpu_buffer_;
-        uint32_t* feedback_count_cpu_buffer_;
-
-        scm::gl::buffer_ptr feedback_lod_storage_;
-        scm::gl::buffer_ptr feedback_count_storage_;
-
-        int toggle_visualization_;
-        bool enable_hierarchy_;
-    };
-
-    vt_info vt_;
-
-public:
-    LamurePointCloudPlugin();
-    ~LamurePointCloudPlugin();
-    bool init();
-
-    static LamurePointCloudPlugin* instance() { return plugin; };
-
-    static int loadVIS(const char* filename, osg::Group* parent, const char* ck = "");
-    static int unloadVIS(const char* filename, const char* ck = "");
-
     void load_settings(std::string const& vis_file_name, settings& settings);
-
-
-
-
 };
+
+#endif

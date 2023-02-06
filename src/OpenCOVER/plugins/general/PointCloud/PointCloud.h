@@ -10,7 +10,6 @@
 
 #include <cover/coVRPlugin.h>
 #include <vector>
-
 #include <cover/coVRPluginSupport.h>
 #include <cover/VRSceneGraph.h>
 #include <cover/coVRFileManager.h>

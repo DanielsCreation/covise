@@ -1,51 +1,150 @@
 //local
 #include "LamurePointCloud.h"
 
+//std
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <chrono>
+#include <vector>
+#include <algorithm>
+#include <list>
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <math.h>
+#include <boost/regex/v4/regex.hpp>
+#include <boost/regex/v4/regex_replace.hpp>
+
+//lamure
+#include <lamure/ren/config.h>
+#include <lamure/ren/model_database.h>
+#include <lamure/ren/cut_database.h>
+#include <lamure/ren/dataset.h>
+#include <lamure/ren/policy.h>
+
+
 using namespace osg;
 using namespace std;
-using namespace opencover;
+using covise::coCoviseConfig;
+using vrui::coInteraction;
 
-LamurePointCloudPlugin* LamurePointCloudPlugin::plugin = NULL;
+bool rendering_ = false;
+int32_t render_width_ = 1280;
+int32_t render_height_ = 720;
+lamure::ren::Data_Provenance data_provenance_;
+std::vector<scm::math::mat4d> model_transformations_;
+
+
+static FileHandler handler = { NULL, LamurePointCloudPlugin::load, LamurePointCloudPlugin::unload, "lam" };
+LamurePointCloudPlugin* LamurePointCloudPlugin::plugin = nullptr;
 
 COVERPLUGIN(LamurePointCloudPlugin)
 
-static const int NUM_HANDLERS = 1;
-
 // Constructor
-LamurePointCloudPlugin::LamurePointCloudPlugin()
+LamurePointCloudPlugin::LamurePointCloudPlugin() 
+: ui::Owner("LamurePointCloud",cover->ui)
 {
-    fprintf(stderr, "LamurePlugin::LamurePlugin\n");
-    plugin = this;
-
-    for (int index = 0; index < NUM_HANDLERS; index++)
-        coVRFileManager::instance()->registerFileHandler(&handlers[index]);
+    printf("LamurePointCloudPlugin::LamurePointCloudPlugin() \n");
 }
 
-static const FileHandler handlers[] = {
-    { NULL,
-      LamurePointCloudPlugin::loadVIS,
-      LamurePointCloudPlugin::unloadVIS,
-      "vis" }
-};
 
-
-LamurePointCloudPlugin::~LamurePointCloudPlugin()
+const LamurePointCloudPlugin* LamurePointCloudPlugin::instance() const
 {
-    fprintf(stderr, "LamurePlugin::~LamurePlugin\n");
-    for (int index = 0; index < NUM_HANDLERS; index++)
-        coVRFileManager::instance()->unregisterFileHandler(&handlers[index]);
+    return plugin;
 }
+
 
 bool LamurePointCloudPlugin::init()
 {
+    printf("init()\n");
     if (plugin != NULL)
-    {
         return false;
+    plugin = this;
+    coVRFileManager::instance()->registerFileHandler(&handler);
+
+    lamureMenu = new ui::Menu("LamureMenu",this);
+    lamureMenu->setText("Lamure");
+    loadMenu = new ui::Menu(lamureMenu, "Load");
+    return 1;
+}
+
+int LamurePointCloudPlugin::load(const char* vis_file, osg::Group* loadParent, const char* covise_key)
+{
+    printf("load()\n");
+    //osg::Group* g = new osg::Group;
+    //loadParent->addChild(g);
+    //g->setName(vis_file);
+ 
+    assert(plugin);
+    plugin->load_settings(vis_file, plugin->settings_);
+
+    plugin->settings_.vis_ = plugin->settings_.show_normals_ ? 1
+        : plugin->settings_.show_accuracy_ ? 2
+        : plugin->settings_.show_output_sensitivity_ ? 3
+        : plugin->settings_.channel_ > 0 ? 3 + plugin->settings_.channel_
+        : 0;
+
+    if (plugin->settings_.provenance_ && plugin->settings_.json_ != "") {
+        std::cout << "json: " << plugin->settings_.json_ << std::endl;
+        data_provenance_ = lamure::ren::Data_Provenance::parse_json(plugin->settings_.json_);
+        std::cout << "size of provenance: " << data_provenance_.get_size_in_bytes() << std::endl;
     }
 
-    
+    lamure::ren::policy* policy = lamure::ren::policy::get_instance();
+    policy->set_max_upload_budget_in_mb(plugin->settings_.upload_);
+    policy->set_render_budget_in_mb(plugin->settings_.vram_);
+    policy->set_out_of_core_budget_in_mb(plugin->settings_.ram_);
+    plugin->render_width_ = plugin->settings_.width_ / plugin->settings_.frame_div_;
+    plugin->render_height_ = plugin->settings_.height_ / plugin->settings_.frame_div_;
+    policy->set_window_width(plugin->settings_.width_);
+    policy->set_window_height(plugin->settings_.height_);
 
+    int num_models_ = 0;
+    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
+    for (const auto& input_file : plugin->settings_.models_) {
+        lamure::model_t model_id = database->add_model(input_file, std::to_string(num_models_));
+        plugin->model_transformations_.push_back(plugin->settings_.transforms_[num_models_] * scm::math::mat4d(scm::math::make_translation(database->get_model(num_models_)->get_bvh()->get_translation())));
+        ++num_models_;
+    }
     return 1;
+}
+
+void LamurePointCloudPlugin::createGeodes(Group* parent, const std::string& filename)
+{
+    printf("createGeodes()\n");
+}
+
+
+int LamurePointCloudPlugin::unload(const char* filename, const char* covise_key)
+{
+    return 1;
+}
+
+
+void LamurePointCloudPlugin::readMenuConfigData(const char* menu, vector<ImageFileEntry>& menulist, ui::Group* subMenu)
+{
+    coCoviseConfig::ScopeEntries entries = coCoviseConfig::getScopeEntries(menu);
+}
+
+void LamurePointCloudPlugin::selectedMenuButton(ui::Element* menuItem)
+{
+    string filename;
+
+    // check structures vector for pointer (if found exit)
+    vector<ImageFileEntry>::iterator itEntry = pointVec.begin();
+    for (; itEntry < pointVec.end(); itEntry++)
+    {
+        if (itEntry->fileMenuItem == menuItem)
+        {
+            // call the load method passing in the file name
+            filename = itEntry->fileName;
+
+            return; //exit
+        }
+    }
 }
 
 
@@ -72,77 +171,9 @@ scm::math::mat4d load_matrix(const std::string& filename) {
 }
 
 
-struct settings {
-    int32_t width_{ 1920 };
-    int32_t height_{ 1080 };
-    int32_t frame_div_{ 1 };
-    int32_t vram_{ 2048 };
-    int32_t ram_{ 4096 };
-    int32_t upload_{ 32 };
-    bool provenance_{ 0 };
-    bool create_aux_resources_{ 1 };
-    float near_plane_{ 0.001f };
-    float far_plane_{ 1000.0f };
-    float fov_{ 30.0f };
-    bool splatting_{ 1 };
-    bool gamma_correction_{ 1 };
-    int32_t gui_{ 1 };
-    int32_t travel_{ 2 };
-    float travel_speed_{ 20.5f };
-    int32_t max_brush_size_{ 4096 };
-    bool lod_update_{ 1 };
-    bool use_pvs_{ 1 };
-    bool pvs_culling_{ 0 };
-    float lod_point_scale_{ 1.0f };
-    float aux_point_size_{ 1.0f };
-    float aux_point_distance_{ 0.5f };
-    float aux_point_scale_{ 1.0f };
-    float aux_focal_length_{ 1.0f };
-    int32_t vis_{ 0 };
-    int32_t show_normals_{ 0 };
-    bool show_accuracy_{ 0 };
-    bool show_radius_deviation_{ 0 };
-    bool show_output_sensitivity_{ 0 };
-    bool show_sparse_{ 0 };
-    bool show_views_{ 0 };
-    bool show_photos_{ 0 };
-    bool show_octrees_{ 0 };
-    bool show_bvhs_{ 0 };
-    bool show_pvs_{ 0 };
-    int32_t channel_{ 0 };
-    float lod_error_{ LAMURE_DEFAULT_THRESHOLD };
-    bool enable_lighting_{ 1 };
-    bool use_material_color_{ 0 };
-    scm::math::vec3f material_diffuse_{ 0.6f, 0.6f, 0.6f };
-    scm::math::vec4f material_specular_{ 0.4f, 0.4f, 0.4f, 1000.0f };
-    scm::math::vec3f ambient_light_color_{ 0.1f, 0.1f, 0.1f };
-    scm::math::vec4f point_light_color_{ 1.0f, 1.0f, 1.0f, 1.2f };
-    bool heatmap_{ 0 };
-    float heatmap_min_{ 0.0f };
-    float heatmap_max_{ 0.05f };
-    scm::math::vec3f background_color_{ LAMURE_DEFAULT_COLOR_R, LAMURE_DEFAULT_COLOR_G, LAMURE_DEFAULT_COLOR_B };
-    scm::math::vec3f heatmap_color_min_{ 68.0f / 255.0f, 0.0f, 84.0f / 255.0f };
-    scm::math::vec3f heatmap_color_max_{ 251.f / 255.f, 231.f / 255.f, 35.f / 255.f };
-    std::string atlas_file_{ "" };
-    std::string json_{ "" };
-    std::string pvs_{ "" };
-    std::string background_image_{ "" };
-    int32_t use_view_tf_{ 0 };
-    scm::math::mat4d view_tf_{ scm::math::mat4d::identity() };
-    std::vector<std::string> models_;
-    std::map<uint32_t, scm::math::mat4d> transforms_;
-    std::map<uint32_t, std::shared_ptr<lamure::prov::octree>> octrees_;
-    std::map<uint32_t, std::vector<lamure::prov::aux::view>> views_;
-    std::map<uint32_t, std::string> aux_;
-    std::string selection_{ "" };
-    float max_radius_{ std::numeric_limits<float>::max() };
+void LamurePointCloudPlugin::load_settings(std::string const& vis_file_name, settings& settings) {
 
-};
-
-
-void load_settings(std::string const& filename, settings& settings) {
-
-    std::ifstream vis_file(filename.c_str());
+    std::ifstream vis_file(vis_file_name.c_str());
 
     if (!vis_file.is_open()) {
         std::cout << "could not open vis file" << std::endl;
@@ -423,22 +454,9 @@ void load_settings(std::string const& filename, settings& settings) {
     }
 }
 
-
-int LamurePointCloudPlugin::loadVIS(const char* vis_filename, osg::Group* loadParent, const char* covise_key)
+LamurePointCloudPlugin::~LamurePointCloudPlugin()
 {
-    if (vis_filename)
-    {
-        settings settings_;
-        plugin->load_settings(vis_filename, settings_);
-
-    }
-    return 0;
-}
-
-
-int LamurePointCloudPlugin::unloadVIS(const char* filename, const char* covise_key)
-{
-    return 0;
+    printf("~LamurePointCloudPlugin()\n");
 }
 
 
