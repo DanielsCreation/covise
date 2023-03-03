@@ -85,6 +85,10 @@ int LamureDrawable::loadBVH(const char *filename)
 
 void LamureDrawable::drawImplementation(osg::RenderInfo &renderInfo) const
 {
+    osg::ref_ptr<osg::StateSet> currentState = new osg::StateSet;
+    renderInfo.getState()->captureCurrentState(*currentState);
+    renderInfo.getState()->pushStateSet(currentState.get());
+
     if (management_ == nullptr)
     {
         char *argv[] = { "opencover" };
@@ -160,9 +164,6 @@ void LamureDrawable::drawImplementation(osg::RenderInfo &renderInfo) const
             contextState[ctx]->applyTF = false;
         }*/
 
-        osg::ref_ptr<osg::StateSet> currentState = new osg::StateSet;
-        renderInfo.getState()->captureCurrentState(*currentState);
-        renderInfo.getState()->pushStateSet(currentState.get());
 
         // Render here:
         management_->MainLoop();

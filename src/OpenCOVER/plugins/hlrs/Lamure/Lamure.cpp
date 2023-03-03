@@ -96,7 +96,6 @@ int LamurePlugin::SloadBVH(const char *filename, osg::Group *parent, const char 
 
     if (filename)
     {
-
         plugin->loadBVH(filename, parent);
     }
 
