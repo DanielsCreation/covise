@@ -12,40 +12,39 @@
 //#include <boost/filesystem.hpp>
 
 //lamure
-//#include <lamure/types.h>
-//#include <lamure/ren/config.h>
-//#include <lamure/ren/model_database.h>
-//#include <lamure/ren/cut_database.h>
-//#include <lamure/ren/dataset.h>
+#include <lamure/types.h>
+#include <lamure/ren/config.h>
+#include <lamure/ren/model_database.h>
+#include <lamure/ren/cut_database.h>
+#include <lamure/ren/dataset.h>
 #include <lamure/ren/controller.h>
 #include <lamure/ren/policy.h>
 //#include <lamure/pvs/pvs_database.h>
 //#include <lamure/ren/ray.h>
 //#include <lamure/prov/prov_aux.h>
 #include <lamure/prov/octree.h>
-//#include <lamure/vt/VTConfig.h>
-//#include <lamure/vt/ren/CutDatabase.h>
+#include <lamure/vt/VTConfig.h>
+#include <lamure/vt/ren/CutDatabase.h>
 #include <lamure/vt/ren/CutUpdate.h>
 //#include <lamure/vt/pre/AtlasFile.h>
 
 //schism
-//#include <scm/high_res_timer.h>
-//#include <scm/time.h>
-//#include <scm/core.h>
-//#include <scm/core/math.h>
-//#include <scm/core/io/tools.h>
-//#include <scm/core/pointer_types.h>
-//#include <scm/core/platform/platform.h>
-//#include <scm/core/utilities/platform_warning_disable.h>
-//#include <scm/gl_core/gl_core_fwd.h>
-//#include <scm/gl_util/primitives/quad.h>
-//#include <scm/gl_util/font/font_face.h>
-//#include <scm/gl_util/font/text.h>
-//#include <scm/gl_util/font/text_renderer.h>
-//#include <scm/gl_util/primitives/primitives_fwd.h>
-//#include <scm/gl_util/data/imaging/texture_loader.h>
+#include <scm/time.h>
+#include <scm/core.h>
+#include <scm/core/math.h>
+#include <scm/core/io/tools.h>
+#include <scm/core/pointer_types.h>
+#include <scm/core/platform/platform.h>
+#include <scm/core/utilities/platform_warning_disable.h>
+#include <scm/gl_core/gl_core_fwd.h>
+#include <scm/gl_util/primitives/quad.h>
+#include <scm/gl_util/font/font_face.h>
+#include <scm/gl_util/font/text.h>
+#include <scm/gl_util/font/text_renderer.h>
+#include <scm/gl_util/primitives/primitives_fwd.h>
+#include <scm/gl_util/data/imaging/texture_loader.h>
 #include <scm/gl_util/primitives/geometry.h>
-//#include <scm/gl_util/primitives/box.h>
+#include <scm/gl_util/primitives/box.h>
 
 
 //#include <cover/coVRMSController.h>
@@ -83,9 +82,9 @@
 #include <osg/Texture2D>
 #include <osgDB/ReadFile>
 
-#include "C:\src\covise\src\OpenCOVER\plugins\general\PointCloud\PointCloudGeometry.h"
+#include "C:\src\covise\src\OpenCOVER\plugins\hlrs\LamurePointCloud\LamureGeometry.h"
+#include "C:\src\covise\src\OpenCOVER\plugins\hlrs\LamurePointCloud\LamureDrawable.h"
 #include "C:\src\covise\src\OpenCOVER\plugins\hlrs\LamurePointCloud\Points.h"
-#include <LamureGeometry.h>
 
 
 namespace opencover {
@@ -124,16 +123,27 @@ public:
     const LamurePointCloudPlugin *instance() const;
     static int load(const char* filename, osg::Group* parent, const char* ck = "");
     static int unload(const char* filename, const char* ck = "");
-    void preFrame();
-    bool update() const;
-    //void set_uniforms(scm::gl::program_ptr shader);
-    //void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader);
-    //void draw_brush(scm::gl::program_ptr shader);
-    //std::string const strip_whitespace(std::string const& in_string);
     ui::Group* FileGroup;
+    void preFrame();
+    bool update();
+    void set_uniforms(scm::gl::program_ptr shader);
+    void lamure_display();
+    void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader);
+    void draw_brush(scm::gl::program_ptr shader);
+    void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
+    void covise_display();
+    void create_aux_resources();
+    void co_draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader);
+    bool parse_prefix(std::string& in_string, std::string const& prefix);
+    bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
+    void init_lamure_shader();
+    void create_framebuffers();
+    void init_render_states();
+    void init_camera();
+    std::string const strip_whitespace(std::string const& in_string);
+    scm::math::mat4d load_matrix(const std::string& filename);
     osg::ref_ptr<osg::Group> LamureGroup;
-    struct settings;
-    //void load_settings(const std::string &filename, settings& settings);
+    void load_settings(const std::string &filename);
 
 private:
     static LamurePointCloudPlugin* plugin;
@@ -151,6 +161,7 @@ private:
     osg::VertexBufferObject* vertexBufferArray;
     osg::ElementBufferObject* primitiveBufferArray;
     PointSet* pointSet = nullptr;
+    
 
 protected:
     osg::MatrixTransform* planetTrans;
