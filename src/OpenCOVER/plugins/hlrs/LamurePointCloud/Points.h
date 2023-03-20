@@ -31,7 +31,7 @@ struct PointSet
     float ymax;
     float zmin;
     float zmax;
-    Point *points = nullptr;
+    ::Point *points = nullptr;
     Color *colors = nullptr;
     uint32_t *IDs = nullptr;
 

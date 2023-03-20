@@ -1542,7 +1542,7 @@ std::string coVRFileManager::getFilterList()
         extensions += ";";
     }
     
-    extensions += "*.lam;";
+    extensions += "*.lmr;";
     extensions += "*.osg *.ive;";
     extensions += "*.osgb *.osgt *.osgx;";
     extensions += "*.obj;";
@@ -1563,7 +1563,7 @@ std::string coVRFileManager::getFilterList()
 std::string coVRFileManager::getWriteFilterList()
 {
     std::string extensions;
-    extensions += "*.lam;";
+    extensions += "*.lmr;";
     extensions += "*.osg;";
     extensions += "*.ive;";
     extensions += "*.osgb;";

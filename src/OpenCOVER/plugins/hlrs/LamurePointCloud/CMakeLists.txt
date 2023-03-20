@@ -3,11 +3,13 @@ USING(LamurePointCloud)
 SET(HEADERS
   LamurePointCloud.h
   LamureGeometry.h
+  LamureDrawable.h
 
 )
 SET(SOURCES
   LamurePointCloud.cpp
   LamureGeometry.cpp
+  LamureDrawable.cpp
 )
 
 include_directories(${REND_INCLUDE_DIR}
