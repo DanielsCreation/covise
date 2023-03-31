@@ -50,6 +50,8 @@
 //#include <cover/coVRMSController.h>
 //#include <cover/coVRTui.h>
 //#include <util/coTypes.h>
+
+#include <util/coExport.h>
 #include <PluginUtil/FeedbackManager.h>
 #include <PluginUtil/ModuleInteraction.h>
 #include <OpenVRUI/coButtonInteraction.h>
@@ -121,11 +123,11 @@ public:
     ~LamurePointCloudPlugin();
     bool init();
     const LamurePointCloudPlugin *instance() const;
-    static int load(const char* filename, osg::Group* parent, const char* ck = "");
-    static int unload(const char* filename, const char* ck = "");
+    static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
+    static int unloadLMR(const char* filename, const char* ck = "");
     ui::Group* FileGroup;
     void preFrame();
-    bool update();
+    //bool update();
     void set_uniforms(scm::gl::program_ptr shader);
     void lamure_display();
     void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader);
@@ -153,6 +155,7 @@ private:
     void readMenuConfigData(const char*, std::vector<ImageFileEntry>&, ui::Group*);
     float pointSizeValue = 4;
     void createGeodes(osg::Group*, const std::string&);
+    bool adaptLOD = true; // LOD enable/disable
     osg::Point* pointstate;
     osg::StateSet* stateset;
     osg::BoundingBox box;
@@ -161,18 +164,37 @@ private:
     osg::VertexBufferObject* vertexBufferArray;
     osg::ElementBufferObject* primitiveBufferArray;
     PointSet* pointSet = nullptr;
+    osg::ref_ptr<osg::Geode> geo;
+    osg::ref_ptr<osg::MatrixTransform> transform;
+    osg::ref_ptr<osg::StateSet> state;
+    osg::ref_ptr<LamureGeometry> drawable;
     
 
 protected:
-    osg::MatrixTransform* planetTrans;
     ui::Menu* lamureMenu = nullptr;
     ui::Menu* loadMenu = nullptr;
     ui::Group* loadGroup = nullptr;
     ui::Group* selectionGroup = nullptr;
+    osg::MatrixTransform* planetTrans;
+
+    ui::Button* singleSelectButton = nullptr;
+    ui::Button* translationButton = nullptr;
+    ui::Button* rotPointsButton = nullptr;
+    ui::Button* rotAxisButton = nullptr;
+    ui::Button* moveButton = nullptr;
+    ui::Button* saveButton = nullptr;
+    ui::Button* fileButton = nullptr;
+    ui::Button* deselectButton = nullptr;
+    ui::Button* createNurbsSurface = nullptr;
+    //ui::Button *deleteButton = nullptr;
     ui::ButtonGroup* selectionButtonGroup = nullptr;
     ui::ButtonGroup* fileButtonGroup = nullptr;
     ui::Group* viewGroup = nullptr;
     ui::Button* adaptLODButton = nullptr;
+    ui::Slider* pointSizeSlider = nullptr;
+
+    ui::Slider* lodFarDistanceSlider = nullptr;
+    ui::Slider* lodNearDistanceSlider = nullptr;
 };
 
 #endif

@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+
+<COCONFIG version="1" >
+
+ <INCLUDE global="1" configname="general" >config.xml</INCLUDE>
+ 
+ <GLOBAL>
+
+    <COVER>
+      <WelcomeMessage value="Welcome to OpenCOVER with custom config file" />
+      <Multisample value="ON" numSamples="4" numBuffers="1" mode="DONT_CARE" />
+      <NavigationMode value="XForm" />
+      <CollisionDist value="1500" />
+      <Background r="0.5" g="0.5" b="1.0" /> 
+      <MultiThreaded value="false" />
+      <ShowGeodeName enable="off" value="off"/>
+      <LODScale value="1" />
+      <RotationSpeed value="10" />
+      <REGISTER_RAW_SCENEGRAPH value="on" />
+      <ScaleAll value="OFF" />
+      <CoordAxis value="ON" />
+      <Freeze value="OFF" />
+      <FPS value="ON" />
+      <ConstantInteractorSize value="OFF"/>
+      <Restrict value="OFF" />
+      <ScaleWithInteractors value="ON"/>
+      <TwoSide value="ON" />
+      <TransparencyMode value="sorted_blended" />
+      <Headlight value="on" />
+      <RenderOnMaster value="true" />
+      <!--<Statistics value="4" /> -->
+      <DebugLevel value="3" />
+      
+      <DebugTUI value="OFF" />
+      
+      <UI>
+        <Manager>
+            <ViewOptions>
+                <TrackHead value="off" />
+            </ViewOptions>
+        </Manager>
+      </UI>
+      
+      <PipeConfig>
+        <Pipe name="0" useDISPLAY="true" />
+      </PipeConfig>
+      
+      <WindowConfig>
+        <Window type="Qt" width="1000" comment="FRONT" window="0" pipeIndex="0" height="450" left="150" top="0" name="0" embedded="false" decoration="true" />
+      </WindowConfig>
+      
+      <ScreenConfig>
+        <Screen width="1920" comment="FRONT" h="0.0" originX="0" originY="0" originZ="0" height="1080" p="0.0" r="0.0" name="0" screen="0" />
+      </ScreenConfig>
+     
+      <ViewportConfig>
+        <Viewport width="1" height="1" left="0" bottom="0" windowIndex="0" channelIndex="0" name="0" />
+      </ViewportConfig>
+      
+      <PipeConfig>
+        <Pipe display="1" server="0" screen="1" name="1" />
+      </PipeConfig>
+
+      <WindowConfig>
+        <Window type="none" window="0" pipeIndex="0" left="0" bottom="0" width="800" height="450" comment="MAIN" name="0" decoration="false" resize="off" />
+      </WindowConfig>
+
+      <CollisionDist value="1500" />
+    </COVER>
+
+ 
+    <System>
+      <CRB>
+        <ModuleAlias name="Renderer/Renderer" value="Renderer/IvRenderer" arch="x11"/>
+        <ModuleAlias name="Renderer/Renderer" value="Renderer/QtRenderer" arch="windows"/>
+        <ModuleAlias name="Renderer/Renderer" value="Renderer/QtRenderer" arch="mac"/>
+        <ModuleAlias value="Renderer/OpenCOVER" name="Renderer/VRRenderer" />
+      </CRB>
+    </System>
+    
+    <System>
+      <VRB>
+        <RemoteFetch value="OFF" path="C:\src\covise\remoteFetch" />
+      </VRB>
+    </System>
+
+  <COVER>
+    <!-- Enable/disable pluEgins here -->
+    <Plugin>
+      <HMI value="off" />
+      <ClipPlane value="off" />
+      <Vrml97 value="on" />
+      <FileBrowser value="off" />
+      <PDB value="off" />
+      <AirCurrents value="off" />
+      <OssimPlanet value="off" />
+      <Image value="off" />
+      <PointModel value="off" />
+      <MipMapVideo value="off" />
+      <MultiVolume value="off" />
+      <Volume value="off" />
+      <ArtifactVis value="off" />
+      <Talha value="off" />
+      <WebMonitor value="off" />
+      <Seismic value="off" /> 
+      <StructView value="off" />
+      <ModelLoader value="off" />
+      <PhotosynthVR value="off" />
+      <Hotspot value="off" />
+      <HPWRENViewer value="off" />
+      <ThreadedLoader value="off" />
+      <LamurePlugin value="on"/>
+    </Plugin>
+
+    <Input>  
+      <DebugButtons value="True" />
+      <ButtonSystem value="MOUSE" />
+      <TrackingSystem value="MOUSE" />
+      <MouseNav value="ON" />
+    </Input>
+ 
+    <Menu>
+      <Orientation h="0" p="0" r="0" />
+      <Position x="0" y="1000" z="0" />
+      <Size value="0.7" />
+    </Menu>
+    
+  </COVER>
+    
+ </GLOBAL>
+ 
+</COCONFIG>

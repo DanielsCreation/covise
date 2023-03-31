@@ -31,13 +31,13 @@ class LamureGeometry : public osg::Geometry
 {
 public:
     LamureGeometry(::PointSet*);
-
+    LamureGeometry(const LamureGeometry& drawimage, const osg::CopyOp& copyop = osg::CopyOp::SHALLOW_COPY);
     void changeLod(float sampleNum); // adjust point density
     void setPointSize(float newPointSize); // adjust point size
     void updateCoords();
 
 protected:
-    LamureGeometry(); // hide default constructor
+    //LamureGeometry(); // hide default constructor
     LamureGeometry& operator=(const LamureGeometry&)
     {
         return *this;
@@ -61,6 +61,5 @@ private:
     osg::Vec3Array* colors;
     osg::VertexBufferObject* vertexBufferArray;
     osg::ElementBufferObject* primitiveBufferArray;
-    void updateBounds();
 };
 #endif

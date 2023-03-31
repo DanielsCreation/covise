@@ -27,10 +27,17 @@
 #include <lamure/ren/policy.h>
 #include <lamure/pvs/pvs_database.h>
 
+#include <config/coConfigConstants.h>
+#include <config/coConfigLog.h>
+#include <config/coConfigConstants.h>
+#include <config/coConfig.h>
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <cover/coVRStatsDisplay.h>
+#include <config/coConfigConstants.h>
 
     __declspec(dllexport) DWORD NvOptimusEnablement = 1;
     __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
@@ -263,41 +270,216 @@ using namespace std;
 using covise::coCoviseConfig;
 using vrui::coInteraction;
 
-static FileHandler handler = { NULL, LamurePointCloudPlugin::load, LamurePointCloudPlugin::unload, "lmr" };
-
+COVERPLUGIN(LamurePointCloudPlugin)
 LamurePointCloudPlugin* LamurePointCloudPlugin::plugin = nullptr;
 
-COVERPLUGIN(LamurePointCloudPlugin)
+static FileHandler handler = 
+    { NULL, 
+      LamurePointCloudPlugin::loadLMR, 
+      LamurePointCloudPlugin::unloadLMR, 
+      "lmr" 
+};
 
 
 // Constructor
-LamurePointCloudPlugin::LamurePointCloudPlugin()
-    : ui::Owner("LamurePointCloud", cover->ui)
+LamurePointCloudPlugin::LamurePointCloudPlugin(): ui::Owner("LamurePointCloud", cover->ui)
 {
-    printf("LamurePointCloudPlugin::LamurePointCloudPlugin() \n");
+    printf("LamurePointCloudPlugin()\n");
+    coVRFileManager::instance()->registerFileHandler(&handler);
+    plugin = this;
 }
 
+LamurePointCloudPlugin::~LamurePointCloudPlugin()
+{
+    fprintf(stderr, "LamurePlugin::~LamurePlugin\n");
+    coVRFileManager::instance()->unregisterFileHandler(&handler);
+    cover->getObjectsRoot()->removeChild(LamureGroup);
+}
+
+
+bool LamurePointCloudPlugin::init() 
+{
+    printf("init()\n");
+    std::cerr << "hostname: " << covise::coConfigConstants::getHostname() << std::endl;
+    
+    //Create main menu button
+    lamureMenu = new ui::Menu("LamureMenu", this);
+    lamureMenu->setText("LamurePlugin");
+    loadMenu = new ui::Menu(lamureMenu, "Load");
+
+    //loadGroup = new ui::Group("Load", loadMenu);
+    //deleteButton = new ui::Button(fileGroup,"Delete");
+
+    selectionGroup = new ui::Group(lamureMenu, "Selection");
+    selectionButtonGroup = new ui::ButtonGroup(selectionGroup, "SelectionGroup");
+    selectionButtonGroup->enableDeselect(true);
+    singleSelectButton = new ui::Button(selectionGroup, "SelectPoints", selectionButtonGroup);
+    singleSelectButton->setText("Select Points");
+    
+    translationButton = new ui::Button(selectionGroup, "MakeTranslate", selectionButtonGroup);
+    translationButton->setText("Make Translate");
+    
+    rotPointsButton = new ui::Button(selectionGroup, "RotationbyPointsSelection", selectionButtonGroup);
+    rotPointsButton->setText("Rotation by Points Selection");
+   
+    rotAxisButton = new ui::Button(selectionGroup, "RotationAxisbyPointer", selectionButtonGroup);
+    rotAxisButton->setText("Rotation Axis by Pointer");
+    
+    moveButton = new ui::Button(selectionGroup, "FreeMovement", selectionButtonGroup);
+    moveButton->setText("Free Movement");
+
+    deselectButton = new ui::Button(selectionGroup, "DeselectPoints", selectionButtonGroup);
+    deselectButton->setText("Deselect Points");
+    
+    fileButtonGroup = new ui::ButtonGroup(selectionGroup, "FileButtonGroup");
+    fileButtonGroup->enableDeselect(true);
+
+    //read in menu data
+    return 1;
+}
 
 const LamurePointCloudPlugin* LamurePointCloudPlugin::instance() const
 {
     return plugin;
 }
 
-
-bool LamurePointCloudPlugin::init()
+int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, const char* covise_key)
 {
-    printf("init()\n");
-    if (plugin != NULL)
-        return false;
-    plugin = this;
-    coVRFileManager::instance()->registerFileHandler(&handler);
+    printf("load()\n");
+    std::cout << covise::coConfigDefaultPaths::getDefaultTransformFileName() << std::endl;
+    std::cout << covise::coConfigDefaultPaths::getDefaultLocalConfigFileName() << std::endl;
+    std::cout << covise::coConfigDefaultPaths::getDefaultGlobalConfigFileName() << std::endl;
 
-    lamureMenu = new ui::Menu("LamureMenu", this);
-    lamureMenu->setText("Lamure");
-    loadMenu = new ui::Menu(lamureMenu, "Load");
+    assert(plugin);
+    std::string lmr_file = std::string(filename);
+    plugin->load_settings(lmr_file);
+    settings_.vis_ = settings_.show_normals_ ? 1
+        : settings_.show_accuracy_ ? 2
+        : settings_.show_output_sensitivity_ ? 3
+        : settings_.channel_ > 0 ? 3 + settings_.channel_
+        : 0;
+
+    if (settings_.provenance_ && settings_.json_ != "") {
+        std::cout << "json: " << settings_.json_ << std::endl;
+        data_provenance_ = lamure::ren::Data_Provenance::parse_json(settings_.json_);
+        std::cout << "size of provenance: " << data_provenance_.get_size_in_bytes() << std::endl;
+    }
+
+    lamure::ren::policy* policy = lamure::ren::policy::get_instance();
+    policy->set_max_upload_budget_in_mb(settings_.upload_);
+    policy->set_render_budget_in_mb(settings_.vram_);
+    policy->set_out_of_core_budget_in_mb(settings_.ram_);
+    policy->set_window_width(settings_.width_);
+    policy->set_window_height(settings_.height_);
+    render_width_ = settings_.width_ / settings_.frame_div_;
+    render_height_ = settings_.height_ / settings_.frame_div_;
+
+    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
+    for (const auto& input_file : settings_.models_) {
+        lamure::model_t model_id = database->add_model(input_file, std::to_string(num_models_));
+        model_transformations_.push_back(settings_.transforms_[num_models_] * scm::math::mat4d(scm::math::make_translation(database->get_model(num_models_)->get_bvh()->get_translation())));
+        ++num_models_;
+    }
+
+    printf("num_models: %i\n", num_models_);
+
+    //osgViewer::ViewerBase* viewer = new osgViewer::Viewer;
+    /*drawStatistics = coCoviseConfig::isOn("COVER.Statistics", false) ? coVRStatsDisplay::VIEWER_STATS : coVRStatsDisplay::NO_STATS;
+    viewer->opencover::coVRStatsDisplay::showStats(0, viewer);*/
+
+    //brush_resource_.buffer_.reset();
+    //brush_resource_.array_.reset();
+    //selection_.brush_.resize(settings_.max_brush_size_);
+    //brush_resource_.buffer_ = device_->create_buffer(scm::gl::BIND_VERTEX_BUFFER, scm::gl::USAGE_STATIC_DRAW, sizeof(xyz) * settings_.max_brush_size_, &selection_.brush_[0]);
+    //brush_resource_.array_ = device_->create_vertex_array(scm::gl::vertex_format
+    //(0, 0, scm::gl::TYPE_VEC3F, sizeof(xyz))
+    //    (0, 1, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
+    //    (0, 2, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
+    //    (0, 3, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
+    //    (0, 4, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
+    //    (0, 5, scm::gl::TYPE_FLOAT, sizeof(xyz))
+    //    (0, 6, scm::gl::TYPE_VEC3F, sizeof(xyz)),
+    //    boost::assign::list_of(brush_resource_.buffer_));
+
+    //if (settings_.background_image_ != "") {
+    //    //std::cout << "background image: " << settings_.background_image_ << std::endl;
+    //    scm::gl::texture_loader tl;
+    //    bg_texture_ = tl.load_texture_2d(*device_, settings_.background_image_, true, false);
+    //}
+
+    //plugin->init_lamure_shader();
+    /*plugin->create_framebuffers();
+    plugin->create_aux_resources();
+    plugin->init_render_states();
+    plugin->init_camera();*/
+    // plugin->covise_display();
+
+    //std::cout << (*device_);
+
+    // Create an OSG drawable
+    // Set up the geometry, vertex and color arrays, etc.
+    
+    plugin->LamureGroup = new osg::Group();
+    plugin->LamureGroup->setName("LamureGroup");
+
+    // Create an OSG Geode to hold the drawable
+    plugin->geo = new osg::Geode();
+    plugin->geo->setName("LamureGeode");
+
+    plugin->pointSet = new PointSet[1];
+    plugin->pointSet[0].colors = new Color[1024];
+    plugin->pointSet[0].points = new ::Point[1024];
+    plugin->pointSet[0].size = 1024;
+
+    for (int n = 0; n < 1024; ++n)
+    {
+        plugin->pointSet[0].points[n].coordinates.x() = 1000 + n;
+        plugin->pointSet[0].points[n].coordinates.y() = 1000 + n;
+        plugin->pointSet[0].points[n].coordinates.z() = 1000 + n;
+
+        plugin->pointSet[0].colors[n].r = n / 1024.0;
+        plugin->pointSet[0].colors[n].g = (n + 500) / 2048.0;
+        plugin->pointSet[0].colors[n].b = (n + 500) / 4096.0;
+    }
+
+    plugin->drawable = new LamureGeometry(&plugin->pointSet[0]);
+    plugin->geo->addDrawable(plugin->drawable.get());
+
+    // Set up Transformation
+    osg::ref_ptr<osg::MatrixTransform> transform = new osg::MatrixTransform();
+    transform->addChild(plugin->geo);
+
+    // Add Group to root
+    plugin->LamureGroup->addChild(transform);
+    cover->getObjectsRoot()->addChild(plugin->LamureGroup);
 
     return 1;
 }
+
+void LamurePointCloudPlugin::preFrame()
+{
+    if (cover->getPointerButton()->getState() == 1) {
+        osg::Matrixf m = cover->getViewerMat();
+        std::cout << m(0, 0) << " " << m(0, 1) << " " << m(0, 2) << " " << m(0, 3) << std::endl;
+        std::cout << m(1, 0) << " " << m(1, 1) << " " << m(1, 2) << " " << m(1, 3) << std::endl;
+        std::cout << m(2, 0) << " " << m(2, 1) << " " << m(2, 2) << " " << m(2, 3) << std::endl;
+        std::cout << m(3, 0) << " " << m(3, 1) << " " << m(3, 2) << " " << m(3, 3) << std::endl;
+
+        osg::Vec3f t = (cover->getViewerMat()).getTrans();
+        std::cout << "" << std::endl;
+    };
+
+    pointShader->apply(plugin->geo, plugin->drawable);
+
+    // Get the vertex array from the geometry object
+    osg::ref_ptr<osg::Vec3Array> vertices = dynamic_cast<osg::Vec3Array*>(plugin->drawable->getVertexArray());
+    vertices->dirty();
+}
+
+//bool LamurePointCloudPlugin::update() {
+//    return
+//}
+
 
 std::string const LamurePointCloudPlugin::strip_whitespace(std::string const& in_string) {
     return boost::regex_replace(in_string, boost::regex("^ +| +$|( ) +"), "$1");
@@ -710,7 +892,6 @@ bool LamurePointCloudPlugin::parse_prefix(std::string& in_string, std::string co
 
 
 bool LamurePointCloudPlugin::read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code = false) {
-    std::cout << " " << std::endl;
     if (!boost::filesystem::exists(path_string)) {
         std::cout << "WARNING: File " << path_string << "does not exist." << std::endl;
         return false;
@@ -748,7 +929,8 @@ bool LamurePointCloudPlugin::read_shader(std::string const& path_string, std::st
 }
 
 
-void LamurePointCloudPlugin::init_lamure_shader() {
+void LamurePointCloudPlugin::init_lamure_shader()
+{
     device_.reset(new scm::gl::render_device());
     if (!device_) {
         std::cout << "error creating device" << std::endl;
@@ -1600,8 +1782,6 @@ void LamurePointCloudPlugin::covise_display() {
         pvs->set_viewer_position(cam_pos);
     }
 
-    std::cout << (*device_);
-
     if (settings_.lod_update_) {
         if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
             controller->dispatch(context_id, device_, data_provenance_);
@@ -2165,173 +2345,7 @@ void LamurePointCloudPlugin::create_aux_resources() {
 }
 
 
-int LamurePointCloudPlugin::load(const char* filename, osg::Group* loadParent, const char* covise_key)
-{
-    printf("load()\n");
-
-    assert(plugin);
-    std::string lmr_file = std::string(filename);
-    plugin->load_settings(lmr_file);
-
-    osg::ref_ptr<osg::MatrixTransform> matTra = new osg::MatrixTransform();
-
-    settings_.vis_ = settings_.show_normals_ ? 1
-        : settings_.show_accuracy_ ? 2
-        : settings_.show_output_sensitivity_ ? 3
-        : settings_.channel_ > 0 ? 3 + settings_.channel_
-        : 0;
-
-    if (settings_.provenance_ && settings_.json_ != "") {
-        std::cout << "json: " << settings_.json_ << std::endl;
-        data_provenance_ = lamure::ren::Data_Provenance::parse_json(settings_.json_);
-        std::cout << "size of provenance: " << data_provenance_.get_size_in_bytes() << std::endl;
-    }
-
-    lamure::ren::policy* policy = lamure::ren::policy::get_instance();
-    policy->set_max_upload_budget_in_mb(settings_.upload_);
-    policy->set_render_budget_in_mb(settings_.vram_);
-    policy->set_out_of_core_budget_in_mb(settings_.ram_);
-    policy->set_window_width(settings_.width_);
-    policy->set_window_height(settings_.height_);
-    render_width_ = settings_.width_ / settings_.frame_div_;
-    render_height_ = settings_.height_ / settings_.frame_div_;
-
-    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
-    for (const auto& input_file : settings_.models_) {
-        lamure::model_t model_id = database->add_model(input_file, std::to_string(num_models_));
-        model_transformations_.push_back(settings_.transforms_[num_models_] * scm::math::mat4d(scm::math::make_translation(database->get_model(num_models_)->get_bvh()->get_translation())));
-        ++num_models_;
-    }
-    printf("num_models: %i\n", num_models_);
-
-    plugin->init_lamure_shader();
-    plugin->create_framebuffers();
-    plugin->create_aux_resources();
-
-    brush_resource_.buffer_.reset();
-    brush_resource_.array_.reset();
-    selection_.brush_.resize(settings_.max_brush_size_);
-    brush_resource_.buffer_ = device_->create_buffer(scm::gl::BIND_VERTEX_BUFFER, scm::gl::USAGE_STATIC_DRAW, sizeof(xyz) * settings_.max_brush_size_, &selection_.brush_[0]);
-    brush_resource_.array_ = device_->create_vertex_array(scm::gl::vertex_format
-    (0, 0, scm::gl::TYPE_VEC3F, sizeof(xyz))
-        (0, 1, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-        (0, 2, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-        (0, 3, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-        (0, 4, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-        (0, 5, scm::gl::TYPE_FLOAT, sizeof(xyz))
-        (0, 6, scm::gl::TYPE_VEC3F, sizeof(xyz)),
-        boost::assign::list_of(brush_resource_.buffer_));
-
-    if (settings_.background_image_ != "") {
-        //std::cout << "background image: " << settings_.background_image_ << std::endl;
-        scm::gl::texture_loader tl;
-        bg_texture_ = tl.load_texture_2d(*device_, settings_.background_image_, true, false);
-    }
-
-    plugin->init_render_states();
-    plugin->init_camera();
-    //plugin->covise_display();
-
-    plugin->pointSet = new PointSet[1];
-    plugin->pointSet[0].colors = new Color[1024];
-    plugin->pointSet[0].points = new ::Point[1024];
-    plugin->pointSet[0].size = 1024;
-
-    plugin->pointSet = new PointSet[1];
-    plugin->pointSet[0].colors = new Color[1024];
-    plugin->pointSet[0].points = new ::Point[1024];
-    plugin->pointSet[0].size = 1024;
-
-    for (int n = 0; n < 1024; ++n)
-    {
-        plugin->pointSet[0].points[n].coordinates.x() = 1000 + n;
-        plugin->pointSet[0].points[n].coordinates.y() = 1000 + n;
-        plugin->pointSet[0].points[n].coordinates.z() = 1000 + n;
-
-        plugin->pointSet[0].colors[n].r = n / 1024.0;
-        plugin->pointSet[0].colors[n].g = (n + 500) / 2048.0;
-        plugin->pointSet[0].colors[n].b = (n + 500) / 4096.0;
-    }
-
-    
-
-    plugin->preFrame();
-
-    return 1;
-}
-
-
-bool LamurePointCloudPlugin::update() {
-
-    /*osg::Vec3 vecBase = (cover->getViewerMat()).getTrans();
-
-    plugin->covise_display();*/
-
-    return false;
-}
-
-
-
-void LamurePointCloudPlugin::preFrame()
-{
-    //std::vector<xyz> points_to_upload;
-    //for (uint32_t i = 0; i < 1024; ++i) {
-    //    points_to_upload.push_back(
-    //        xyz{ scm::math::vec3f(i/100, (i+100)/100, (i+300)/100) ,
-    //          50, 50, 50, 0,
-    //          settings_.aux_point_size_,
-    //          scm::math::vec3f(1.0, 0.0, 0.0) } //placeholder
-    //    );
-    //}
-
-    //resource points_resource;
-    //points_resource.num_primitives_ = points_to_upload.size();
-    //points_resource.buffer_.reset();
-    //points_resource.array_.reset();
-
-    //points_resource.buffer_ = device_->create_buffer(
-    //    scm::gl::BIND_VERTEX_BUFFER, scm::gl::USAGE_STATIC_DRAW, sizeof(xyz) * points_to_upload.size(), &points_to_upload[0]);
-    //points_resource.array_ = device_->create_vertex_array(scm::gl::vertex_format
-    //(0, 0, scm::gl::TYPE_VEC3F, sizeof(xyz))
-    //    (0, 1, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-    //    (0, 2, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-    //    (0, 3, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-    //    (0, 4, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-    //    (0, 5, scm::gl::TYPE_FLOAT, sizeof(xyz))
-    //    (0, 6, scm::gl::TYPE_VEC3F, sizeof(xyz)),
-    //    boost::assign::list_of(points_resource.buffer_));
-
-    //sparse_resources_[0] = points_resource;
-
-    osg::ref_ptr<osg::MatrixTransform> transform(new osg::MatrixTransform);
-    cover->getObjectsRoot()->addChild(transform);
-    Geode* geo = new Geode();
-    LamureGeometry* drawable = new LamureGeometry(&plugin->pointSet[0]);
-    geo->addDrawable(drawable);
-    transform->addChild(geo);
-
-
-    if (pointShader != nullptr)
-    {
-        pointShader->apply(geo, drawable);
-    }
-    
-    if (cover->getPointerButton()->getState() == 1) {
-        osg::Matrixf m = cover->getViewerMat();
-        std::cout << m(0, 0) << " " << m(0, 1) << " " << m(0, 2) << " " << m(0, 3) << std::endl;
-        std::cout << m(1, 0) << " " << m(1, 1) << " " << m(1, 2) << " " << m(1, 3) << std::endl;
-        std::cout << m(2, 0) << " " << m(2, 1) << " " << m(2, 2) << " " << m(2, 3) << std::endl;
-        std::cout << m(3, 0) << " " << m(3, 1) << " " << m(3, 2) << " " << m(3, 3) << std::endl;
-
-        osg::Vec3f t = (cover->getViewerMat()).getTrans();
-        std::cout << "x=" << t.x() << ", y=" << t.y() << ", z=" << t.z() << std::endl; 
-    };
-
-  
-}
-
-
-int LamurePointCloudPlugin::unload(const char* filename, const char* covise_key)
+int LamurePointCloudPlugin::unloadLMR(const char* filename, const char* covise_key)
 {
     return 1;
 }
@@ -2340,6 +2354,16 @@ int LamurePointCloudPlugin::unload(const char* filename, const char* covise_key)
 void LamurePointCloudPlugin::readMenuConfigData(const char* menu, vector<ImageFileEntry>& menulist, ui::Group* subMenu)
 {
     coCoviseConfig::ScopeEntries entries = coCoviseConfig::getScopeEntries(menu);
+    for (const auto& entry : entries)
+    {
+        ui::Button* temp = new ui::Button(subMenu, entry.second);
+        temp->setCallback([this, entry](bool state)
+            {
+                if (state)
+                printf("createGeodes(planetTrans, entry.second)");
+            });
+        menulist.push_back(ImageFileEntry(entry.first.c_str(), entry.second.c_str(), (ui::Element*)temp));
+    }
 }
 
 void LamurePointCloudPlugin::selectedMenuButton(ui::Element* menuItem)
@@ -2360,8 +2384,5 @@ void LamurePointCloudPlugin::selectedMenuButton(ui::Element* menuItem)
     }
 }
 
-LamurePointCloudPlugin::~LamurePointCloudPlugin()
-{
-    printf("~LamurePointCloudPlugin()\n");
-}
+
 
