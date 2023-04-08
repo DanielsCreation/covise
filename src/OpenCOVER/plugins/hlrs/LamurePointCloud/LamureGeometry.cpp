@@ -29,9 +29,6 @@ LamureGeometry::LamureGeometry(PointSet* pointData)
     setSupportsDisplayList(false);
     setUseVertexBufferObjects(true);
 
-    // maximum point size
-    maxPointSize = 3.0;
-
     // save copy of pointData pointer
     pointSet = pointData;
     vertexBufferArray = getOrCreateVertexBufferObject();
@@ -47,19 +44,16 @@ LamureGeometry::LamureGeometry(PointSet* pointData)
     {
         box.expandBy(data[i].coordinates.x(), data[i].coordinates.y(), data[i].coordinates.z());
     }
-    vertexBufferArray->setArray(0, points);
     setVertexArray(points);
-
-    pointstate = new osg::Point();
-    pointstate->setSize(10.0);
-
+    setColorArray(colors);
+    addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, (int)(pointSet->size)));
 
     stateset = new StateSet();
-    stateset->setMode(GL_LIGHTING, StateAttribute::OFF);
-    stateset->setMode(GL_DEPTH_TEST, StateAttribute::ON);
+    stateset->setMode(GL_LIGHTING, StateAttribute::ON);
+    stateset->setMode(GL_BLEND, StateAttribute::ON);
+    stateset->setMode(GL_POINT_SMOOTH, StateAttribute::ON);
+    stateset->setAttribute(new osg::Point(10.0f), osg::StateAttribute::ON);
     setStateSet(stateset);
-
-    addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, (int)(pointSet->size * 1)));
 }
 
 #if OSG_VERSION_GREATER_OR_EQUAL(3, 3, 2)

@@ -122,6 +122,10 @@ public:
     LamurePointCloudPlugin();
     ~LamurePointCloudPlugin();
     bool init();
+    string getConfigEntry(string scope);
+    const char* stringToConstChar(string str);
+    string extractFilename(const string pathname);
+    void strcpyTail(char* suffix, const char* str, char c);
     const LamurePointCloudPlugin *instance() const;
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
