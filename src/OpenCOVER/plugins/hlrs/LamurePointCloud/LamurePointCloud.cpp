@@ -10,6 +10,8 @@
 #include <vector>
 #include <algorithm>
 #include <list>
+#include <iosfwd>
+#include <sstream>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -31,13 +33,20 @@
 #include <config/coConfigLog.h>
 #include <config/coConfigConstants.h>
 #include <config/coConfig.h>
+#include <cover/ui/SelectionList.h>
+#include <cover/coVRStatsDisplay.h>
+#include <config/coConfigConstants.h>
+#include "C:\src\covise\src\OpenCOVER\cover\ui\FileBrowser.h"
+#include <C:\src\covise\src\3rdparty\deskvox/virvo/virvo/vvtoolshed.h>
+#include <config/coConfigLog.h>
+#include <config/coConfig.h>
+#include <config/coConfigString.h>
+#include <config\coConfigEntryString.h>
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include <cover/coVRStatsDisplay.h>
-#include <config/coConfigConstants.h>
 
     __declspec(dllexport) DWORD NvOptimusEnablement = 1;
     __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
@@ -277,17 +286,17 @@ static FileHandler handler =
     { NULL, 
       LamurePointCloudPlugin::loadLMR, 
       LamurePointCloudPlugin::unloadLMR, 
-      "lmr" 
+      "lmr"
 };
 
 
 // Constructor
 LamurePointCloudPlugin::LamurePointCloudPlugin(): ui::Owner("LamurePointCloud", cover->ui)
 {
-    printf("LamurePointCloudPlugin()\n");
     coVRFileManager::instance()->registerFileHandler(&handler);
     plugin = this;
 }
+
 
 LamurePointCloudPlugin::~LamurePointCloudPlugin()
 {
@@ -300,12 +309,15 @@ LamurePointCloudPlugin::~LamurePointCloudPlugin()
 bool LamurePointCloudPlugin::init() 
 {
     printf("init()\n");
+    cover->addPlugin("Move");
+    cover->addPlugin("Annotation");
+
     std::cerr << "hostname: " << covise::coConfigConstants::getHostname() << std::endl;
-    
+    VRViewer::instance()->statsDisplay->showStats(coVRStatsDisplay::VIEWER_SCENE_STATS, VRViewer::instance());
+
     //Create main menu button
     lamureMenu = new ui::Menu("LamureMenu", this);
     lamureMenu->setText("LamurePlugin");
-    loadMenu = new ui::Menu(lamureMenu, "Load");
 
     //loadGroup = new ui::Group("Load", loadMenu);
     //deleteButton = new ui::Button(fileGroup,"Delete");
@@ -334,9 +346,85 @@ bool LamurePointCloudPlugin::init()
     fileButtonGroup = new ui::ButtonGroup(selectionGroup, "FileButtonGroup");
     fileButtonGroup->enableDeselect(true);
 
-    //read in menu data
+    // Create an OSG drawable
+    // Set up the geometry, vertex and color arrays, etc.
+    // init dummy data
+    plugin->LamureGroup = new osg::Group();
+    plugin->LamureGroup->setName("LamureGroup");
+
+    // Create an OSG Geode to hold the drawable
+    plugin->geo = new osg::Geode();
+    plugin->geo->setName("LamureGeode");
+
+    plugin->pointSet = new PointSet[1];
+    plugin->pointSet[0].colors = new Color[1024];
+    plugin->pointSet[0].points = new ::Point[1024];
+    plugin->pointSet[0].size = 1024;
+
+    for (int n = 0; n < 1024; ++n)
+    {
+        plugin->pointSet[0].points[n].coordinates.x() = 1000 + n;
+        plugin->pointSet[0].points[n].coordinates.y() = 1000 + n;
+        plugin->pointSet[0].points[n].coordinates.z() = 1000 + n;
+
+        plugin->pointSet[0].colors[n].r = n / 1024.0;
+        plugin->pointSet[0].colors[n].g = (n + 500) / 2048.0;
+        plugin->pointSet[0].colors[n].b = (n + 500) / 4096.0;
+    }
+
+    plugin->drawable = new LamureGeometry(&plugin->pointSet[0]);
+    plugin->geo->addDrawable(plugin->drawable.get());
+
+    // Set up Transformation
+    osg::ref_ptr<osg::MatrixTransform> transform = new osg::MatrixTransform();
+    transform->addChild(plugin->geo);
+
+    // Add Group to root
+    plugin->LamureGroup->addChild(transform);
+    cover->getObjectsRoot()->addChild(plugin->LamureGroup);
+
+    std::cout << covise::coConfigDefaultPaths::getDefaultTransformFileName() << std::endl;
+    std::cout << covise::coConfigDefaultPaths::getDefaultLocalConfigFileName() << std::endl;
+    std::cout << covise::coConfigDefaultPaths::getDefaultGlobalConfigFileName() << std::endl;
+
+
+    string path = getConfigEntry("COVER.Plugin.LamurePointCloud");
+    std::cout << path << std::endl;
+
+    //getScopeEntries
+    /*coCoviseConfig::ScopeEntries entries = coCoviseConfig::getScopeEntries("COVER.Plugin.LamurePointCloud");
+    std::cout << "getScopeEntries(): ";
+    std::cout << "[";
+    for (const auto& entry : entries)
+    {
+        std::cout << entry.first.c_str();
+        std::cout << ":";
+        std::cout << entry.second.c_str();
+    }
+    std::cout << "]" << std::endl;*/
+
+    osg::Node* lamureFileNode = coVRFileManager::instance()->loadFile(path.c_str());
+    LamureGroup->addChild(lamureFileNode);
+    
     return 1;
 }
+
+string LamurePointCloudPlugin::getConfigEntry(string scope) {
+    std::cout << "getConfigEntry(): ";
+    coCoviseConfig::ScopeEntries entries = coCoviseConfig::getScopeEntries(scope);
+    for (const auto& entry : entries)
+    {
+        return entry.second;
+    }
+    return "";
+}
+
+
+const char* LamurePointCloudPlugin::stringToConstChar(string str) {
+    const char* cstr = str.c_str();
+    return cstr;
+}
+
 
 const LamurePointCloudPlugin* LamurePointCloudPlugin::instance() const
 {
@@ -345,10 +433,10 @@ const LamurePointCloudPlugin* LamurePointCloudPlugin::instance() const
 
 int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, const char* covise_key)
 {
-    printf("load()\n");
-    std::cout << covise::coConfigDefaultPaths::getDefaultTransformFileName() << std::endl;
+    printf("loadLMR()\n");
+    /*std::cout << covise::coConfigDefaultPaths::getDefaultTransformFileName() << std::endl;
     std::cout << covise::coConfigDefaultPaths::getDefaultLocalConfigFileName() << std::endl;
-    std::cout << covise::coConfigDefaultPaths::getDefaultGlobalConfigFileName() << std::endl;
+    std::cout << covise::coConfigDefaultPaths::getDefaultGlobalConfigFileName() << std::endl;*/
 
     assert(plugin);
     std::string lmr_file = std::string(filename);
@@ -415,50 +503,12 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
     // plugin->covise_display();
 
     //std::cout << (*device_);
-
-    // Create an OSG drawable
-    // Set up the geometry, vertex and color arrays, etc.
-    
-    plugin->LamureGroup = new osg::Group();
-    plugin->LamureGroup->setName("LamureGroup");
-
-    // Create an OSG Geode to hold the drawable
-    plugin->geo = new osg::Geode();
-    plugin->geo->setName("LamureGeode");
-
-    plugin->pointSet = new PointSet[1];
-    plugin->pointSet[0].colors = new Color[1024];
-    plugin->pointSet[0].points = new ::Point[1024];
-    plugin->pointSet[0].size = 1024;
-
-    for (int n = 0; n < 1024; ++n)
-    {
-        plugin->pointSet[0].points[n].coordinates.x() = 1000 + n;
-        plugin->pointSet[0].points[n].coordinates.y() = 1000 + n;
-        plugin->pointSet[0].points[n].coordinates.z() = 1000 + n;
-
-        plugin->pointSet[0].colors[n].r = n / 1024.0;
-        plugin->pointSet[0].colors[n].g = (n + 500) / 2048.0;
-        plugin->pointSet[0].colors[n].b = (n + 500) / 4096.0;
-    }
-
-    plugin->drawable = new LamureGeometry(&plugin->pointSet[0]);
-    plugin->geo->addDrawable(plugin->drawable.get());
-
-    // Set up Transformation
-    osg::ref_ptr<osg::MatrixTransform> transform = new osg::MatrixTransform();
-    transform->addChild(plugin->geo);
-
-    // Add Group to root
-    plugin->LamureGroup->addChild(transform);
-    cover->getObjectsRoot()->addChild(plugin->LamureGroup);
-
     return 1;
 }
 
 void LamurePointCloudPlugin::preFrame()
 {
-    if (cover->getPointerButton()->getState() == 1) {
+    /*if (cover->getPointerButton()->getState() == 1) {
         osg::Matrixf m = cover->getViewerMat();
         std::cout << m(0, 0) << " " << m(0, 1) << " " << m(0, 2) << " " << m(0, 3) << std::endl;
         std::cout << m(1, 0) << " " << m(1, 1) << " " << m(1, 2) << " " << m(1, 3) << std::endl;
@@ -467,13 +517,15 @@ void LamurePointCloudPlugin::preFrame()
 
         osg::Vec3f t = (cover->getViewerMat()).getTrans();
         std::cout << "" << std::endl;
-    };
+    };*/
 
     pointShader->apply(plugin->geo, plugin->drawable);
 
     // Get the vertex array from the geometry object
     osg::ref_ptr<osg::Vec3Array> vertices = dynamic_cast<osg::Vec3Array*>(plugin->drawable->getVertexArray());
+    osg::ref_ptr<osg::Vec3Array> colors = dynamic_cast<osg::Vec3Array*>(plugin->drawable->getColorArray());
     vertices->dirty();
+    colors->dirty();
 }
 
 //bool LamurePointCloudPlugin::update() {
