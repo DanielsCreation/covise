@@ -457,6 +457,7 @@ VRViewer::VRViewer()
     showStats->append("Viewer");
     showStats->append("Viewer+camera");
     showStats->append("Viewer+camera+nodes");
+    showStats->setShared(true);
     cover->viewOptionsMenu->add(showStats);
     showStats->select(coVRConfig::instance()->drawStatistics);
     showStats->setCallback([this](int val){

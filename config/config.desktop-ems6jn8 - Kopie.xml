@@ -17,7 +17,7 @@
       <ShowGeodeName enable="off" value="off"/>
       <LODScale value="1" />
       <RotationSpeed value="10" />
-      <REGISTER_RAW_SCENEGRAPH value="off" />
+      <REGISTER_RAW_SCENEGRAPH value="on" />
       <ScaleAll value="on" />
       <CoordAxis value="off" />
       <Freeze value="off" />
@@ -33,11 +33,9 @@
       <DebugLevel value="2" />
       <ContinuousRendering value="true" />
       <DebugTUI value="off" />
-      <!--  <GLVersion value="3.0" /> -->
+      <SyncToVBlank value="OFF" device="DFP-0" />
       
-      <!-- 
-      <TabletUI host="localhost" /> 
-      -->
+      <TabletUI host="localhost" />
 
       <PipeConfig>
         <Pipe name="0" useDISPLAY="true" />
@@ -48,15 +46,15 @@
       </WindowConfig>
       
       <ScreenConfig>
-        <Screen width="2560" comment="FRONT" h="0.0" originX="0" originY="0" originZ="0" height="1600" p="0.0" r="0.0" name="0" screen="0" />
+        <Screen width="1920" comment="FRONT" h="0.0" originX="0" originY="0" originZ="0" height="1080" p="0.0" r="0.0" name="0" screen="0" />
       </ScreenConfig>
       
       <ViewportConfig>
-        <Viewport width="1" height="1" left="0" bottom="0" windowIndex="0" channelIndex="0" name="0" />
+        <Viewport width="1" height="1" left="0" bottom="0" windowIndex="0" channelIndex="0" name="0"  />
       </ViewportConfig>
       
       <UI>
-        <VRUI toolbar="false" />
+        <VRUI toolbar="true" />
       </UI>
       
       <Input>  
@@ -67,22 +65,17 @@
       </Input>
       
       <Menu>
-        <Position x="900" y="0" z="700" />
-        <Size value=".7" />
+        <Orientation h="0" p="0" r="0" />
+        <Position x="0" y="1000" z="0" />
+        <Size value="0.7" />
       </Menu>
-      
-      <VRB>
-        <Server value="off" />
-        <RemoteFetch value="off" />
-      </VRB>
-      
-      
       
       <Plugin>
         <Vrml97 value="off" />
-        <Annotation value="off" />
+        <Annotation value="on" />
         <Move value="on" />
         <LamurePointCloud value="on" />
+        <RhrClient mpiThread="false" />
         <DistortViewer value="off" />
         <Revit value="off" />
         <HMI value="off" />
@@ -106,12 +99,6 @@
         <Hotspot value="off" />
         <HPWRENViewer value="off" />
         <ThreadedLoader value="off" />
-      </Plugin>
-      
-      <Plugin>
-        <LamurePointCloud>
-          <lmr value="C:/Users/Daniel/Desktop/Ablage/School_one.lmr" />
-        </LamurePointCloud>
 
         <AKToolbar value="false" menu="false">
           <Attachment value="TOP" />
@@ -125,6 +112,15 @@
           <ShortCut value="drive" name="drive" />
           <ShortCut value="fly" name="fly" />
         </AKToolbar>
+        
+        <Vrml97>
+         <StateFixLevel value="100" />
+         <TextureCounter value="ON" />
+         <Texture mode="MODULATE" quality="High" />
+         <TransparencyMode value="sorted_blended" />
+         <Headlight value="ON" />
+         <Lights value="ON" />
+        </Vrml97>
       </Plugin>
     </COVER>
     
@@ -136,8 +132,12 @@
         <ModuleAlias value="Renderer/OpenCOVER" name="Renderer/VRRenderer" />
         <ModuleAlias value="Renderer/OpenCOVER" name="Renderer/Renderer" />
         <ModuleAlias value="Renderer/OpenCOVER" name="Renderer/COVER" />
+        <ModuleAlias value="Renderer/OpenCOVER" name="Renderer/COVER_VRML" />
       </CRB>
 
+      <VRB>
+        <RemoteFetch value="off" path="C:/src/covise/remoteFetch" />
+      </VRB>
     </System>
     
   </GLOBAL>

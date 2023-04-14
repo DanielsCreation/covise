@@ -65,7 +65,7 @@ void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const
     int main_memory_budget = 4096;
 
 
-    lamure::ren::policy* policy = lamure::ren::policy::get_instance();
+    policy* policy = policy::get_instance();
     policy->set_max_upload_budget_in_mb(max_upload_budget); //8
     policy->set_render_budget_in_mb(video_memory_budget); //2048
     policy->set_out_of_core_budget_in_mb(main_memory_budget); //4096, 8192
@@ -73,7 +73,7 @@ void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const
     policy->set_window_height(coVRConfig::instance()->windows[0].sy);
 
 
-    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
+    model_database* database = model_database::get_instance();
 
     std::vector<scm::math::mat4d> parsed_views = std::vector<scm::math::mat4d>();
 

@@ -21,22 +21,15 @@
 #include <boost/regex/v4/regex.hpp>
 #include <boost/regex/v4/regex_replace.hpp>
 
-//lamure
-#include <lamure/ren/config.h>
-#include <lamure/ren/model_database.h>
-#include <lamure/ren/cut_database.h>
-#include <lamure/ren/dataset.h>
-#include <lamure/ren/policy.h>
-#include <lamure/pvs/pvs_database.h>
-
 #include <config/coConfigConstants.h>
 #include <config/coConfigLog.h>
 #include <config/coConfigConstants.h>
 #include <config/coConfig.h>
 #include <cover/ui/SelectionList.h>
 #include <cover/coVRStatsDisplay.h>
+#include <cover/VRSceneGraph.h>
 #include <config/coConfigConstants.h>
-#include "C:\src\covise\src\OpenCOVER\cover\ui\FileBrowser.h"
+#include <C:\src\covise\src\OpenCOVER\cover\ui\FileBrowser.h>
 #include <C:\src\covise\src\3rdparty\deskvox/virvo/virvo/vvtoolshed.h>
 #include <config/coConfigLog.h>
 #include <config/coConfig.h>
@@ -62,13 +55,13 @@ int32_t render_height_ = 720;
 int32_t num_models_ = 0;
 std::vector<scm::math::mat4d> model_transformations_;
 
-lamure::ren::camera* camera_ = nullptr;
+camera* camera_ = nullptr;
 
 double fps_ = 0.0;
 uint64_t rendered_splats_ = 0;
 uint64_t rendered_nodes_ = 0;
 
-lamure::ren::Data_Provenance data_provenance_;
+Data_Provenance data_provenance_;
 float height_divided_by_top_minus_bottom_ = 0.f;
 scm::shared_ptr<scm::gl::render_device> device_;
 scm::shared_ptr<scm::gl::render_context> context_;
@@ -136,7 +129,7 @@ struct input {
     bool brush_mode_ = 0;
     bool brush_clear_ = 0;
     bool gui_lock_ = false;
-    lamure::ren::camera::mouse_state mouse_state_;
+    camera::mouse_state mouse_state_;
     bool keys_[3] = { 0, 0, 0 };
 };
 input input_;
@@ -313,7 +306,6 @@ bool LamurePointCloudPlugin::init()
     cover->addPlugin("Annotation");
 
     std::cerr << "hostname: " << covise::coConfigConstants::getHostname() << std::endl;
-    VRViewer::instance()->statsDisplay->showStats(coVRStatsDisplay::VIEWER_SCENE_STATS, VRViewer::instance());
 
     //Create main menu button
     lamureMenu = new ui::Menu("LamureMenu", this);
@@ -383,15 +375,10 @@ bool LamurePointCloudPlugin::init()
     plugin->LamureGroup->addChild(transform);
     cover->getObjectsRoot()->addChild(plugin->LamureGroup);
 
-    std::cout << covise::coConfigDefaultPaths::getDefaultTransformFileName() << std::endl;
-    std::cout << covise::coConfigDefaultPaths::getDefaultLocalConfigFileName() << std::endl;
-    std::cout << covise::coConfigDefaultPaths::getDefaultGlobalConfigFileName() << std::endl;
+    //std::cout << covise::coConfigDefaultPaths::getDefaultTransformFileName() << std::endl;
+    //std::cout << covise::coConfigDefaultPaths::getDefaultLocalConfigFileName() << std::endl;
+    //std::cout << covise::coConfigDefaultPaths::getDefaultGlobalConfigFileName() << std::endl;
 
-
-    string path = getConfigEntry("COVER.Plugin.LamurePointCloud");
-    std::cout << path << std::endl;
-
-    //getScopeEntries
     /*coCoviseConfig::ScopeEntries entries = coCoviseConfig::getScopeEntries("COVER.Plugin.LamurePointCloud");
     std::cout << "getScopeEntries(): ";
     std::cout << "[";
@@ -403,8 +390,11 @@ bool LamurePointCloudPlugin::init()
     }
     std::cout << "]" << std::endl;*/
 
-    osg::Node* lamureFileNode = coVRFileManager::instance()->loadFile(path.c_str());
-    LamureGroup->addChild(lamureFileNode);
+    osg::Node* lamureFileNode = coVRFileManager::instance()->loadFile(getConfigEntry("COVER.Plugin.LamurePointCloud").c_str());
+    transform->addChild(lamureFileNode);
+
+    VRSceneGraph::instance()->viewAll();
+    VRViewer::instance()->statsDisplay->showStats(coVRStatsDisplay::VIEWER_SCENE_STATS, VRViewer::instance());
     
     return 1;
 }
@@ -449,11 +439,11 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
 
     if (settings_.provenance_ && settings_.json_ != "") {
         std::cout << "json: " << settings_.json_ << std::endl;
-        data_provenance_ = lamure::ren::Data_Provenance::parse_json(settings_.json_);
-        std::cout << "size of provenance: " << data_provenance_.get_size_in_bytes() << std::endl;
+        data_provenance_ = Data_Provenance::parse_json(settings_.json_);
+        //std::cout << "size of provenance: " << data_provenance_.get_size_in_bytes() << std::endl;
     }
 
-    lamure::ren::policy* policy = lamure::ren::policy::get_instance();
+    policy* policy = policy::get_instance();
     policy->set_max_upload_budget_in_mb(settings_.upload_);
     policy->set_render_budget_in_mb(settings_.vram_);
     policy->set_out_of_core_budget_in_mb(settings_.ram_);
@@ -462,47 +452,29 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
     render_width_ = settings_.width_ / settings_.frame_div_;
     render_height_ = settings_.height_ / settings_.frame_div_;
 
-    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
+    model_database* database = model_database::get_instance();
     for (const auto& input_file : settings_.models_) {
-        lamure::model_t model_id = database->add_model(input_file, std::to_string(num_models_));
+        model_t model_id = database->add_model(input_file, std::to_string(num_models_));
         model_transformations_.push_back(settings_.transforms_[num_models_] * scm::math::mat4d(scm::math::make_translation(database->get_model(num_models_)->get_bvh()->get_translation())));
         ++num_models_;
     }
 
     printf("num_models: %i\n", num_models_);
 
-    //osgViewer::ViewerBase* viewer = new osgViewer::Viewer;
-    /*drawStatistics = coCoviseConfig::isOn("COVER.Statistics", false) ? coVRStatsDisplay::VIEWER_STATS : coVRStatsDisplay::NO_STATS;
-    viewer->opencover::coVRStatsDisplay::showStats(0, viewer);*/
-
-    //brush_resource_.buffer_.reset();
-    //brush_resource_.array_.reset();
-    //selection_.brush_.resize(settings_.max_brush_size_);
-    //brush_resource_.buffer_ = device_->create_buffer(scm::gl::BIND_VERTEX_BUFFER, scm::gl::USAGE_STATIC_DRAW, sizeof(xyz) * settings_.max_brush_size_, &selection_.brush_[0]);
-    //brush_resource_.array_ = device_->create_vertex_array(scm::gl::vertex_format
-    //(0, 0, scm::gl::TYPE_VEC3F, sizeof(xyz))
-    //    (0, 1, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-    //    (0, 2, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-    //    (0, 3, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-    //    (0, 4, scm::gl::TYPE_UBYTE, sizeof(xyz), scm::gl::INT_FLOAT_NORMALIZE)
-    //    (0, 5, scm::gl::TYPE_FLOAT, sizeof(xyz))
-    //    (0, 6, scm::gl::TYPE_VEC3F, sizeof(xyz)),
-    //    boost::assign::list_of(brush_resource_.buffer_));
-
-    //if (settings_.background_image_ != "") {
-    //    //std::cout << "background image: " << settings_.background_image_ << std::endl;
-    //    scm::gl::texture_loader tl;
-    //    bg_texture_ = tl.load_texture_2d(*device_, settings_.background_image_, true, false);
-    //}
-
     //plugin->init_lamure_shader();
-    /*plugin->create_framebuffers();
-    plugin->create_aux_resources();
-    plugin->init_render_states();
-    plugin->init_camera();*/
-    // plugin->covise_display();
+
+    //plugin->create_framebuffers();
+    //plugin->create_aux_resources();
+    //plugin->init_render_states();
+    //plugin->init_camera();
+
+    //plugin->covise_display();
 
     //std::cout << (*device_);
+
+
+    //std::cout << opencover::coVRConfig::instance()->glVersion << std::endl;
+
     return 1;
 }
 
@@ -575,7 +547,7 @@ void LamurePointCloudPlugin::load_settings(std::string const& filename) {
         exit(-1);
     }
     else {
-        lamure::model_t model_id = 0;
+        model_t model_id = 0;
         std::string line;
         while (std::getline(lmr_file, line)) {
             if (line.length() >= 2) {
@@ -982,7 +954,8 @@ bool LamurePointCloudPlugin::read_shader(std::string const& path_string, std::st
 
 
 void LamurePointCloudPlugin::init_lamure_shader()
-{
+{   
+    std::cout << "init_lamure_shader()" << std::endl;
     device_.reset(new scm::gl::render_device());
     if (!device_) {
         std::cout << "error creating device" << std::endl;
@@ -991,6 +964,8 @@ void LamurePointCloudPlugin::init_lamure_shader()
     if (!context_) {
         std::cout << "error creating context" << std::endl;
     }
+    std::cout << device_->device_context_version() << std::endl;
+
     try
     {
         std::string vis_quad_vs_source;
@@ -1243,7 +1218,7 @@ void LamurePointCloudPlugin::init_render_states() {
 }
 
 void LamurePointCloudPlugin::init_camera() {
-    auto root_bb = lamure::ren::model_database::get_instance()->get_model(0)->get_bvh()->get_bounding_boxes()[0];
+    auto root_bb = model_database::get_instance()->get_model(0)->get_bvh()->get_bounding_boxes()[0];
     auto root_bb_min = scm::math::mat4f(model_transformations_[0]) * root_bb.min_vertex();
     auto root_bb_max = scm::math::mat4f(model_transformations_[0]) * root_bb.max_vertex();
     scm::math::vec3f center = (root_bb_min + root_bb_max) / 2.f;
@@ -1252,7 +1227,7 @@ void LamurePointCloudPlugin::init_camera() {
     std::cout << root_bb_max << std::endl;
     std::cout << center << std::endl;
 
-    camera_ = new lamure::ren::camera(0,
+    camera_ = new camera(0,
         make_look_at_matrix(center + scm::math::vec3f(0.f, 0.1f, -0.01f), center, scm::math::vec3f(0.f, 1.f, 0.f)),
         length(root_bb_max - root_bb_min), false, false);
     camera_->set_dolly_sens_(settings_.travel_speed_);
@@ -1301,19 +1276,19 @@ void LamurePointCloudPlugin::set_uniforms(scm::gl::program_ptr shader) {
 }
 
 
-void LamurePointCloudPlugin::draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader) {
+void LamurePointCloudPlugin::draw_all_models(const context_t context_id, const view_t view_id, scm::gl::program_ptr shader) {
     std::cout << "draw_all_models()" << std::endl;
-    lamure::ren::controller* controller = lamure::ren::controller::get_instance();
-    lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
-    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
+    controller* controller = controller::get_instance();
+    cut_database* cuts = cut_database::get_instance();
+    model_database* database = model_database::get_instance();
     lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
-    if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+    if (policy::get_instance()->size_of_provenance() > 0) {
         context_->bind_vertex_array(
-            controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_, data_provenance_));
+            controller->get_context_memory(context_id, bvh::primitive_type::POINTCLOUD, device_, data_provenance_));
     }
     else {
         context_->bind_vertex_array(
-            controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_));
+            controller->get_context_memory(context_id, bvh::primitive_type::POINTCLOUD, device_));
     }
     context_->apply();
 
@@ -1327,11 +1302,11 @@ void LamurePointCloudPlugin::draw_all_models(const lamure::context_t context_id,
             //else continue; //don't show lod when sparse is already shown
             else draw = false;
         }
-        lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
-        lamure::ren::cut& cut = cuts->get_cut(context_id, view_id, m_id);
-        std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
-        const lamure::ren::bvh* bvh = database->get_model(m_id)->get_bvh();
-        if (bvh->get_primitive() != lamure::ren::bvh::primitive_type::POINTCLOUD) {
+        model_t m_id = controller->deduce_model_id(std::to_string(model_id));
+        cut& cut = cuts->get_cut(context_id, view_id, m_id);
+        std::vector<cut::node_slot_aggregate> renderable = cut.complete_set();
+        const bvh* bvh = database->get_model(m_id)->get_bvh();
+        if (bvh->get_primitive() != bvh::primitive_type::POINTCLOUD) {
             if (selection_.selected_model_ != -1) break;
             //else continue;
             else draw = false;
@@ -1371,10 +1346,10 @@ void LamurePointCloudPlugin::draw_all_models(const lamure::context_t context_id,
 
             if (node_culling_result != 1) {
                 
-                if (settings_.use_pvs_ && pvs->is_activated() && settings_.pvs_culling_
+                /*if (settings_.use_pvs_ && pvs->is_activated() && settings_.pvs_culling_
                     && !lamure::pvs::pvs_database::get_instance()->get_viewer_visibility(model_id, node_slot_aggregate.node_id_)) {
                     continue;
-                }
+                }*/
                 
                 if (settings_.show_accuracy_) {
                     const float accuracy = 1.0 - (bvh->get_depth_of_node(node_slot_aggregate.node_id_) * 1.0) / (bvh->get_depth() - 1);
@@ -1526,7 +1501,7 @@ void apply_vt_cut_update() {
 }
 
 
-void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, const lamure::view_t view_id) {
+void LamurePointCloudPlugin::draw_resources(const context_t context_id, const view_t view_id) {
     if (sparse_resources_.size() > 0) {
         if ((settings_.show_sparse_ || settings_.show_views_) && sparse_resources_.size() > 0) {
 
@@ -1718,10 +1693,10 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
 
     if (settings_.show_bvhs_) {
 
-        lamure::ren::controller* controller = lamure::ren::controller::get_instance();
-        lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
-        lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
-        lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
+        controller* controller = controller::get_instance();
+        cut_database* cuts = cut_database::get_instance();
+        model_database* database = model_database::get_instance();
+        //lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
 
         context_->bind_program(vis_line_shader_);
 
@@ -1737,11 +1712,11 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
             }
 
             bool draw = true;
-            lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
-            lamure::ren::cut& cut = cuts->get_cut(context_id, view_id, m_id);
-            std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
-            const lamure::ren::bvh* bvh = database->get_model(m_id)->get_bvh();
-            if (bvh->get_primitive() != lamure::ren::bvh::primitive_type::POINTCLOUD) {
+            model_t m_id = controller->deduce_model_id(std::to_string(model_id));
+            cut& cut = cuts->get_cut(context_id, view_id, m_id);
+            std::vector<cut::node_slot_aggregate> renderable = cut.complete_set();
+            const bvh* bvh = database->get_model(m_id)->get_bvh();
+            if (bvh->get_primitive() != bvh::primitive_type::POINTCLOUD) {
                 if (selection_.selected_model_ != -1) break;
                 else draw = false;
             }
@@ -1764,9 +1739,9 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
 
                         if (node_culling_result != 1) {
                             
-                            if (settings_.use_pvs_ && pvs->is_activated() && settings_.pvs_culling_ && !lamure::pvs::pvs_database::get_instance()->get_viewer_visibility(model_id, node_slot_aggregate.node_id_)) {
+                            /*if (settings_.use_pvs_ && pvs->is_activated() && settings_.pvs_culling_ && !lamure::pvs::pvs_database::get_instance()->get_viewer_visibility(model_id, node_slot_aggregate.node_id_)) {
                                 continue;
-                            }
+                            }*/
                             
                             context_->draw_arrays(scm::gl::PRIMITIVE_LINE_LIST, node_slot_aggregate.node_id_ * 24, 24);
                         }
@@ -1803,46 +1778,46 @@ void LamurePointCloudPlugin::covise_display() {
     }
     rendering_ = true;
     camera_->set_projection_matrix(settings_.fov_, float(settings_.width_) / float(settings_.height_), settings_.near_plane_, settings_.far_plane_);
-    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
-    lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
-    lamure::ren::controller* controller = lamure::ren::controller::get_instance();
-    lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
-    if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+    model_database* database = model_database::get_instance();
+    cut_database* cuts = cut_database::get_instance();
+    controller* controller = controller::get_instance();
+    //lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
+    if (policy::get_instance()->size_of_provenance() > 0) {
         controller->reset_system(data_provenance_);
     }
     else {
         controller->reset_system();
     }
-    lamure::context_t context_id = controller->deduce_context_id(0);
-    for (lamure::model_t model_id = 0; model_id < settings_.models_.size(); ++model_id) {
-        lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
+    context_t context_id = controller->deduce_context_id(0);
+    for (model_t model_id = 0; model_id < settings_.models_.size(); ++model_id) {
+        model_t m_id = controller->deduce_model_id(std::to_string(model_id));
         cuts->send_transform(context_id, m_id, scm::math::mat4f(model_transformations_[m_id]));
         cuts->send_threshold(context_id, m_id, settings_.lod_error_);
         cuts->send_rendered(context_id, m_id);
         database->get_model(m_id)->set_transform(scm::math::mat4f(model_transformations_[m_id]));
     }
-    lamure::view_t cam_id = controller->deduce_view_id(context_id, camera_->view_id());
+    view_t cam_id = controller->deduce_view_id(context_id, camera_->view_id());
     cuts->send_camera(context_id, cam_id, *camera_);
     std::vector<scm::math::vec3d> corner_values = camera_->get_frustum_corners();
     double top_minus_bottom = scm::math::length((corner_values[2]) - (corner_values[0]));
-    height_divided_by_top_minus_bottom_ = lamure::ren::policy::get_instance()->window_height() / top_minus_bottom;
+    height_divided_by_top_minus_bottom_ = policy::get_instance()->window_height() / top_minus_bottom;
     cuts->send_height_divided_by_top_minus_bottom(context_id, cam_id, height_divided_by_top_minus_bottom_);
 
     if (settings_.use_pvs_) {
         scm::math::mat4f cm = scm::math::inverse(scm::math::mat4f(camera_->trackball_matrix()));
         scm::math::vec3d cam_pos = scm::math::vec3d(cm[12], cm[13], cm[14]);
-        pvs->set_viewer_position(cam_pos);
+        //pvs->set_viewer_position(cam_pos);
     }
 
     if (settings_.lod_update_) {
-        if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+        if (policy::get_instance()->size_of_provenance() > 0) {
             controller->dispatch(context_id, device_, data_provenance_);
         }
         else {
             controller->dispatch(context_id, device_);
         }
     }
-    lamure::view_t view_id = controller->deduce_view_id(context_id, camera_->view_id());
+    view_t view_id = controller->deduce_view_id(context_id, camera_->view_id());
     context_->set_rasterizer_state(no_backface_culling_rasterizer_state_);
 
     // 
@@ -1863,19 +1838,19 @@ void LamurePointCloudPlugin::covise_display() {
     draw_brush(vis_xyz_pass1_shader_);
 }
 
-void LamurePointCloudPlugin::co_draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader) {
+void LamurePointCloudPlugin::co_draw_all_models(const context_t context_id, const view_t view_id, scm::gl::program_ptr shader) {
     std::cout << "co_draw_all_models()" << std::endl;
-    lamure::ren::controller* controller = lamure::ren::controller::get_instance();
-    lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
-    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
-    lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
-    if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+    controller* controller = controller::get_instance();
+    cut_database* cuts = cut_database::get_instance();
+    model_database* database = model_database::get_instance();
+    //lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
+    if (policy::get_instance()->size_of_provenance() > 0) {
         context_->bind_vertex_array(
-            controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_, data_provenance_));
+            controller->get_context_memory(context_id, bvh::primitive_type::POINTCLOUD, device_, data_provenance_));
     }
     else {
         context_->bind_vertex_array(
-            controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_));
+            controller->get_context_memory(context_id, bvh::primitive_type::POINTCLOUD, device_));
     }
     context_->apply();
 
@@ -1889,11 +1864,11 @@ void LamurePointCloudPlugin::co_draw_all_models(const lamure::context_t context_
             //else continue; //don't show lod when sparse is already shown
             else draw = false;
         }
-        lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
-        lamure::ren::cut& cut = cuts->get_cut(context_id, view_id, m_id);
-        std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
-        const lamure::ren::bvh* bvh = database->get_model(m_id)->get_bvh();
-        if (bvh->get_primitive() != lamure::ren::bvh::primitive_type::POINTCLOUD) {
+        model_t m_id = controller->deduce_model_id(std::to_string(model_id));
+        cut& cut = cuts->get_cut(context_id, view_id, m_id);
+        std::vector<cut::node_slot_aggregate> renderable = cut.complete_set();
+        const bvh* bvh = database->get_model(m_id)->get_bvh();
+        if (bvh->get_primitive() != bvh::primitive_type::POINTCLOUD) {
             if (selection_.selected_model_ != -1) break;
             //else continue;
             else draw = false;
@@ -1933,10 +1908,10 @@ void LamurePointCloudPlugin::co_draw_all_models(const lamure::context_t context_
 
             if (node_culling_result != 1) {
 
-                if (settings_.use_pvs_ && pvs->is_activated() && settings_.pvs_culling_
+                /*if (settings_.use_pvs_ && pvs->is_activated() && settings_.pvs_culling_
                     && !lamure::pvs::pvs_database::get_instance()->get_viewer_visibility(model_id, node_slot_aggregate.node_id_)) {
                     continue;
-                }
+                }*/
 
                 if (settings_.show_accuracy_) {
                     const float accuracy = 1.0 - (bvh->get_depth_of_node(node_slot_aggregate.node_id_) * 1.0) / (bvh->get_depth() - 1);
@@ -1973,48 +1948,48 @@ void LamurePointCloudPlugin::lamure_display() {
     }
     rendering_ = true;
     camera_->set_projection_matrix(settings_.fov_, float(settings_.width_) / float(settings_.height_), settings_.near_plane_, settings_.far_plane_);
-    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
-    lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
-    lamure::ren::controller* controller = lamure::ren::controller::get_instance();
-    lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
-    if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+    model_database* database = model_database::get_instance();
+    cut_database* cuts = cut_database::get_instance();
+    controller* controller = controller::get_instance();
+    //lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
+    if (policy::get_instance()->size_of_provenance() > 0) {
         controller->reset_system(data_provenance_);
     }
     else {
         controller->reset_system();
     }
-    lamure::context_t context_id = controller->deduce_context_id(0);
-    for (lamure::model_t model_id = 0; model_id < num_models_; ++model_id) {
-        lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
+    context_t context_id = controller->deduce_context_id(0);
+    for (model_t model_id = 0; model_id < num_models_; ++model_id) {
+        model_t m_id = controller->deduce_model_id(std::to_string(model_id));
         cuts->send_transform(context_id, m_id, scm::math::mat4f(model_transformations_[m_id]));
         cuts->send_threshold(context_id, m_id, settings_.lod_error_);
         cuts->send_rendered(context_id, m_id);
         database->get_model(m_id)->set_transform(scm::math::mat4f(model_transformations_[m_id]));
     }
-    lamure::view_t cam_id = controller->deduce_view_id(context_id, camera_->view_id());
+    view_t cam_id = controller->deduce_view_id(context_id, camera_->view_id());
     cuts->send_camera(context_id, cam_id, *camera_);
     std::vector<scm::math::vec3d> corner_values = camera_->get_frustum_corners();
     double top_minus_bottom = scm::math::length((corner_values[2]) - (corner_values[0]));
-    height_divided_by_top_minus_bottom_ = lamure::ren::policy::get_instance()->window_height() / top_minus_bottom;
+    height_divided_by_top_minus_bottom_ = policy::get_instance()->window_height() / top_minus_bottom;
     cuts->send_height_divided_by_top_minus_bottom(context_id, cam_id, height_divided_by_top_minus_bottom_);
 
     if (settings_.use_pvs_) {
         scm::math::mat4f cm = scm::math::inverse(scm::math::mat4f(camera_->trackball_matrix()));
         scm::math::vec3d cam_pos = scm::math::vec3d(cm[12], cm[13], cm[14]);
-        pvs->set_viewer_position(cam_pos);
+        //pvs->set_viewer_position(cam_pos);
     }
 
     std::cout << (*device_);
 
     if (settings_.lod_update_) {
-        if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+        if (policy::get_instance()->size_of_provenance() > 0) {
             controller->dispatch(context_id, device_, data_provenance_);
         }
         else {
             controller->dispatch(context_id, device_);
         }
     }
-    lamure::view_t view_id = controller->deduce_view_id(context_id, camera_->view_id());
+    view_t view_id = controller->deduce_view_id(context_id, camera_->view_id());
     context_->set_rasterizer_state(no_backface_culling_rasterizer_state_);
 
     if (settings_.splatting_) {
@@ -2149,7 +2124,7 @@ void LamurePointCloudPlugin::create_aux_resources() {
 
     //create bvh representation
     for (uint32_t model_id = 0; model_id < num_models_; ++model_id) {
-        const auto& bounding_boxes = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
+        const auto& bounding_boxes = model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
 
         resource bvh_line_resource;
         bvh_line_resource.buffer_.reset();
@@ -2256,7 +2231,7 @@ void LamurePointCloudPlugin::create_aux_resources() {
             octree_resource.num_primitives_ = octree_lines_to_upload.size();
             octree_resources_[model_id] = octree_resource;
 
-            auto root_bb = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes()[0];
+            auto root_bb = model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes()[0];
             auto root_bb_min = scm::math::mat4f(model_transformations_[model_id]) * root_bb.min_vertex();
             auto root_bb_max = scm::math::mat4f(model_transformations_[model_id]) * root_bb.max_vertex();
             auto model_dim = scm::math::length(root_bb_max - root_bb_min);
