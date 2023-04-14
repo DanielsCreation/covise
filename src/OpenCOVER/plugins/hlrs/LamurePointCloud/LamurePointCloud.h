@@ -11,21 +11,33 @@
 //#include <boost/lexical_cast.hpp>
 //#include <boost/filesystem.hpp>
 
+
 //lamure
-#include <lamure/types.h>
-#include <lamure/ren/config.h>
-#include <lamure/ren/model_database.h>
-#include <lamure/ren/cut_database.h>
-#include <lamure/ren/dataset.h>
-#include <lamure/ren/controller.h>
-#include <lamure/ren/policy.h>
-//#include <lamure/pvs/pvs_database.h>
-//#include <lamure/ren/ray.h>
-//#include <lamure/prov/prov_aux.h>
+#include <types.h>
+#include <config.h>
+#include <model_database.h>
+#include <cut_database.h>
+#include <dataset.h>
+#include <controller.h>
+#include <policy.h>
+#include <ray.h>
+
 #include <lamure/prov/octree.h>
 #include <lamure/vt/VTConfig.h>
 #include <lamure/vt/ren/CutDatabase.h>
 #include <lamure/vt/ren/CutUpdate.h>
+
+//lamure
+//#include <lamure/types.h>
+//#include <lamure/ren/config.h>
+//#include <lamure/ren/model_database.h>
+//#include <lamure/ren/cut_database.h>
+//#include <lamure/ren/dataset.h>
+//#include <lamure/ren/controller.h>
+//#include <lamure/ren/policy.h>
+#include <lamure/pvs/pvs_database.h>
+//#include <lamure/ren/ray.h>
+//#include <lamure/prov/prov_aux.h>
 //#include <lamure/vt/pre/AtlasFile.h>
 
 //schism
@@ -134,12 +146,12 @@ public:
     //bool update();
     void set_uniforms(scm::gl::program_ptr shader);
     void lamure_display();
-    void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader);
+    void draw_all_models(const context_t context_id, const view_t view_id, scm::gl::program_ptr shader);
     void draw_brush(scm::gl::program_ptr shader);
-    void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
+    void draw_resources(const context_t context_id, const view_t view_id);
     void covise_display();
     void create_aux_resources();
-    void co_draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader);
+    void co_draw_all_models(const context_t context_id, const view_t view_id, scm::gl::program_ptr shader);
     bool parse_prefix(std::string& in_string, std::string const& prefix);
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void init_lamure_shader();
