@@ -1,0 +1,145 @@
+<?xml version="1.0"?>
+
+<COCONFIG version="1" >
+
+<INCLUDE global="1" configname="colormap" >config-colormaps.xml </INCLUDE>
+<INCLUDE global="1" configname="filetypes" >config-filetypes.xml </INCLUDE>
+
+  <GLOBAL>
+    <COVER>
+      <WelcomeMessage value="Welcome to OpenCOVER with custom config file" />
+      <Multisample value="on" numSamples="4" numBuffers="1" mode="DONT_CARE" />
+      <NavigationMode value="XForm" />
+      <Stereo value="false" />
+      <CollisionDist value="1500" />
+      <Background r="0.5" g="0.5" b="1.0" /> 
+      <MultiThreaded value="false" />
+      <ShowGeodeName enable="off" value="off"/>
+      <LODScale value="1" />
+      <RotationSpeed value="10" />
+      <REGISTER_RAW_SCENEGRAPH value="on" />
+      <ScaleAll value="on" />
+      <CoordAxis value="off" />
+      <Freeze value="off" />
+      <FPS value="on" />
+      <ConstantInteractorSize value="off"/>
+      <Restrict value="off" />
+      <ScaleWithInteractors value="on"/>
+      <TwoSide value="on" />
+      <TransparencyMode value="sorted_blended" />
+      <Headlight value="on" />
+      <RenderOnMaster value="true" />
+      <Statistics value="true" />
+      <DebugLevel value="2" />
+      <ContinuousRendering value="true" />
+      <DebugTUI value="off" />
+      <SyncToVBlank value="OFF" device="DFP-0" />
+      
+      <TabletUI host="localhost" />
+
+      <PipeConfig>
+        <Pipe name="0" useDISPLAY="true" />
+      </PipeConfig>
+      
+      <WindowConfig>
+        <Window type="Qt" width="800" height="450" comment="FRONT" window="0" pipeIndex="0" left="150" top="0" name="0" embedded="false" decoration="true" />
+      </WindowConfig>
+      
+      <ScreenConfig>
+        <Screen width="1920" comment="FRONT" h="0.0" originX="0" originY="0" originZ="0" height="1080" p="0.0" r="0.0" name="0" screen="0" />
+      </ScreenConfig>
+      
+      <ViewportConfig>
+        <Viewport width="1" height="1" left="0" bottom="0" windowIndex="0" channelIndex="0" name="0"  />
+      </ViewportConfig>
+      
+      <UI>
+        <VRUI toolbar="true" />
+      </UI>
+      
+      <Input>  
+        <DebugButtons value="true" />
+        <ButtonSystem value="MOUSE" />
+        <TrackingSystem value="MOUSE" />
+        <MouseNav value="on" />
+      </Input>
+      
+      <Menu>
+        <Orientation h="0" p="0" r="0" />
+        <Position x="0" y="1000" z="0" />
+        <Size value="0.7" />
+      </Menu>
+      
+      <Plugin>
+        <Vrml97 value="off" />
+        <Annotation value="on" />
+        <Move value="on" />
+        <LamurePointCloud value="on" />
+        <RhrClient mpiThread="false" />
+        <DistortViewer value="off" />
+        <Revit value="off" />
+        <HMI value="off" />
+        <ClipPlane value="off" />
+        <FileBrowser value="off" />
+        <PDB value="off" />
+        <AirCurrents value="off" />
+        <OssimPlanet value="off" />
+        <Image value="off" />
+        <PointModel value="off" />
+        <MipMapVideo value="off" />
+        <MultiVolume value="off" />
+        <Volume value="off" />
+        <ArtifactVis value="off" />
+        <Talha value="off" />
+        <WebMonitor value="off" />
+        <Seismic value="off" /> 
+        <StructView value="off" />
+        <ModelLoader value="off" />
+        <PhotosynthVR value="off" />
+        <Hotspot value="off" />
+        <HPWRENViewer value="off" />
+        <ThreadedLoader value="off" />
+
+        <AKToolbar value="false" menu="false">
+          <Attachment value="TOP" />
+          <Scale value=".7" />
+          <MinClickTime value="0.2" />
+          <Position x="-900" y="0" z="360" />
+          <ShortCut value="viewall" name="viewall" />
+          <ShortCut value="scale" name="scale" />
+          <ShortCut value="xform" name="xform" />
+          <ShortCut value="walk" name="walk" />
+          <ShortCut value="drive" name="drive" />
+          <ShortCut value="fly" name="fly" />
+        </AKToolbar>
+        
+        <Vrml97>
+         <StateFixLevel value="100" />
+         <TextureCounter value="ON" />
+         <Texture mode="MODULATE" quality="High" />
+         <TransparencyMode value="sorted_blended" />
+         <Headlight value="ON" />
+         <Lights value="ON" />
+        </Vrml97>
+      </Plugin>
+    </COVER>
+    
+    <System>
+      <CRB>
+        <ModuleAlias name="Renderer/Renderer" value="Renderer/IvRenderer" arch="x11"/>
+        <ModuleAlias name="Renderer/Renderer" value="Renderer/QtRenderer" arch="windows"/>
+        <ModuleAlias name="Renderer/Renderer" value="Renderer/QtRenderer" arch="mac"/>
+        <ModuleAlias value="Renderer/OpenCOVER" name="Renderer/VRRenderer" />
+        <ModuleAlias value="Renderer/OpenCOVER" name="Renderer/Renderer" />
+        <ModuleAlias value="Renderer/OpenCOVER" name="Renderer/COVER" />
+        <ModuleAlias value="Renderer/OpenCOVER" name="Renderer/COVER_VRML" />
+      </CRB>
+
+      <VRB>
+        <RemoteFetch value="off" path="C:/src/covise/remoteFetch" />
+      </VRB>
+    </System>
+    
+  </GLOBAL>
+ 
+</COCONFIG>

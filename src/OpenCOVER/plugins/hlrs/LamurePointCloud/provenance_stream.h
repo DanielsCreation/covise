@@ -1,0 +1,56 @@
+// Copyright (c) 2014-2018 Bauhaus-Universitaet Weimar
+// This Software is distributed under the Modified BSD License, see license.txt.
+//
+// Virtual Reality and Visualization Research Group 
+// Faculty of Media, Bauhaus-Universitaet Weimar
+// http://www.uni-weimar.de/medien/vr
+
+#ifndef CO_REN_PROVENANCE_STREAM_H_
+#define CO_REN_PROVENANCE_STREAM_H_
+
+#include <fstream>
+#include <vector>
+#include <string>
+#include <cstdio>
+
+#include <lamure/ren/platform.h>
+//#include <lamure/utils.h>
+//#include <lamure/ren/config.h>
+
+//#include <platform.h>
+#include <utils.h>
+#include <config.h>
+
+
+class provenance_stream
+{
+public:
+                        provenance_stream();
+                        provenance_stream(const provenance_stream&) = delete;
+                        provenance_stream& operator=(const provenance_stream&) = delete;
+    virtual             ~provenance_stream();
+
+
+    void                open(const std::string& file_name);
+    void                open_for_writing(const std::string& file_name);
+    void                close();
+    const bool          is_file_open() const { return is_file_open_; };
+    const std::string&  file_name() const { return file_name_; };
+
+    void                read(char* const data,
+                            const size_t start_in_file,
+                            const size_t length_in_bytes) const;
+                            
+    // void                write(char* const data,
+    //                         const size_t start_in_file,
+    //                         const size_t length_in_bytes);
+
+private:
+    mutable std::ifstream stream_;
+
+    std::string         file_name_;
+    bool                is_file_open_;
+};
+
+#endif // CO_REN_PROVENANCE_STREAM_H_
+

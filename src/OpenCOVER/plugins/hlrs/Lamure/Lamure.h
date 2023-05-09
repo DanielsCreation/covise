@@ -18,6 +18,7 @@
 #include <cover/VRViewer.h>
 #include <cover/coVRPluginSupport.h>
 #include <cover/coVRMSController.h>
+
 using namespace covise;
 using namespace opencover;
 

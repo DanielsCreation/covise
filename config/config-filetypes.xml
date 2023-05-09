@@ -60,6 +60,8 @@
         <!--FileType name="pts" plugin="PointModel" /-->
         <!--FileType name="xyz" plugin="PointModel" /-->
         
+        <FileType name="lmr" plugin="LamurePointCloud" />
+        
         <FileType name="c2m" plugin="PointCloud" />
         <FileType name="pts" plugin="PointCloud" />
         <FileType name="ptsb" plugin="PointCloud" />

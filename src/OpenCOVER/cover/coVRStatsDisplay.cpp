@@ -1235,7 +1235,6 @@ struct SlowFrameMarkerDrawCallback : public virtual osg::Drawable::DrawCallback
 
 struct PagerCallback : public virtual osg::NodeCallback
 {
-
     PagerCallback(osgDB::DatabasePager *dp,
                   osgText::Text *minValue,
                   osgText::Text *maxValue,
