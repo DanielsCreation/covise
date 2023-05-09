@@ -32,6 +32,7 @@
 #include <covise/coTimer.h>
 #endif
 
+#include <OpenConfig/access.h>
 #include <config/CoviseConfig.h>
 #include <config/coConfigConstants.h>
 #include <cover/coCommandLine.h>
@@ -94,6 +95,11 @@ int main(int argc, char *argv[])
         std::cerr << "OpenCOVER: not compiled with MPI support" << std::endl;
         exit(1);
 #endif
+    }
+    opencover::config::Access config(my_hostname, mastername, myID);
+    if (auto covisedir = getenv("COVISEDIR"))
+    {
+        config.setPrefix(covisedir);
     }
     covise::coConfigConstants::setRank(myID);
     covise::coConfigConstants::setMaster(mastername);

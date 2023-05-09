@@ -433,7 +433,8 @@ void VariantPlugin::addNode(osg::Node *node, const RenderObject *render)
                     osg::Node::ParentList parents;
                     if (node)
                         parents = node->getParents();
-                    var = new Variant(var_att, node, parents, variant_menu, VariantPluginTab, varlist.size() + 1, xmlfile, &qDE_Variant, boi, set_default?default_state:true);
+                    var = new Variant(this, var_att, node, parents, variant_menu, VariantPluginTab, varlist.size() + 1,
+                                      xmlfile, &qDE_Variant, boi, set_default ? default_state : true);
                     varlist.push_back(var);
                     var->AddToScenegraph();
                     var->hideVRLabel();
@@ -472,30 +473,19 @@ void VariantPlugin::removeNode(osg::Node *node, bool /*isGroup*/, osg::Node * /*
     {
         cout << "Varname " << var->getVarname().c_str() << endl;
         cout << "Number of Parents " << var->numParents() << endl;
-        // if (var->numNodes() == 1)
-        // {
-            //TODO remote TUI and add TUI if a variant comes back
-            /* var->removeFromScenegraph(node);
-            varlist.remove(var);
-            delete var;
-            std::list<Variant *>::iterator varlIter;
-            int count = 1;
-            for (varlIter = varlist.begin(); varlIter != varlist.end(); varlIter++)
-            {
-                (*varlIter)->ui->setPosTUIItems(count);
-                count++;
-            }*/
-        // }
-        // else
-        // {
-        //     var->releaseNode(node);
-        // }
-        var->removeFromScenegraph(node);
         var->releaseNode(node);
-        varlist.remove(var);
         varmap.erase(node);
+        if (var->numNodes() == 0)
+        {
+            auto it = std::find(varlist.begin(), varlist.end(), var);
+            if (it != varlist.end())
+            {
+                varlist.erase(it);
+            }
+            var->removeFromScenegraph(node);
+            delete var;
+        }
     }
-    delete var;
 }
 //------------------------------------------------------------------------------------------------------------------------------
 

@@ -316,10 +316,10 @@ namespace OpenCOVERPlugin
             Level lastLevel = null;
             FilteredElementCollector collector = new FilteredElementCollector(document);
             ICollection<Element> collection = collector.OfClass(typeof(Level)).ToElements();
-            foreach (Element e in collection)
+            List<Level> levels = collection.Cast<Level>().ToList();
+            levels.Sort((left, right) => left.Elevation.CompareTo(right.Elevation));
+            foreach (Level level in levels)
             {
-                Level level = e as Level;
-
                 if (null != level)
                 {
                     // keep track of number of levels
@@ -329,6 +329,10 @@ namespace OpenCOVERPlugin
                         if (height < level.Elevation && height > lastLevel.Elevation)
                         {
                             return lastLevel;
+                        }
+                        else if(levelNumber == levels.Count() && height > level.Elevation)
+                        {
+                            return level;
                         }
                     }
                     lastLevel = level;
@@ -457,11 +461,39 @@ namespace OpenCOVERPlugin
             }
             sendMessage(mb.buf, MessageTypes.DesignOptionSets);
 
+            
+
             ProjectPosition projectPos = doc.ActiveProjectLocation.GetProjectPosition(XYZ.Zero);
             double ProjectNorthAngle = projectPos.Angle;
+            double ProjectHeight = projectPos.Elevation;
+
+            FilteredElementCollector locations = new FilteredElementCollector(doc).OfClass(typeof(BasePoint));
+            foreach (var locationPoint in locations)
+            {
+                BasePoint basePoint = locationPoint as BasePoint;
+                Location svLoc = basePoint.Location;
+                if (basePoint.IsShared == true)
+                {
+                    //this is the survey point
+
+                    /*Location svLoc = basePoint.Location;
+                    projectSurvpntX = basePoint.get_Parameter(BuiltInParameter.BASEPOINT_EASTWEST_PARAM).AsDouble();
+                    projectSurvpntY = basePoint.get_Parameter(BuiltInParameter.BASEPOINT_NORTHSOUTH_PARAM).AsDouble();
+                    projectSurvpntZ = basePoint.get_Parameter(BuiltInParameter.BASEPOINT_ELEVATION_PARAM).AsDouble();*/
+                }
+                else // this is one of the project base points, we just hope that they all share the same height...
+                {
+                    if(basePoint.get_Parameter(BuiltInParameter.BASEPOINT_ELEVATION_PARAM) != null)
+                    ProjectHeight = basePoint.get_Parameter(BuiltInParameter.BASEPOINT_ELEVATION_PARAM).AsDouble(); 
+                    else
+                        ProjectHeight = basePoint.Position.Z;
+                }
+            }
+
             MessageBuffer mbdocinfo = new MessageBuffer();
             mbdocinfo.add(doc.PathName);
             mbdocinfo.add(ProjectNorthAngle);
+            mbdocinfo.add(ProjectHeight);
 
             mbdocinfo.add(projectPos.EastWest);
             mbdocinfo.add(projectPos.NorthSouth);
@@ -1688,7 +1720,7 @@ namespace OpenCOVERPlugin
             BoundingBoxXYZ bbR = new BoundingBoxXYZ();
             bbR.Min = new XYZ(100000, 100000, 100000);
             bbR.Max = new XYZ(-100000, -100000, -100000);
-            bool hasStyle = false;
+            //bool hasStyle = false;
             bool hasIK = false;
             bool doWalk = false;
             if (fi != null)
@@ -1808,7 +1840,7 @@ namespace OpenCOVERPlugin
                     return;
                 if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Stairs)
                 {
-                    hasStyle = false;
+                    //hasStyle = false;
                     doWalk = true;
                 }
                 else if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Topography)
@@ -1838,14 +1870,12 @@ namespace OpenCOVERPlugin
                 else if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Doors)
                 {
                     Autodesk.Revit.DB.GeometryObject geomObject = elementGeom.ElementAt(0);
-                    Autodesk.Revit.DB.GraphicsStyle graphicsStyle = elem.Document.GetElement(geomObject.GraphicsStyleId) as Autodesk.Revit.DB.GraphicsStyle;
-                    if (graphicsStyle != null)
-                        hasStyle = true;
+                    
                 }
             }
 
 
-            if (hasStyle && (fi != null) && elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Doors)
+            if ( (fi != null) && elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Doors)
             {
                 bool hasLeft = false;
                 bool hasRight = false;
@@ -1873,7 +1903,7 @@ namespace OpenCOVERPlugin
                         Autodesk.Revit.DB.Solid solid = geomObject as Autodesk.Revit.DB.Solid;
                         if (solid != null)
                         {
-                            if (graphicsStyle.Name == "Panel")
+                            if (graphicsStyle.Name == "Panel"|| graphicsStyle.Name == "Element")
                             {
                                 extendBB(bb, solid.GetBoundingBox());
                             }
@@ -1886,6 +1916,10 @@ namespace OpenCOVERPlugin
                                 extendBB(bbR, solid.GetBoundingBox());
                             }
                         }
+                    }
+                    else // no style --> will be treated as moving parts
+                    {
+                        //sendGeomElement(elem, num, geomObject, false, false);
                     }
                     num++;
                 }
@@ -2105,6 +2139,7 @@ namespace OpenCOVERPlugin
         private void SendDoorPart(Autodesk.Revit.DB.GeometryElement elementGeom, Autodesk.Revit.DB.Element elem, FamilyInstance fi, BoundingBoxXYZ bb, String name, XYZ Center)
         {
             int num = 0;
+            double travel = 0.0;
             MessageBuffer mb = new MessageBuffer();
             mb.add(elem.Id.IntegerValue);
             mb.add(DocumentID);
@@ -2140,6 +2175,11 @@ namespace OpenCOVERPlugin
                     }
                 }
                 mb.add(sliding);
+                IList<Parameter> pt = family.GetParameters("travel");
+                if ((pt.Count > 0) && (pt[0] != null))
+                {
+                    travel = pt[0].AsDouble();
+                }
             }
             else
             {
@@ -2147,6 +2187,7 @@ namespace OpenCOVERPlugin
             }
             mb.add(bb.Min);
             mb.add(bb.Max);
+            mb.add(travel);
             sendMessage(mb.buf, MessageTypes.NewDoorGroup);
             int namelen = name.Length;
 

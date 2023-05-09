@@ -49,7 +49,7 @@
            </ConstHead>
 
            <CaveHead device="DTrackCave" device1="DTrackCaveOutside" bodyIndex="1">
-              <Offset x="-105" y="-40" z="-50" />
+              <Offset x="105" y="-50" z="-60" />
               <Orientation h="0" p="0" r="0" />
            </CaveHead>
 
@@ -59,7 +59,7 @@
            </CaveHand>
 
            <CaveCamera device="DTrackCave" device1="DTrackCaveOutside" bodyIndex="2">
-              <Offset x="0" y="120" z="-200" />
+              <Offset x="0" y="120" z="-100" />
               <Orientation h="0" p="0" r="0" />
            </CaveCamera>
 
@@ -545,7 +545,7 @@
    <!--Model aircraft="lcaro" enginesDir="engine" systemsDir="aircraft/lcaro/Systems" resetFile="reset00.xml">
    </Model-->
    </JSBSim>
-        <ARToolKit value="Off">
+        <MarkerTracking value="Off">
 		   <Capture value="Off" />
 		   <Stereo value="OFF" />
 		   <AdjustCameraParameter value="ON" />
@@ -568,7 +568,7 @@
 			   <irmosReceiverPort value="31666" />
 			   <irmosReceiverServer value="192.108.38.44" />
 		   </RemoteAR>
-        </ARToolKit>	   
+        </MarkerTracking>	   
 	   
    <Bicycle>
    <LenkMaus value="/dev/input/mouse3"/>

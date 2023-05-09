@@ -122,6 +122,8 @@ if "%BASEARCHSUFFIX%" EQU "zebu"  (
 if "%VC14_15%" EQU "yes" (
    if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" ( 
     call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64
+   ) else if exist "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" ( 
+    call "D:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64
    ) else if exist "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat" ( 
     call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat" -arch=x64
    ) else if exist "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat" ( 
@@ -201,7 +203,7 @@ if "%VCPKG_ROOT%" NEQ "" (
           set "OSG_LIBRARY_PATH=%VCPKG_ROOT%\installed\%VCPKG_DEFAULT_TRIPLET%\debug\tools\osg\osgPlugins-%VCPKG_OSGVER%"
     )
 )
-
+set "CMAKE_CONFIGURATION_TYPES=Debug;Release"
 
 if "%BASEARCHSUFFIX%" EQU "vcpkg" (
     goto FINALIZE
@@ -234,12 +236,6 @@ if not defined QT_HOME (
      REM Set QT_HOME according to QTDIR. If User ignores any warnings before he will find himself in a world of pain! 
    )
 )
-set "QT_HOME=%QTDIR%"
-set "QT_SHAREDHOME=%QT_HOME%"
-set "QT_INCPATH=%QT_HOME%\include"
-set "QT_LIBPATH=%QT_HOME%\lib"
-set "PATH=%QT_HOME%\bin;%QT_HOME%\lib;%PATH%"
-set "QT_QPA_PLATFORM_PLUGIN_PATH=%QT_HOME%\plugins\platforms"  
 
 if not defined  OPENSCENEGRAPH_HOME (
    if exist %EXTERNLIBS%\OpenSceneGraph\bin\osgversion.exe (
@@ -349,6 +345,19 @@ if not "%COVISE_USE_QT5%" == "OFF" if not defined Qt5WebEngineWidgets_DIR  (
 )
 
 set PATH=%PATH%;%EXTERNLIBS%\bison\bin
+
+set "QT_HOME=%QTDIR%"
+set "QT_SHAREDHOME=%QT_HOME%"
+set "QT_INCPATH=%QT_HOME%\include"
+set "QT_LIBPATH=%QT_HOME%\lib"
+set "QT_PLUGIN_PATH=%QT_HOME%\plugins"
+set "QT_RESOURCES_PATH=%QT_HOME%\resources"
+set "QTDIR=%QT_HOME%"
+set "PATH=%QT_HOME%\bin;%QT_HOME%\lib;%PATH%"
+set "QT_QPA_PLATFORM_PLUGIN_PATH=%QT_HOME%\plugins\platforms"  
+set "QTWEBENGINE_RESOURCES_PATH=%QT_HOME%\resources"
+rem set "QTWEBENGINEPROCESS_PATH=%QT_HOME%\bin\QtWebEngineProcess.exe"
+set QTWEBENGINE_DISABLE_SANDBOX=1
 
 :FINALIZE
 set LOGNAME=covise

@@ -28,6 +28,7 @@
 #include "coVRPluginList.h"
 #include "coVRPluginSupport.h"
 #include "coVRRenderer.h"
+#include "SidecarConfigBridge.h"
 #include "ui/Action.h"
 #include "ui/Button.h"
 #include "ui/FileBrowser.h"
@@ -818,6 +819,12 @@ osg::Node *coVRFileManager::loadFile(const char *fileName, coTUIFileBrowserButto
     if (covise_key)
         fe->key = covise_key;
     fe->filebrowser = fb;
+    if (!OpenCOVER::instance()->visPlugin() && !m_settings && fe->url.valid() && fe->url.isLocal())
+    {
+        std::cerr << "Sidecar file for " << fe->url.str() << std::endl;
+        m_settings = std::make_unique<SidecarConfigBridge>(fe->url.str(), coVRMSController::instance()->isMaster());
+        cover->m_config.setWorkspaceBridge(m_settings.get());
+    }
 
     OpenCOVER::instance()->hud->setText2("loading");
 
@@ -865,7 +872,8 @@ osg::Node *coVRFileManager::loadFile(const char *fileName, coTUIFileBrowserButto
 	bool isVRML = false;
 	for (auto ext : vrmlExtentions)
 	{
-		if (("." + ext) == lowXt || urlStr.substr(urlStr.size() - (ext.size() + strlen(ive))) == ext + ive)
+        size_t extlen = ext.size() + strlen(ive);
+		if (("." + ext) == lowXt ||(urlStr.size()> extlen) && (urlStr.substr(urlStr.size() - extlen) == ext + ive))
 		{
 			isVRML = true;
 			break;
@@ -1126,6 +1134,15 @@ void coVRFileManager::unloadFile(const char *file)
         }
         m_files.clear();
     }
+
+    if (m_files.empty())
+    {
+        if (m_settings)
+        {
+            cover->m_config.removeWorkspaceBridge(m_settings.get());
+            m_settings.reset();
+        }
+    }
 }
 
 coVRFileManager *coVRFileManager::instance()
@@ -1194,6 +1211,7 @@ coVRFileManager::coVRFileManager()
     }
 
     osgDB::Registry::instance()->addFileExtensionAlias("gml", "citygml");
+    osgDB::Registry::instance()->addFileExtensionAlias("3mxb", "3mx");
 
     options = new osgDB::ReaderWriter::Options;
     options->setOptionString(coCoviseConfig::getEntry("options", "COVER.File"));
