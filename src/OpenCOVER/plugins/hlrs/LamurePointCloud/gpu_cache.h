@@ -8,10 +8,10 @@
 #ifndef CO_REN_GPU_CACHE_H_
 #define CO_REN_GPU_CACHE_H_
 
-#include <lamure/types.h>
+//#include <lamure/types.h>
 #include <unordered_set>
-#include <lamure/utils.h>
-#include <lamure/ren/cache.h>
+//#include <lamure/utils.h>
+//#include <lamure/ren/cache.h>
 
 #include <utils.h>
 #include <types.h>

@@ -13,11 +13,11 @@
 #include <string>
 #include <cstdio>
 
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 //#include <lamure/utils.h>
 //#include <lamure/ren/config.h>
 
-#include <platform.h>
+//#include <platform.h>
 #include <utils.h>
 #include <config.h>
 

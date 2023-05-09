@@ -10,7 +10,6 @@
 
 #include <scm/gl_core.h>
 #include <scm/gl_core/primitives/frustum.h>
-#include <scm/gl_util/viewer/camera.h>
 
 #include <fstream>
 #include <iostream>
@@ -19,11 +18,11 @@
 #include <string>
 #include <vector>
 
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 //#include <lamure/ren/trackball.h>
 //#include <lamure/types.h>
 
-#include <platform.h>
+//#include <platform.h>
 #include <trackball.h>
 #include <types.h>
 

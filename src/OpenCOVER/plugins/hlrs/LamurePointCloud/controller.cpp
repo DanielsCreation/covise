@@ -79,7 +79,7 @@ void controller::signal_system_reset()
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    policy *policy = policy::get_instance();
+    lamure::ren::policy *policy = lamure::ren::policy::get_instance();
     policy->set_reset_system(true);
 
     for(const auto &context : context_map_)
@@ -108,7 +108,7 @@ const bool controller::is_system_reset_signaled(const context_t context_id)
 
 void controller::reset_system()
 {
-    policy *policy = policy::get_instance();
+    lamure::ren::policy *policy = lamure::ren::policy::get_instance();
 
     if(policy->reset_system())
     {
@@ -171,7 +171,7 @@ void controller::reset_system()
 
 void controller::reset_system(Data_Provenance const &data_provenance)
 {
-    policy *policy = policy::get_instance();
+    lamure::ren::policy *policy = lamure::ren::policy::get_instance();
 
     if(policy->reset_system())
     {

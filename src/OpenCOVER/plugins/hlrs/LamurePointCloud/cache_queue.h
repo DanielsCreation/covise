@@ -14,10 +14,10 @@
 #include <unordered_set>
 #include <deque>
 
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 //#include <lamure/utils.h>
 
-#include <platform.h>
+//#include <platform.h>
 #include <utils.h>
 #include <types.h>
 

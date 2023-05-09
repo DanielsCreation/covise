@@ -35,20 +35,13 @@
 #include <data_provenance.h>
 #include <cache_index.h>
 #include <cache_queue.h>
-#include <config.h>
 #include <lod_stream.h>
-#include <model_database.h>
-#include <provenance_stream.h>
-#include <types.h>
-#include <utils.h>
 #include <semaphore.h>
 #include <utils.h>
 #include <types.h>
 #include <config.h>
 #include <model_database.h>
 #include <lod_stream.h>
-#include <cache_queue.h>
-#include <cache_index.h>
 
 class ooc_pool
 {

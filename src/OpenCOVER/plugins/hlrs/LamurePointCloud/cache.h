@@ -18,19 +18,18 @@
 #include <scm/gl_core.h>
 
 //#include <lamure/ren/model_database.h>
-//#include <lamure/ren/policy.h>
+#include <lamure/ren/policy.h>
 
 //#include <lamure/types.h>
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 //#include <lamure/ren/cache_index.h>
 
 #include <utils.h>
 
 #include <model_database.h>
-#include <policy.h>
-
+//#include <policy.h>
 #include <types.h>
-#include <platform.h>
+//#include <platform.h>
 #include <cache_index.h>
 
 

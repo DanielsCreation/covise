@@ -17,7 +17,7 @@
 
 //#include <lamure/ren/cut_database.h>
 //#include <lamure/ren/model_database.h>
-//#include <lamure/ren/policy.h>
+#include <lamure/ren/policy.h>
 
 //#include <lamure/memory_status.h>
 //#include <lamure/ren/camera.h>
@@ -33,7 +33,7 @@
 #include <utils.h>
 #include <cut_database.h>
 #include <model_database.h>
-#include <policy.h>
+//#include <policy.h>
 #include <memory_status.h>
 #include <camera.h>
 #include <cut.h>

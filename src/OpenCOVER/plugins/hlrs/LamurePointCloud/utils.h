@@ -8,7 +8,7 @@
 #ifndef CO_COMMON_UTILS_H_
 #define CO_COMMON_UTILS_H_
 
-//#include <lamure/platform.h>
+#include <lamure/platform.h>
 //#include <lamure/types.h>
 
 #include <boost/timer/timer.hpp>
@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <vector>
 
-#include <platform.h>
+//#include <platform.h>
 #include <types.h>
 
 

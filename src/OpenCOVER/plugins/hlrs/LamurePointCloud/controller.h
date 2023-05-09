@@ -15,14 +15,14 @@
 //#include <lamure/ren/data_provenance.h>
 //#include <lamure/ren/cut_update_pool.h>
 //#include <lamure/ren/gpu_context.h>
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 
 #include <types.h>
 #include <utils.h>
 #include <data_provenance.h>
 #include <cut_update_pool.h>
 #include <gpu_context.h>
-#include <platform.h>
+//#include <platform.h>
 
 
 class controller

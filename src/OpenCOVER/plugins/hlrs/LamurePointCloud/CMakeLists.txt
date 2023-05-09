@@ -4,6 +4,8 @@ SET(HEADERS
   LamurePointCloud.h
   LamureGeometry.h
   LamureDrawable.h
+  LamureContext.h
+  LamureDevice.h
   bvh.h
   bvh_stream.h
   cache.h
@@ -48,6 +50,8 @@ SET(SOURCES
   LamurePointCloud.cpp
   LamureGeometry.cpp
   LamureDrawable.cpp
+  LamureContext.cpp
+  LamureDevice.cpp
   bvh.cpp
   bvh_stream.cpp
   cache.cpp
@@ -101,4 +105,17 @@ include_directories(SYSTEM
 
 cover_add_plugin(LamurePointCloud)
 covise_wnoerror(LamurePointCloud)
-TARGET_LINK_LIBRARIES(LamurePointCloud)
+
+TARGET_LINK_LIBRARIES(LamurePointCloud
+    optimized ${LAMURE_RENDERING_LIBRARY} debug ${LAMURE_RENDERING_LIBRARY_DEBUG}
+    optimized ${LAMURE_COMMON_LIBRARY} debug ${LAMURE_COMMON_LIBRARY_DEBUG}
+    optimized ${LAMURE_PVS_COMMON_LIBRARY} debug ${LAMURE_PVS_COMMON_LIBRARY_DEBUG}
+    optimized ${LAMUREVT_LIBRARY} debug ${LAMUREVT_LIBRARY_DEBUG}
+    optimized ${LAMURE_QUALITY_MEASUREMENT_LIBRARY} debug ${LAMURE_QUALITY_MEASUREMENT_LIBRARY_DEBUG}
+    optimized ${LAMURE_PVS_PREPROCESSING_LIBRARY} debug ${LAMURE_PVS_PREPROCESSING_LIBRARY_DEBUG}
+    optimized ${LAMURE_PREPROCESSING_LIBRARY} debug ${LAMURE_PREPROCESSING_LIBRARY_DEBUG}
+    optimized ${SCHISM_CORE_LIBRARY} debug ${SCHISM_CORE_LIBRARY_DEBUG}
+    optimized ${SCHISM_GL_CORE_LIBRARY} debug ${SCHISM_GL_CORE_LIBRARY_DEBUG}
+    optimized ${SCHISM_GL_UTIL_LIBRARY} debug ${SCHISM_GL_UTIL_LIBRARY_DEBUG}
+    optimized ${Boost_TIMER_LIBRARY_RELEASE} debug ${Boost_TIMER_LIBRARY_DEBUG}
+)

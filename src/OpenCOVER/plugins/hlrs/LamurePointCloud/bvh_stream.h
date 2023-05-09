@@ -15,11 +15,11 @@
 #include <cstring>
 
 #include <lamure/ren/platform.h>
-#include <lamure/types.h>
+//#include <lamure/types.h>
+//#include <lamure/ren/bvh.h>
 #include <scm/gl_core/primitives/box.h>
 
-#include <lamure/ren/bvh.h>
-
+//#include <platform.h>
 #include <bvh.h>
 #include <types.h>
 

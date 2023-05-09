@@ -71,7 +71,7 @@ cut_update_pool::~cut_update_pool()
 void cut_update_pool::initialize(bool provenance)
 {
     model_database *database = model_database::get_instance();
-    policy *policy = policy::get_instance();
+    lamure::ren::policy *policy = lamure::ren::policy::get_instance();
 
     assert(policy->render_budget_in_mb() > 0);
     assert(policy->out_of_core_budget_in_mb() > 0);

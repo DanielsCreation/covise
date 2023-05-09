@@ -14,7 +14,7 @@
 
 //#include <lamure/utils.h>
 //#include <lamure/types.h>
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 //#include <lamure/ren/bvh.h>
 //#include <lamure/ren/config.h>
 #include <scm/gl_core/primitives/box.h>
@@ -22,7 +22,7 @@
 #include <types.h>
 #include <bvh.h>
 #include <utils.h>
-#include <platform.h>
+//#include <platform.h>
 #include <config.h>
 
 class model_database;

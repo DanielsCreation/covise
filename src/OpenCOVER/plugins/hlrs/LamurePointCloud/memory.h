@@ -8,8 +8,8 @@
 #ifndef CO_COMMON_MEMORY_H_
 #define CO_COMMON_MEMORY_H_
 
-//#include <lamure/platform.h>
-#include <platform.h>
+#include <lamure/platform.h>
+//#include <platform.h>
 #include <cstddef>
 
 const size_t get_total_memory();

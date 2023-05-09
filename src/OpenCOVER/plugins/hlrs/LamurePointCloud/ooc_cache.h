@@ -16,8 +16,8 @@
 #include <queue>
 
 //#include <lamure/ren/model_database.h>
-//#include <lamure/ren/platform.h>
-//#include <lamure/ren/policy.h>
+#include <lamure/ren/platform.h>
+#include <lamure/ren/policy.h>
 #ifndef WIN32
 #include <sys/sysinfo.h>
 #endif
@@ -28,7 +28,7 @@
 #include <utils.h>
 #include <model_database.h>
 #include <platform.h>
-#include <policy.h>
+//#include <policy.h>
 
 
 class ooc_cache : public cache

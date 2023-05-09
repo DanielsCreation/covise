@@ -13,13 +13,13 @@
 //#include <lamure/types.h>
 #include <mutex>
 
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 //#include <lamure/ren/cut.h>
 //#include <lamure/ren/cut_database_record.h>
 
 #include <utils.h>
 #include <types.h>
-#include <platform.h>
+//#include <platform.h>
 #include <cut.h>
 #include <cut_database_record.h>
 

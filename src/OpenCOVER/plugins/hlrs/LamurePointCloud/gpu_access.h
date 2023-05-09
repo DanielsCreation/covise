@@ -16,7 +16,7 @@
 //#include <lamure/ren/data_provenance.h>
 #include <memory>
 #include <scm/core.h>
-#include <scm/gl_core.h>
+//#include <scm/gl_core.h>
 
 #include <bvh.h>
 #include <types.h>
