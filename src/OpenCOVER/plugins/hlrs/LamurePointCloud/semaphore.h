@@ -13,8 +13,8 @@
 #include <mutex>
 #include <condition_variable>
 
-//#include <lamure/platform.h>
-#include <platform.h>
+#include <lamure/platform.h>
+//#include <platform.h>
 
 
 class semaphore

@@ -15,7 +15,7 @@
 //#include <lamure/types.h>
 //#include <lamure/ren/dataset.h>
 //#include <lamure/ren/config.h>
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 
 #include <scm/gl_core/query_objects.h>
 
@@ -23,7 +23,7 @@
 #include <types.h>
 #include <dataset.h>
 #include <config.h>
-#include <platform.h>
+//#include <platform.h>
 
 class model_database
 {

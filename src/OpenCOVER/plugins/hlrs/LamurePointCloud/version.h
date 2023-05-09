@@ -11,12 +11,12 @@
 
   static const std::string    LAMURE_LIBRARY_NAME = std::string("lamure - Large Multi-Resolution Library");
 
-  static const unsigned       VERSION_MAJOR = 0;
-  static const unsigned       VERSION_MINOR = 2;
-  static const unsigned       VERSION_REVISION = 0;
+  static const unsigned       LAMURE_VERSION_MAJOR = 0;
+  static const unsigned       LAMURE_VERSION_MINOR = 2;
+  static const unsigned       LAMURE_VERSION_REVISION = 0;
 
-  static const std::string    VERSION_TAG = std::string("development");
-  static const std::string    VERSION_NAME = std::string("bohr");
+  static const std::string    LAMURE_VERSION_TAG = std::string("development");
+  static const std::string    LAMURE_VERSION_NAME = std::string("bohr");
 
   // oncoming version names :
   // - coulomb

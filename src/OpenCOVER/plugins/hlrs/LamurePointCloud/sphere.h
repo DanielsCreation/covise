@@ -8,10 +8,10 @@
 #ifndef CO_COMMON_sphere_H_
 #define CO_COMMON_sphere_H_
 
-//#include <lamure/platform.h>
+#include <lamure/platform.h>
 //#include <lamure/types.h>
 
-#include <platform.h>
+//#include <platform.h>
 #include <types.h>
 
 class bounding_box;

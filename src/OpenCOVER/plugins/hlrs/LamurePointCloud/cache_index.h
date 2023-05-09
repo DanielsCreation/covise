@@ -11,7 +11,7 @@
 //#include <lamure/types.h>
 //#include <lamure/utils.h>
 //#include <lamure/ren/config.h>
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 
 #include <vector>
 #include <set>
@@ -23,7 +23,7 @@
 #include <types.h>
 #include <utils.h>
 #include <config.h>
-#include <platform.h>
+//#include <platform.h>
 
 
 class cache_index

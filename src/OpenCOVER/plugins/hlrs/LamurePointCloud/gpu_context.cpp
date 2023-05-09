@@ -9,7 +9,7 @@
 //#include <lamure/ren/cut_database.h>
 //#include <lamure/ren/gpu_context.h>
 //#include <lamure/ren/model_database.h>
-//#include <lamure/ren/policy.h>
+#include <lamure/ren/policy.h>
 
 #include <scm/gl_core/render_device/opengl/gl_core.h>
 
@@ -17,7 +17,7 @@
 #include <cut_database.h>
 #include <gpu_context.h>
 #include <model_database.h>
-#include <policy.h>
+//#include <policy.h>
 
 gpu_context::gpu_context(const context_t context_id)
     : context_id_(context_id), is_created_(false), temp_buffer_a_(nullptr), temp_buffer_b_(nullptr), primary_buffer_(nullptr), temporary_storages_(temporary_storages(nullptr, nullptr)),
@@ -100,7 +100,7 @@ void gpu_context::create(scm::gl::render_device_ptr device, Data_Provenance cons
 void gpu_context::test_video_memory(scm::gl::render_device_ptr device)
 {
     model_database *database = model_database::get_instance();
-    policy *policy = policy::get_instance();
+    lamure::ren::policy *policy = lamure::ren::policy::get_instance();
 
     float safety = 0.75;
     size_t video_ram_free_in_mb = gpu_access::query_video_memory_in_mb(device) * safety;
@@ -141,7 +141,7 @@ void gpu_context::test_video_memory(scm::gl::render_device_ptr device)
 void gpu_context::test_video_memory(scm::gl::render_device_ptr device, Data_Provenance const &data_provenance)
 {
     model_database *database = model_database::get_instance();
-    policy *policy = policy::get_instance();
+    lamure::ren::policy *policy = lamure::ren::policy::get_instance();
 
     float safety = 0.75;
     size_t video_ram_free_in_mb = gpu_access::query_video_memory_in_mb(device) * safety;

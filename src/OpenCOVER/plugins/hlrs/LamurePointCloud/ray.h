@@ -20,7 +20,7 @@
 //#include <lamure/ren/model_database.h>
 //#include <lamure/ren/ooc_cache.h>
 //
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 //#include <lamure/types.h>
 //
 //#include <lamure/ren/dataset.h>

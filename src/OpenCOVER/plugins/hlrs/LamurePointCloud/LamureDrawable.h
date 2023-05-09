@@ -1,3 +1,6 @@
+#ifndef LAMUREDRAWABLE_H
+#define LAMUREDRAWABLE_H
+
 /* This file is part of COVISE.
 
    You can use it under the terms of the GNU Lesser General Public License
@@ -5,41 +8,27 @@
 
  * License: LGPL 2+ */
 
-#ifndef _LamureDrawable_H
-#define _LamureDrawable_H
+
 
 #include <osg/Drawable>
-#include <osg/Geode>
-#include <scm/core/math.h>
+#include <osg/Object>
+#include <osg/RenderInfo>
+#include <osg/CopyOp>
 
-class management;
+#include "LamurePointCloud.h"
 
 class LamureDrawable : public osg::Drawable
 {
+
 public:
-    LamureDrawable();
-    virtual ~LamureDrawable();
+    LamureDrawable::LamureDrawable();
+    ~LamureDrawable();
 
-    virtual void drawImplementation(osg::RenderInfo& renderInfo) const;
-private:
-    virtual osg::Object* cloneType() const
-    {
-        return new LamureDrawable();
-    }
-    virtual osg::Object* clone(const osg::CopyOp& copyop) const
-    {
-        return new LamureDrawable(*this, copyop);
-    }
+    void drawImplementation(osg::RenderInfo& renderInfo) const override;
 
-    LamureDrawable(const LamureDrawable&, const osg::CopyOp& copyop = osg::CopyOp::SHALLOW_COPY);
-    void init();
-    struct ContextState
-    {
-        ContextState();
-        ~ContextState();
-    };
+    osg::Object* LamureDrawable::cloneType() const override;
 
-    mutable std::vector<ContextState*> contextState;
+    osg::Object* LamureDrawable::clone(const osg::CopyOp&) const override;
 
 };
 

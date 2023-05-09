@@ -22,7 +22,6 @@
 #include <vector>
 
 #include <item_provenance.h>
-#include <policy.h>
 #include <types.h>
 #include <utils.h>
 
@@ -102,7 +101,7 @@ class Data_Provenance
             data_provenance.add_item(item_provenance);
         }
 
-        policy::get_instance()->set_size_of_provenance(data_provenance.get_size_in_bytes());
+        lamure::ren::policy::get_instance()->set_size_of_provenance(data_provenance.get_size_in_bytes());
 
         return data_provenance;
     }

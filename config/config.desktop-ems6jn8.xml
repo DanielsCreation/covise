@@ -10,7 +10,6 @@
       <WelcomeMessage value="Welcome to OpenCOVER with custom config file" />
       <Multisample value="on" numSamples="4" numBuffers="1" mode="DONT_CARE" />
       <NavigationMode value="XForm" />
-      <Stereo value="false" />
       <CollisionDist value="1500" />
       <Background r="0.5" g="0.5" b="1.0" /> 
       <MultiThreaded value="false" />
@@ -32,28 +31,49 @@
       <Statistics value="true" />
       <DebugLevel value="2" />
       <ContinuousRendering value="true" />
+      <trackedHMD value="off" />
+      <HMDMode value="off" />
       <DebugTUI value="off" />
+      <stereoMode value="none" />
+      <NumChannels value="1" />
+      <NumScreens value="1" />
+      <NumViewports value="1" />
+      <NumWindows value="1" />
+      <NumBlendingTextures value="0" />
+      <NumPBOs value="0" />
+      <Stereo value="off" />
+      <Stencil value="off" />
+      
       <!--  <GLVersion value="3.0" /> -->
       
       <!-- 
       <TabletUI host="localhost" /> 
       -->
-
       <PipeConfig>
-        <Pipe name="0" useDISPLAY="true" />
+        <Pipe name="0" useDISPLAY="false" />
       </PipeConfig>
       
       <WindowConfig>
-        <Window type="Qt" width="800" height="450" comment="FRONT" window="0" pipeIndex="0" left="150" top="0" name="0" embedded="false" decoration="true" />
+        <!-- <Window arch="windows" width="1600" height="900" comment="FRONT" window="0" pipeIndex="0" left="0" top="0" name="0" embedded="false" decoration="true" /> -->
+        <Window arch="windows" type="Qt" width="1600" height="900" comment="FRONT" pipeIndex="0" left="0" top="0" name="0" embedded="false" /> 
       </WindowConfig>
       
       <ScreenConfig>
-        <Screen width="2560" comment="FRONT" h="0.0" originX="0" originY="0" originZ="0" height="1600" p="0.0" r="0.0" name="0" screen="0" />
+        <Screen width="2560" height="1600" comment="FRONT" h="0.0" originX="0" originY="0" originZ="0" p="0.0" r="0.0" name="0" screen="0" />
       </ScreenConfig>
       
+      <ChannelConfig>
+        <Channel windowIndex="0" stereoMode="MONO" viewportIndex="0" screenIndex="0" name="0" />
+      </ChannelConfig>
+      
       <ViewportConfig>
-        <Viewport width="1" height="1" left="0" bottom="0" windowIndex="0" channelIndex="0" name="0" />
+        <Viewport mode="channel" width="1" height="1" windowIndex="0" channelIndex="0" />
       </ViewportConfig>
+      
+      <PBOConfig>
+        <PBO width="2560" height="1600" windowIndex="0" />
+      </PBOConfig>
+
       
       <UI>
         <VRUI toolbar="false" />

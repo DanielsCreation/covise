@@ -8,9 +8,9 @@
 #ifndef CO_COMMON_BOUNDING_BOX_H_
 #define CO_COMMON_BOUNDING_BOX_H_
 
-#include <lamure/platform.h>
-#include <lamure/types.h>
-#include <lamure/sphere.h>
+//#include <lamure/platform.h>
+//#include <lamure/types.h>
+//#include <lamure/sphere.h>
 
 #include <platform.h>
 #include <types.h>

@@ -15,12 +15,14 @@
 #include <vector>
 
 #include <lamure/ren/platform.h>
-#include <lamure/types.h>
-#include <lamure/bounding_box.h>
+//#include <lamure/types.h>
+//#include <lamure/bounding_box.h>
 
 #include <scm/gl_core/primitives/box.h>
 
+//#include <platform.h>
 #include <types.h>
+#include <bounding_box.h>
 
 
 class bvh

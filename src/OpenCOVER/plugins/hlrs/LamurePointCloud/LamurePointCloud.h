@@ -3,13 +3,19 @@
 #define _Lamure_PC_PLUGIN_H
 
 //gl
-//#include <GL/glew.h>
+#ifndef __gl_h_
+    #include <GL/glew.h>
+#endif
 
 //boost
 //#include <boost/assign/list_of.hpp>
 #include <boost/regex.h>
 //#include <boost/lexical_cast.hpp>
 //#include <boost/filesystem.hpp>
+#include <osgViewer/Viewer>
+#include <osgViewer/ViewerEventHandlers>
+
+#include <util/common.h>
 
 
 //lamure
@@ -19,7 +25,7 @@
 #include <cut_database.h>
 #include <dataset.h>
 #include <controller.h>
-#include <policy.h>
+//#include <policy.h>
 #include <ray.h>
 
 #include <lamure/prov/octree.h>
@@ -34,7 +40,7 @@
 //#include <lamure/ren/cut_database.h>
 //#include <lamure/ren/dataset.h>
 //#include <lamure/ren/controller.h>
-//#include <lamure/ren/policy.h>
+#include <lamure/ren/policy.h>
 #include <lamure/pvs/pvs_database.h>
 //#include <lamure/ren/ray.h>
 //#include <lamure/prov/prov_aux.h>
@@ -135,6 +141,7 @@ public:
     ~LamurePointCloudPlugin();
     bool init();
     string getConfigEntry(string scope);
+    string getConfigEntry(string scope, string name);
     const char* stringToConstChar(string str);
     string extractFilename(const string pathname);
     void strcpyTail(char* suffix, const char* str, char c);
@@ -162,6 +169,7 @@ public:
     scm::math::mat4d load_matrix(const std::string& filename);
     osg::ref_ptr<osg::Group> LamureGroup;
     void load_settings(const std::string &filename);
+    bool rendering_ = false;
 
 private:
     static LamurePointCloudPlugin* plugin;
@@ -184,6 +192,9 @@ private:
     osg::ref_ptr<osg::MatrixTransform> transform;
     osg::ref_ptr<osg::StateSet> state;
     osg::ref_ptr<LamureGeometry> drawable;
+    osg::ref_ptr<osg::Node> lamureFileNode;
+
+    
     
 
 protected:

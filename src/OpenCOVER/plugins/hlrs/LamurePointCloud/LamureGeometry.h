@@ -5,8 +5,8 @@
 
  * License: LGPL 2+ */
 
-#ifndef _LAMUREGEOMETRY_DRAWABLE_H_
-#define _LAMUREGEOMETRY_DRAWABLE_H_
+#ifndef _LAMUREGEOMETRY_GEOMETRY_H_
+#define _LAMUREGEOMETRY_GEOMETRY_H_
 
 #include <osg/Version>
 #include <osg/Geometry>

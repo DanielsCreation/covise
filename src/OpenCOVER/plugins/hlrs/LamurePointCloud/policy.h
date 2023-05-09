@@ -10,17 +10,17 @@
 
 #include <mutex>
 
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 //#include <lamure/utils.h>
 //#include <lamure/types.h>
 //#include <lamure/memory.h>
-//#include <lamure/config.h>
+#include <lamure/config.h>
 
-#include <platform.h>
+//#include <platform.h>
 #include <utils.h>
 #include <types.h>
 #include <memory.h>
-#include <config.h>
+//#include <config.h>
 
 class policy
 {

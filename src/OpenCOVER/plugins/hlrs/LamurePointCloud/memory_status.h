@@ -8,8 +8,8 @@
 #ifndef CO_COMMON_MEMORY_MANAGER_H_
 #define CO_COMMON_MEMORY_MANAGER_H_
 
-//#include <lamure/platform.h>
-#include <platform.h>
+#include <lamure/platform.h>
+//#include <platform.h>
 #include <cstddef>
 
 class memory_status

@@ -81,7 +81,7 @@ ooc_cache *ooc_cache::get_instance(Data_Provenance const &data_provenance)
 
         if(!is_instanced_)
         {
-            policy *policy = policy::get_instance();
+            lamure::ren::policy *policy = lamure::ren::policy::get_instance();
             model_database *database = model_database::get_instance();
             // size_t out_of_core_budget_in_nodes = (policy->out_of_core_budget_in_mb()*1024*1024) / database->get_slot_size();
             long freeram = 0;
@@ -148,7 +148,7 @@ ooc_cache *ooc_cache::get_instance()
 
         if(!is_instanced_)
         {
-            policy *policy = policy::get_instance();
+            lamure::ren::policy *policy = lamure::ren::policy::get_instance();
             model_database *database = model_database::get_instance();
             // size_t out_of_core_budget_in_nodes = (policy->out_of_core_budget_in_mb()*1024*1024) / database->get_slot_size();
 

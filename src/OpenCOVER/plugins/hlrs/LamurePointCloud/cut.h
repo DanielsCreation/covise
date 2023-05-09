@@ -12,13 +12,13 @@
 #include <deque>
 
 //#include <lamure/types.h>
-//#include <lamure/ren/platform.h>
+#include <lamure/ren/platform.h>
 //#include <lamure/semaphore.h>
 //#include <lamure/ren/cache_queue.h>
 //#include <lamure/utils.h>
 
 #include <types.h>
-#include <platform.h>
+//#include <platform.h>
 #include <semaphore.h>
 #include <cache_queue.h>
 #include <utils.h>
