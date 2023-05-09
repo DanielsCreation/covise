@@ -694,11 +694,11 @@ void ARMarkerInfo::setValues(int id, int docID, int mid, std::string& n, double 
 	
 	if (marker == nullptr)
 	{
-		marker = new ARToolKitMarker((markerType+std::to_string(MarkerID)),MarkerID,size, offsetMat,hostMat,true);
+		marker = new MarkerTrackingMarker((markerType+std::to_string(MarkerID)),MarkerID,size, offsetMat,true);
         if (markerType == "ObjectMarker")
         {
             marker->setObjectMarker(true);
-            ARToolKit::instance()->addMarker(marker);
+            MarkerTracking::instance()->addMarker(marker);
         }
 	}
 	else
@@ -2402,6 +2402,8 @@ RevitPlugin::handleMessage(Message *m)
         const char *fileName;
         tb >> fileName;
 		tb >> TrueNorthAngle;
+		tb >> ProjectHeight;
+		ProjectHeight *= REVIT_FEET_TO_M;
 		double eastWest;
 		double northSouth;
 		double xo=0.0, yo = 0.0, zo = 0.0;
@@ -3214,9 +3216,14 @@ RevitPlugin::handleMessage(Message *m)
 		{
 		case Message::SOCKET_CLOSED:
 		case Message::CLOSE_SOCKET:
-
+	        if (coVRMSController::instance()->isMaster())
+            {
+            if(toRevit!=nullptr && toRevit->getSocket() !=nullptr)
+            {
             cover->unwatchFileDescriptor(toRevit->getSocket()->get_id());
 			toRevit.reset(nullptr);
+            }
+            }
 
 			cerr << "connection to Revit closed" << endl;
 			break;
@@ -3487,8 +3494,9 @@ RevitPlugin::preFrame()
 			{
 				TokenBuffer stb;
 				
-
-				osg::Matrix mat = RevitScale * NorthRotMat * RevitGeoRefference * cover->getBaseMat();
+				osg::Matrix projectHeightMatrix;
+				projectHeightMatrix.makeTranslate(osg::Vec3(0,0,ProjectHeight));
+				osg::Matrix mat = RevitScale * NorthRotMat * projectHeightMatrix * RevitGeoRefference * cover->getBaseMat();
 				osg::Matrix invMat;
 				invMat.invert(mat);
 				osg::Matrix viewerTrans = cover->getViewerMat() * invMat;
@@ -4003,10 +4011,12 @@ DoorInfo::DoorInfo(int id, const char *Name, osg::MatrixTransform *tn, TokenBuff
 	osg::Vec3 BBMax;
 	tb >> BBMin;
 	tb >> BBMax;
+	tb >> maxDistance;
 	boundingBox.set(BBMin, BBMax);
 	if (isSliding != SlidingDirection::dirNone)
 	{
-		maxDistance = boundingBox.xMax() - boundingBox.xMin();
+		if(maxDistance == 0)
+		    maxDistance = boundingBox.xMax() - boundingBox.xMin();
 		if (maxDistance == 0)
 			maxDistance = 1;
 		HandOrientation.normalize(); // HandOrientation is in Revit World coordinates so either transform this back to local coordinates orjust use X for now.

@@ -36,7 +36,7 @@
 // for AnnotationMessage:
 #include <../../general/Annotation/AnnotationPlugin.h>
 
-#include <cover/ARToolKit.h>
+#include <cover/MarkerTracking.h>
 #include <cover/ui/Menu.h>
 #include <cover/ui/Action.h>
 #include <cover/ui/Button.h>
@@ -278,7 +278,7 @@ class ARMarkerInfo
 {
 public:
 	ARMarkerInfo();
-	ARToolKitMarker* marker=nullptr;
+	MarkerTrackingMarker* marker=nullptr;
 
 	osg::Matrix mat; // marker coordinates in mm in Revit coordinate system (object coordinates)
 	osg::Matrix invMarker;
@@ -607,6 +607,7 @@ public:
     void setPhase(int phase);
     int currentPhase=0;
     double TrueNorthAngle = 0.0;
+    double ProjectHeight = 0.0;
     osg::Matrix NorthRotMat;
     osg::Matrix RevitScale;
     osg::Matrix RevitGeoRefference;

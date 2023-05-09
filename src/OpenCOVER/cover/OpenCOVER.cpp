@@ -75,7 +75,7 @@
 #include "VRViewer.h"
 #include "VRSceneGraph.h"
 #include "coVRLighting.h"
-#include "ARToolKit.h"
+#include "MarkerTracking.h"
 #include "coHud.h"
 #include "coVRShader.h"
 #include "coOnscreenDebug.h"
@@ -92,6 +92,7 @@
 #include "ui/Button.h"
 #include "ui/Group.h"
 #include "ui/Manager.h"
+#include <OpenConfig/access.h>
 
 
 #ifdef _OPENMP
@@ -610,7 +611,7 @@ bool OpenCOVER::init()
 
     coVRTui::instance();
 
-    ARToolKit::instance();
+    MarkerTracking::instance();
 
     if (cover->debugLevel(4))
         fprintf(stderr, "Calling pfConfig\n");
@@ -711,7 +712,7 @@ bool OpenCOVER::init()
 
     coVRLighting::instance()->initMenu();
 
-    ARToolKit::instance()->config(); // setup Rendering Node
+    MarkerTracking::instance()->config(); // setup Rendering Node
     VRSceneGraph::instance()->config();
 
     coVRTui::instance()->config();
@@ -873,6 +874,13 @@ bool OpenCOVER::init()
     double frameEnd = cover->currentTime();
     hud->hideLater();
 
+    Input::instance()->discovery()->init();
+
+    config::Access config;
+    config.setErrorHandler(); // make parse errors in configuration files non-fatal
+
+    m_initialized = true;
+
     if (cover->debugLevel(1))
     {
         std::cerr << std::endl << "INIT TIMES:"
@@ -881,9 +889,6 @@ bool OpenCOVER::init()
                   << ", 1st frame " << frameEnd-init2End << "s"
                   << std::endl;
     }
-
-    Input::instance()->discovery()->init();
-    m_initialized = true;
 
     return true;
 }
@@ -1190,8 +1195,8 @@ bool OpenCOVER::frame()
     }
 
     //Remote AR update (send picture if required)
-    if (ARToolKit::instance()->remoteAR)
-        ARToolKit::instance()->remoteAR->update();
+    if (MarkerTracking::instance()->remoteAR)
+        MarkerTracking::instance()->remoteAR->update();
 
     if (interactionManager.update())
     {
@@ -1303,7 +1308,7 @@ bool OpenCOVER::frame()
             VRViewer::instance()->getViewerStats()->setAttribute(fn, "preframe time taken", endTime - beginPreFrameTime);
         }
     }
-    ARToolKit::instance()->update();
+    MarkerTracking::instance()->update();
 
     // print frame rate
     fl_time = cover->frameRealTime();
@@ -1407,7 +1412,7 @@ OpenCOVER::~OpenCOVER()
     delete coVRNavigationManager::instance();
     delete coVRCommunication::instance();
     delete coVRPartnerList::instance();
-    delete ARToolKit::instance();
+    delete MarkerTracking::instance();
     delete coVRTui::instance();
 
     cover->intersectedNode = NULL;
@@ -1481,6 +1486,7 @@ OpenCOVER::requestQuit()
     {
         terminateOnCoverQuit = true;
     }
+    terminateOnCoverQuit = coVRMSController::instance()->syncBool(terminateOnCoverQuit);
     if (terminateOnCoverQuit)
         coVRPluginList::instance()->requestQuit(true);
     m_vrbc.reset(nullptr);

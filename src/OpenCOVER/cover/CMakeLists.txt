@@ -19,21 +19,11 @@ INCLUDE_DIRECTORIES(
   ${OPENSCENEGRAPH_INCLUDE_DIRS}
 )
 
-FIND_PACKAGE(CURL QUIET)
-IF(CURL_FOUND)
-  ADD_DEFINITIONS(-DHAVE_LIBCURL)
-  IF(WIN32)
-    ADD_DEFINITIONS(-DCURL_STATICLIB)
-  ENDIF(WIN32)
-  SET(EXTRA_INCS ${EXTRA_INCS} ${CURL_INCLUDE_DIR})
-  SET(EXTRA_LIBS ${EXTRA_LIBS} ${CURL_LIBRARIES})
-ENDIF()
-
 SET(COVER_HEADERS
   # tui file browser headers
   #coVRDePee.h
   #coVRDePeePass.h
-  ARToolKit.h
+  MarkerTracking.h
   Deletable.h
   EventReceiver.h
   InitGLOperation.h
@@ -76,6 +66,7 @@ SET(COVER_HEADERS
   coVRConfig.h
   coVRDynLib.h
   coVRFileManager.h
+  SidecarConfigBridge.h
   coVRIOBase.h
   coVRIOReader.h
   coVRIntersectionInteractor.h
@@ -103,7 +94,7 @@ SET(COVER_HEADERS
 )
 
 SET(COVER_SOURCES
-  ARToolKit.cpp
+  MarkerTracking.cpp
   Deletable.cpp
   EventReceiver.cpp
   InitGLOperation.cpp
@@ -148,6 +139,7 @@ SET(COVER_SOURCES
   coVRConfig.cpp
   coVRDynLib.cpp
   coVRFileManager.cpp
+  SidecarConfigBridge.cpp
   coVRIOBase.cpp
   coVRIOReader.cpp
   coVRIntersectionInteractor.cpp
@@ -291,6 +283,11 @@ if(APPLE)
    add_covise_compile_flags(${COVERKERNEL_TARGET} "-Wno-error=null-dereference")
 endif()
 
+IF(CURL_FOUND)
+  SET(EXTRA_INCS ${EXTRA_INCS} ${CURL_INCLUDE_DIR})
+  SET(EXTRA_LIBS ${EXTRA_LIBS} ${CURL_LIBRARIES})
+ENDIF()
+
 IF(BASEARCHSUFFIX STREQUAL "angus" OR
    BASEARCHSUFFIX STREQUAL "vista")
   IF(MSVC AND QT_VERSION_MAJOR EQUAL 4)
@@ -307,7 +304,7 @@ ENDIF(WIN32)
 
 COVISE_WNOERROR(${COVERKERNEL_TARGET} BASEARCH basilisk tuatara zebu)
 
-TARGET_LINK_LIBRARIES(${COVERKERNEL_TARGET} coOpenVRUI coOSGVRUI coQtUtil coMessages
+TARGET_LINK_LIBRARIES(${COVERKERNEL_TARGET} coOpenVRUI coOSGVRUI coQtUtil coMessages coOpenConfig
    ${COVISE_VRBCLIENT_LIBRARY} ${COVISE_GRMSG_LIBRARY} ${COVISE_UTIL_LIBRARY} ${COVISE_GPU_LIBRARIES} ${COVISE_NET_LIBRARY}
    ${XERCESC_LIBRARIES} ${OPENSCENEGRAPH_LIBRARIES} ${TIFF_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${EXTRA_LIBS})
 target_include_directories(${COVERKERNEL_TARGET} PRIVATE ${EXTRA_INCS})
