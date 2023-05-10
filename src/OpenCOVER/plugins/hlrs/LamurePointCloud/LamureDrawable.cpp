@@ -9,15 +9,27 @@
  
 #include "LamureDrawable.h"
 
+LamureDrawable* LamureDrawable::lmrNode = NULL;
 
 LamureDrawable::LamureDrawable()
 {
+    lmrNode = this;
 }
 
 
 void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const
 {
+    glBegin(GL_TRIANGLES);
+    {
+        glVertex2f(-500.0f, -500.0f);
+        glVertex2f(500.0f, 500.0f);
+        glVertex2f(500.0f, -500);
+
+        
+    }
+    glEnd();
 }
+
 
 
 osg::Object* LamureDrawable::cloneType() const
@@ -33,4 +45,5 @@ osg::Object* LamureDrawable::clone(const osg::CopyOp&) const
 
 LamureDrawable::~LamureDrawable()
 {
+    delete lmrNode;
 }

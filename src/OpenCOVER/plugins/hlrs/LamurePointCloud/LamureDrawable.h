@@ -24,6 +24,8 @@ public:
     LamureDrawable::LamureDrawable();
     ~LamureDrawable();
 
+    static LamureDrawable* lmrNode;
+
     void drawImplementation(osg::RenderInfo& renderInfo) const override;
 
     osg::Object* LamureDrawable::cloneType() const override;

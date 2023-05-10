@@ -105,6 +105,7 @@
 #include "C:\src\covise\src\OpenCOVER\plugins\hlrs\LamurePointCloud\LamureGeometry.h"
 #include "C:\src\covise\src\OpenCOVER\plugins\hlrs\LamurePointCloud\LamureDrawable.h"
 #include "C:\src\covise\src\OpenCOVER\plugins\hlrs\LamurePointCloud\Points.h"
+#include "LamureDrawable.h"
 
 
 namespace opencover {

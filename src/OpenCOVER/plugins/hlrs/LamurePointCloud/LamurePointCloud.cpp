@@ -401,8 +401,15 @@ bool LamurePointCloudPlugin::init()
     plugin->transform->addChild(plugin->lamureFileNode);
 
     VRSceneGraph::instance()->viewAll();
-    VRViewer::instance()->statsDisplay->showStats(coVRStatsDisplay::VIEWER_SCENE_STATS, VRViewer::instance());
-    
+    //VRViewer::instance()->statsDisplay->showStats(coVRStatsDisplay::VIEWER_SCENE_STATS, VRViewer::instance());
+
+
+    osg::Geode* geodevideo = new osg::Geode;
+    LamureDrawable* lmrNode = new LamureDrawable();
+    osg::StateSet* statesetBackgroundBin = new osg::StateSet();
+    geodevideo->addDrawable(lmrNode);
+    plugin->transform->addChild(geodevideo);
+
     return 1;
 }
 
@@ -607,9 +614,6 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
     //HGLRC hglrc = wglCreateContext(hdc);
     //wglMakeCurrent(hdc, hglrc);
 
-
-    
-    
     return 1;
 }
 
@@ -644,9 +648,11 @@ void LamurePointCloudPlugin::preFrame()
         //std::cout << "" << std::endl;
 
 
+
+
+
         VRViewer::ViewerBase* viewer = VRViewer::instance();
 
-        std::string font = coVRFileManager::instance()->getFontFile(NULL);
 
         // collect all the relevant cameras
         osgViewer::ViewerBase::Cameras validCameras;
