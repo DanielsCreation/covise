@@ -4,8 +4,8 @@ SET(HEADERS
   LamurePointCloud.h
   LamureGeometry.h
   LamureDrawable.h
-  LamureContext.h
-  LamureDevice.h
+  #LamureContext.h
+  #LamureDevice.h
   bvh.h
   bvh_stream.h
   cache.h
@@ -50,8 +50,8 @@ SET(SOURCES
   LamurePointCloud.cpp
   LamureGeometry.cpp
   LamureDrawable.cpp
-  LamureContext.cpp
-  LamureDevice.cpp
+  #LamureContext.cpp
+  #LamureDevice.cpp
   bvh.cpp
   bvh_stream.cpp
   cache.cpp
@@ -85,23 +85,41 @@ SET(SOURCES
   utils.cpp
 )
 
-include_directories(${REND_INCLUDE_DIR}
-			${COMMON_INCLUDE_DIR}
-            ${PVS_COMMON_INCLUDE_DIR}
-			${FREEGLUT_INCLUDE_DIR}
-            ${GLUT_INCLUDE_DIR}
-		    ${GLM_INCLUDE_DIR}
-            ${FREEIMAGE_INCLUDE_DIR}
-	        ${LAMURE_INCLUDE_DIR}
-            ${SCHISM_INCLUDE_DIRS}
-            ${GLEW_INCLUDE_DIR}
-            ${Boost_INCLUDE_DIR}
+set(SCHISM_INCLUDE_DIRS
+    ${CMAKE_CURRENT_LIST_DIR}/schism/scm_core/src
+    ${CMAKE_CURRENT_LIST_DIR}/schism/scm_gl_core/src
+    ${CMAKE_CURRENT_LIST_DIR}/schism/scm_gl_util/src
+    ${CMAKE_CURRENT_LIST_DIR}/schism/scm_input/src
+)
+
+set(SCHISM_CORE_LIBRARY ${CMAKE_CURRENT_LIST_DIR}/schism/lib/win_x64/Release/scm_core.lib)
+set(SCHISM_CORE_LIBRARY_DEBUG ${CMAKE_CURRENT_LIST_DIR}/schism/lib/win_x64/Debug/scm_core-gd.lib)
+
+set(SCHISM_GL_CORE_LIBRARY ${CMAKE_CURRENT_LIST_DIR}/schism/lib/win_x64/Release/scm_gl_core.lib)
+set(SCHISM_GL_CORE_LIBRARY_DEBUG ${CMAKE_CURRENT_LIST_DIR}/schism/lib/win_x64/Debug/scm_gl_core-gd.lib)
+
+set(SCHISM_GL_UTIL_LIBRARY ${CMAKE_CURRENT_LIST_DIR}/schism/lib/win_x64/Release/scm_gl_util.lib)
+set(SCHISM_GL_UTIL_LIBRARY_DEBUG ${CMAKE_CURRENT_LIST_DIR}/schism/lib/win_x64/Debug/scm_gl_util-gd.lib)
+
+
+include_directories(
+${REND_INCLUDE_DIR}
+${COMMON_INCLUDE_DIR}
+${PVS_COMMON_INCLUDE_DIR}
+${FREEGLUT_INCLUDE_DIR}
+${GLUT_INCLUDE_DIR}
+${GLM_INCLUDE_DIR}
+${FREEIMAGE_INCLUDE_DIR}
+${LAMURE_INCLUDE_DIR}
+${SCHISM_INCLUDE_DIRS}
+${GLEW_INCLUDE_DIR}
+${Boost_INCLUDE_DIR}
 )
 
 include_directories(SYSTEM 
   ${SCHISM_INCLUDE_DIRS}
-  ${Boost_INCLUDE_DIR})
-
+  ${Boost_INCLUDE_DIR}
+)
 
 cover_add_plugin(LamurePointCloud)
 covise_wnoerror(LamurePointCloud)
@@ -118,4 +136,5 @@ TARGET_LINK_LIBRARIES(LamurePointCloud
     optimized ${SCHISM_GL_CORE_LIBRARY} debug ${SCHISM_GL_CORE_LIBRARY_DEBUG}
     optimized ${SCHISM_GL_UTIL_LIBRARY} debug ${SCHISM_GL_UTIL_LIBRARY_DEBUG}
     optimized ${Boost_TIMER_LIBRARY_RELEASE} debug ${Boost_TIMER_LIBRARY_DEBUG}
+    #optimized ${FREETYPE_LIBRARY_RELEASE} debug ${FREETYPE_LIBRARY_DEBUG}
 )

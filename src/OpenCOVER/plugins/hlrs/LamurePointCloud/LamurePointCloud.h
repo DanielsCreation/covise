@@ -43,8 +43,8 @@
 #include <lamure/ren/policy.h>
 #include <lamure/pvs/pvs_database.h>
 //#include <lamure/ren/ray.h>
-//#include <lamure/prov/prov_aux.h>
-//#include <lamure/vt/pre/AtlasFile.h>
+#include <lamure/prov/prov_aux.h>
+#include <lamure/vt/pre/AtlasFile.h>
 
 //schism
 #include <scm/time.h>
@@ -54,7 +54,6 @@
 #include <scm/core/pointer_types.h>
 #include <scm/core/platform/platform.h>
 #include <scm/core/utilities/platform_warning_disable.h>
-#include <scm/gl_core/gl_core_fwd.h>
 #include <scm/gl_util/primitives/quad.h>
 #include <scm/gl_util/font/font_face.h>
 #include <scm/gl_util/font/text.h>
@@ -63,7 +62,6 @@
 #include <scm/gl_util/data/imaging/texture_loader.h>
 #include <scm/gl_util/primitives/geometry.h>
 #include <scm/gl_util/primitives/box.h>
-
 
 //#include <cover/coVRMSController.h>
 //#include <cover/coVRTui.h>
@@ -102,10 +100,10 @@
 #include <osg/Texture2D>
 #include <osgDB/ReadFile>
 
-#include "C:\src\covise\src\OpenCOVER\plugins\hlrs\LamurePointCloud\LamureGeometry.h"
-#include "C:\src\covise\src\OpenCOVER\plugins\hlrs\LamurePointCloud\LamureDrawable.h"
-#include "C:\src\covise\src\OpenCOVER\plugins\hlrs\LamurePointCloud\Points.h"
+#include "Points.h"
+#include "LamureGeometry.h"
 #include "LamureDrawable.h"
+#include "scm/gl_core/gl_core_fwd.h"
 
 
 namespace opencover {
@@ -140,32 +138,46 @@ class LamurePointCloudPlugin : public coVRPlugin, public ui::Owner
 public:
     LamurePointCloudPlugin();
     ~LamurePointCloudPlugin();
+
+    const LamurePointCloudPlugin* instance() const;
     bool init();
-    string getConfigEntry(string scope);
-    string getConfigEntry(string scope, string name);
-    const char* stringToConstChar(string str);
-    string extractFilename(const string pathname);
-    void strcpyTail(char* suffix, const char* str, char c);
-    const LamurePointCloudPlugin *instance() const;
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
-    ui::Group* FileGroup;
     void preFrame();
-    //bool update();
-    void set_uniforms(scm::gl::program_ptr shader);
-    void lamure_display();
-    void draw_all_models(const context_t context_id, const view_t view_id, scm::gl::program_ptr shader);
-    void draw_brush(scm::gl::program_ptr shader);
-    void draw_resources(const context_t context_id, const view_t view_id);
-    void covise_display();
-    void create_aux_resources();
-    void co_draw_all_models(const context_t context_id, const view_t view_id, scm::gl::program_ptr shader);
-    bool parse_prefix(std::string& in_string, std::string const& prefix);
-    bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
+
+    // shared functions
     void init_lamure_shader();
+    bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
+    void create_aux_resources();
+    void draw_resources(const context_t context_id, const view_t view_id);
+    void draw_brush(scm::gl::program_ptr shader);
+    void set_uniforms(scm::gl::program_ptr shader);
+    
+    // old functions
     void create_framebuffers();
     void init_render_states();
     void init_camera();
+    void lamure_display();
+    void draw_all_models(const context_t context_id, const view_t view_id, scm::gl::program_ptr shader);
+
+    // util
+    bool parse_prefix(std::string& in_string, std::string const& prefix);
+    string getConfigEntry(string scope);
+    string getConfigEntry(string scope, string name);
+    string extractFilename(const string pathname);
+    void strcpyTail(char* suffix, const char* str, char c);
+    const char* stringToConstChar(string str);
+    scm::gl::data_format get_tex_format();
+    void apply_vt_cut_update();
+    float get_atlas_scale_factor();
+    void lines_from_min_max(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, std::vector<scm::math::vec3f>& lines);
+
+    // objects and pointers
+    ui::Group* FileGroup;
+    osg::Vec3f vecConv(scm::math::vec3f& v);
+    osg::Vec3d vecConv(scm::math::vec3d& v);
+    osg::Matrixf matConv(scm::math::mat4f& m);
+    osg::Matrixd matConv(scm::math::mat4d& m);
     std::string const strip_whitespace(std::string const& in_string);
     scm::math::mat4d load_matrix(const std::string& filename);
     osg::ref_ptr<osg::Group> LamureGroup;
@@ -189,6 +201,8 @@ private:
     osg::VertexBufferObject* vertexBufferArray;
     osg::ElementBufferObject* primitiveBufferArray;
     PointSet* pointSet = nullptr;
+
+
     osg::ref_ptr<osg::Geode> geo;
     osg::ref_ptr<osg::MatrixTransform> transform;
     osg::ref_ptr<osg::StateSet> state;
