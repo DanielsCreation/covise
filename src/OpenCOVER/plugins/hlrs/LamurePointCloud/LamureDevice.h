@@ -2,10 +2,13 @@
 // Copyright (c) 2012 Christopher Lux <christopherlux@gmail.com>
 // Distributed under the Modified BSD License, see license.txt.
 
-#ifndef LAMURE_DEVICE_H_INCLUDED
-#define LAMURE_DEVICE_H_INCLUDED
+#ifndef CO_LAMURE_DEVICE_H_INCLUDED
+#define CO_LAMURE_DEVICE_H_INCLUDED
 
-#include <scm/gl_core/render_device/device.h>
+//gl
+#ifndef __gl_h_
+#include <GL/glew.h>
+#endif
 
 #include <iosfwd>
 #include <limits>
@@ -13,49 +16,32 @@
 #include <set>
 #include <utility>
 #include <vector>
+#include <algorithm>
+#include <exception>
+#include <stdexcept>
+#include <sstream>
 
 #include <boost/noncopyable.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
 
-
-#include <scm/config.h>
 #include <scm/core/math.h>
-#include <scm/core/memory.h>
-
-#include <scm/gl_core/gl_core_fwd.h>
-#include <scm/gl_core/data_formats.h>
-#include <scm/gl_core/buffer_objects/buffer.h>
-#include <scm/gl_core/shader_objects/shader_objects_fwd.h>
-#include <scm/gl_core/shader_objects/shader_macro.h>
-#include <scm/gl_core/state_objects/blend_state.h>
-#include <scm/gl_core/state_objects/depth_stencil_state.h>
-#include <scm/gl_core/state_objects/rasterizer_state.h>
-
-#include <scm/core/platform/platform.h>
-#include <scm/core/utilities/platform_warning_disable.h>
-
-#include "LamureContext.h"
-
-#include <boost/thread/mutex.hpp>
-#include <boost/shared_ptr.hpp>
-#include <scm/core/numeric_types.h>
-#include <scm/gl_core/render_device/render_device_fwd.h>
-#include <scm/gl_core/shader_objects/shader_objects_fwd.h>
-#include <scm/core/numeric_types.h>
-#include "scm/gl_core/gl_core_fwd.h"
+#include <scm/gl_core/buffer_objects.h>
+#include <scm/gl_core/frame_buffer_objects.h>
+#include <scm/gl_core/query_objects.h>
+#include <scm/gl_core/shader_objects.h>
+#include <scm/gl_core/state_objects.h>
+#include <scm/gl_core/texture_objects.h>
 
 
 
-namespace gl {
-    namespace opengl {
-        class gl_core;
-    }
-}
 
+class LamureContext;
 
 class LamureDevice
 {
+
+
 public:
 
     struct device_capabilities {
@@ -99,28 +85,26 @@ public:
 
         int             _max_shader_storage_block_bindings;
         int             _max_shader_storage_block_size;
-        scm::int64           _shader_storage_buffer_offset_alignment;
-    }; 
+        scm::int64      _shader_storage_buffer_offset_alignment;
+    };
 
 protected:
     typedef boost::unordered_set<scm::gl::render_device_resource*>      resource_ptr_set;
     typedef boost::unordered_map<std::string, scm::gl::shader_macro>    shader_macro_map;
-
     typedef std::set<std::string>                                       string_set;
     typedef std::list<scm::gl::shader_ptr>                              shader_list;
     typedef std::vector<scm::gl::buffer_ptr>                            buffer_array;
 
 
-////// methods ////////////////////////////////////////////////////////////////////////////////////
+    ////// methods ////////////////////////////////////////////////////////////////////////////////////
 public:
     LamureDevice();
     virtual ~LamureDevice();
 
-    const scm::gl::opengl::gl_core& opengl_api() const;
-
-    scm::gl::render_context_ptr              main_context() const;
-    //render_context_ptr              create_context();
-    const device_capabilities&      capabilities() const;
+    // device /////////////////////////////////////////////////////////////////////////////////////
+    scm::gl::render_context_ptr             main_context() const;
+    scm::gl::render_context_ptr             create_context();
+    const device_capabilities&              capabilities() const;
 
     virtual void                    print_device_informations(std::ostream& os) const;
     const std::string               device_vendor() const;
@@ -128,8 +112,15 @@ public:
     const std::string               device_shader_compiler() const;
     const std::string               device_context_version() const;
 
+protected:
+    void                            init_capabilities();
 
-    // buffer api /////////////////////////////////////////////////////////////////////////////////
+    void                            register_resource(scm::gl::render_device_resource* res_ptr);
+    void                            release_resource(scm::gl::render_device_resource* res_ptr);
+
+    bool add_include_string_internal(const std::string& in_path, const std::string& in_source_string, bool lock_thread);
+
+// buffer api /////////////////////////////////////////////////////////////////////////////////
 public:
     scm::gl::buffer_ptr                     create_buffer(const scm::gl::buffer_desc& in_buffer_desc, const void* in_initial_data = 0);
     scm::gl::buffer_ptr                     create_buffer(scm::gl::buffer_binding in_binding, scm::gl::buffer_usage   in_usage, scm::size_t    in_size, const void* in_initial_data = 0);
@@ -139,51 +130,8 @@ public:
 
     scm::gl::transform_feedback_ptr         create_transform_feedback(const scm::gl::stream_output_setup& in_setup);
 
-////// attributes /////////////////////////////////////////////////////////////////////////////////
-protected:
-    // device /////////////////////////////////////////////////////////////////////////////////////
-    struct mutex_impl;
-    boost::shared_ptr<mutex_impl>          _mutex_impl;
 
-    // device /////////////////////////////////////////////////////////////////////////////////////
-    boost::shared_ptr<scm::gl::opengl::gl_core>     _opengl_api_core;
-    scm::gl::render_context_ptr              _main_context;
-
-    // shader api /////////////////////////////////////////////////////////////////////////////////
-    shader_macro_map                _default_macro_defines;
-    string_set                      _default_include_paths;
-
-    device_capabilities             _capabilities;
-    resource_ptr_set                _registered_resources;
-
-
-protected:
-    typedef boost::unordered_set<scm::gl::render_device_resource*>   resource_ptr_set;
-
-    typedef boost::unordered_map<std::string, scm::gl::shader_macro> shader_macro_map;
-    typedef std::set<std::string>                           string_set;
-
-    typedef std::list<scm::gl::shader_ptr>                           shader_list;
-
-    typedef std::vector<scm::gl::buffer_ptr>                         buffer_array;
-
-
-protected:
-    void                            init_capabilities();
-
-    void                            register_resource(scm::gl::render_device_resource* res_ptr);
-    void                            release_resource(scm::gl::render_device_resource* res_ptr);
-
-    // buffer api /////////////////////////////////////////////////////////////////////////////////
-public:
-    scm::gl::buffer_ptr             create_buffer(const scm::gl::buffer_desc& in_buffer_desc, const void* in_initial_data = 0);
-    scm::gl::buffer_ptr             create_buffer(scm::gl::buffer_binding in_binding, scm::gl::buffer_usage   in_usage, scm::size_t    in_size, const void* in_initial_data = 0);
-    bool                            resize_buffer(const scm::gl::buffer_ptr& in_buffer, scm::size_t in_size);
-
-    scm::gl::vertex_array_ptr                create_vertex_array(const scm::gl::vertex_format& in_vert_fmt, const buffer_array& in_attrib_buffers, const scm::gl::program_ptr& in_program = scm::gl::program_ptr());
-    scm::gl::transform_feedback_ptr          create_transform_feedback(const scm::gl::stream_output_setup& in_setup);
-
-    // shader api /////////////////////////////////////////////////////////////////////////////////
+// shader api /////////////////////////////////////////////////////////////////////////////////
 public:
     bool                            add_include_files(const std::string& in_path,
         const std::string& in_glsl_root_path = std::string("/"),
@@ -249,10 +197,9 @@ public:
         bool in_rasterization_discard = false,
         const std::string& in_program_name = "");
 
-protected:
-    bool add_include_string_internal(const std::string& in_path, const std::string& in_source_string, bool lock_thread);
 
-    // texture api ////////////////////////////////////////////////////////////////////////////////
+
+//    texture api ////////////////////////////////////////////////////////////////////////////////
 public:
     scm::gl::texture_1d_ptr                  create_texture_1d(const scm::gl::texture_1d_desc& in_desc);
     scm::gl::texture_1d_ptr                  create_texture_1d(const scm::gl::texture_1d_desc& in_desc,
@@ -364,7 +311,7 @@ public:
         scm::gl::compare_func         in_compare_func = scm::gl::COMPARISON_LESS_EQUAL,
         scm::gl::texture_compare_mode in_compare_mode = scm::gl::TEXCOMPARE_NONE);
 
-    // frame buffer api ///////////////////////////////////////////////////////////////////////////
+// frame buffer api ///////////////////////////////////////////////////////////////////////////
     scm::gl::render_buffer_ptr               create_render_buffer(const scm::gl::render_buffer_desc& in_desc);
     scm::gl::render_buffer_ptr               create_render_buffer(const scm::math::vec2ui& in_size,
         const scm::gl::data_format   in_format,
@@ -372,7 +319,7 @@ public:
     scm::gl::frame_buffer_ptr                create_frame_buffer();
 
 
-    // state api //////////////////////////////////////////////////////////////////////////////////
+// state api //////////////////////////////////////////////////////////////////////////////////
 public:
     scm::gl::depth_stencil_state_ptr         create_depth_stencil_state(const scm::gl::depth_stencil_state_desc& in_desc);
     scm::gl::depth_stencil_state_ptr         create_depth_stencil_state(bool in_depth_test, bool in_depth_mask = true, scm::gl::compare_func in_depth_func = scm::gl::COMPARISON_LESS,
@@ -403,12 +350,22 @@ public:
     scm::gl::transform_feedback_statistics_query_ptr create_transform_feedback_statistics_query(int stream = 0);
 
 
-
-
+////// attributes /////////////////////////////////////////////////////////////////////////////////
 protected:
-    bool                            add_include_string_internal(const std::string& in_path,
-        const std::string& in_source_string,
-        bool         lock_thread);
+    // device /////////////////////////////////////////////////////////////////////////////////////
+    struct mutex_impl;
+    boost::shared_ptr<mutex_impl>          _mutex_impl;
+
+    // device /////////////////////////////////////////////////////////////////////////////////////
+    scm::gl::render_device_ptr              _device;
+    scm::gl::render_context_ptr             _main_context;
+
+    // shader api /////////////////////////////////////////////////////////////////////////////////
+    shader_macro_map                _default_macro_defines;
+    string_set                      _default_include_paths;
+
+    device_capabilities             _capabilities;
+    resource_ptr_set                _registered_resources;
 
 
 }; // class LamureDevice

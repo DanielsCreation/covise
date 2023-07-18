@@ -6,7 +6,6 @@
  * License: LGPL 2+ */
 
  // Local:
-#include "LamurePointCloud.h"
 #include "LamureGeometry.h"
 
 #include <iostream>
@@ -23,7 +22,6 @@ using namespace std;
 // should be using a file pointer instead of loading all data into memory
 LamureGeometry::LamureGeometry(PointSet* pointData)
 {
-
     // load data outside of the drawable
     setUseDisplayList(false);
     setSupportsDisplayList(false);

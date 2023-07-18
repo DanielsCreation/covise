@@ -2,15 +2,17 @@
 # search paths
 ##############################################################################
 SET(SCHISM_INCLUDE_SEARCH_DIRS
-  $ENV{EXTERNLIBS}/schism/include
+  $ENV{EXTERNLIBS}/schism
   ${GLOBAL_EXT_DIR}/schism/include
   ${GLOBAL_EXT_DIR}/include/schism
+  ${GLOBAL_EXT_DIR}/schism
   ${SCHISM_INCLUDE_SEARCH_DIR}
   /opt/schism/current
 )
 
 SET(SCHISM_LIBRARY_SEARCH_DIRS
-  $ENV{EXTERNLIBS}/schism/lib
+  $ENV{EXTERNLIBS}/schism/lib/win_x64/Debug
+  $ENV{EXTERNLIBS}/schism/lib/win_x64/Release
   ${GLOBAL_EXT_DIR}/lib
   ${GLOBAL_EXT_DIR}/schism/lib
   ${SCHISM_LIBRARY_SEARCH_DIR}
@@ -42,7 +44,7 @@ IF ( NOT SCHISM_INCLUDE_DIRS )
         LIST(APPEND _SCHISM_INCLUDE_DIRS ${_INC_DIR}/scm_gl_core/src)
         LIST(APPEND _SCHISM_INCLUDE_DIRS ${_INC_DIR}/scm_gl_util/src)
         LIST(APPEND _SCHISM_INCLUDE_DIRS ${_INC_DIR}/scm_input/src)
-    ENDFOREACH(_INC_DIR ${_BOOST_FOUND_INC_DIRS})
+    ENDFOREACH(_INC_DIR ${_SCHISM_FOUND_INC_DIRS})
 
     IF (_SCHISM_FOUND_INC_DIRS)
         SET(SCHISM_INCLUDE_DIRS ${_SCHISM_INCLUDE_DIRS} CACHE PATH "path to schism headers.")

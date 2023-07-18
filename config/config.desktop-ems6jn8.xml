@@ -101,7 +101,7 @@
       <Plugin>
         <Vrml97 value="off" />
         <Annotation value="off" />
-        <Move value="on" />
+        <Move value="off" />
         <LamurePointCloud value="on" />
         <DistortViewer value="off" />
         <Revit value="off" />
