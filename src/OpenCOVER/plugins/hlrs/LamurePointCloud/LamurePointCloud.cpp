@@ -538,50 +538,17 @@ size_t LamurePointCloudPlugin::query_video_memory_in_mb() {
 }
 
 
-struct NodeCall : public osg::Geode
+struct GeoGl : public osg::Group
 {
-    NodeCall()
-        :   _id(), 
-            _vec()
-    {
-        setEventCallback(new Event(_id, _vec));
-    }
-
-    uint8_t _id;
-    std::vector<std::string> _vec;
-
-
-    struct Event : public virtual osg::Drawable::EventCallback
-    {
-        Event(uint8_t id, std::vector<std::string> vec) : _id(id), _vec(vec)
-        {
-        }
-
-        virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
-        {
-            drawable->drawImplementation(renderInfo);
-
-
-
-        }
-        uint8_t _id;
-        std::vector<std::string> _vec;
-    };
-};
-NodeCall nc;
-
-
-struct GeoTrafo : public osg::MatrixTransform
-{
-    GeoTrafo()
+    GeoGl()
         : _triangle_geode(new osg::Geode),
         _line_geode(new osg::Geode),
         _point_geode(new osg::Geode)
     {
-        std::cout << "struct GeoTrafo()" << std::endl;
-        //_pos -= osg::Vec3(0, height, 0.1);
-        //setMatrix(osg::Matrix::translate(_pos));
+        std::cout << "struct GeoGl()" << std::endl;
         addChild(_triangle_geode.get());
+        addChild(_line_geode.get());
+        addChild(_point_geode.get());
     }
 
     void addTriangleGeo(osg::Stats* viewerStats)
@@ -590,13 +557,13 @@ struct GeoTrafo : public osg::MatrixTransform
         _triangle_geode->addDrawable(new TriangleGeometry(this, viewerStats));
     }
 
-    void addLineGeo(osg::Stats* viewerStats, osg::Stats* stats)
+    void addLineGeo(osg::Stats* viewerStats)
     {
         std::cout << "void addTriangleGeo()" << std::endl;
         _line_geode->addDrawable(new LinesGeometry(this, viewerStats));
     }
 
-    void addPointGeo(osg::Stats* viewerStats, osg::PrimitiveSet* pointSet)
+    void addPointGeo(osg::Stats* viewerStats)
     {
         std::cout << "void addTriangleGeo()" << std::endl;
         _point_geode->addDrawable(new PointsGeometry(this, viewerStats));
@@ -608,23 +575,17 @@ struct GeoTrafo : public osg::MatrixTransform
 protected:
     struct TriangleGeometry : public osg::Geometry
     {
-        TriangleGeometry(struct GeoTrafo* geo_trafo, osg::Stats* viewerStats)
+        TriangleGeometry(struct GeoGl* geo_gl, osg::Stats* viewerStats)
         {
             std::cout << "protected struct TriangleGeometry()" << std::endl;
-            setUseDisplayList(false);
-            //setVertexArray(new osg::Vec3Array);
-            //osg::Vec4Array* colors = new osg::Vec4Array;
-            //colors->push_back(color);
-            //setColorArray(colors);
-            //setColorBinding(osg::Geometry::BIND_OVERALL);
-
-            setDrawCallback(new TriangleUpdateCallback(geo_trafo, viewerStats));
+            setUseDisplayList(true);
+            setDrawCallback(new TriangleUpdateCallback(geo_gl, viewerStats));
         }
     };
     struct TriangleUpdateCallback : public virtual osg::Drawable::DrawCallback
     {
-        TriangleUpdateCallback(GeoTrafo* geo_trafo, osg::Stats* viewerStats)
-            : _geo_trafo(geo_trafo),
+        TriangleUpdateCallback(GeoGl* geo_gl, osg::Stats* viewerStats)
+            : _geo_gl(geo_gl),
             _viewerStats(viewerStats)
         {
             std::cout << "protected struct TriangleUpdateCallback()" << std::endl;
@@ -632,10 +593,7 @@ protected:
         /** do customized draw code.*/
         virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
         {
-            /*osg::Geometry* geom = (osg::Geometry*)drawable;
-            osg::Vec3Array* vertices = (osg::Vec3Array*)geom->getVertexArray();
-            vertices->dirty();
-            drawable->drawImplementation(renderInfo);*/
+            drawable->drawImplementation(renderInfo);
             std::cout << "protected struct TriangleUpdateCallback(), virtual void drawImplementation()" << std::endl;
             glBegin(GL_TRIANGLES);
             {
@@ -645,54 +603,216 @@ protected:
             }
             glEnd();
         }
-        GeoTrafo* _geo_trafo = nullptr;
+        GeoGl* _geo_gl = nullptr;
         osg::Stats* _viewerStats;
     };
 
     struct LinesGeometry : public osg::Geometry
     {
-        LinesGeometry(struct GeoTrafo* geo_trafo, osg::Stats* viewerStats)
+        LinesGeometry(struct GeoGl* geo_gl, osg::Stats* viewerStats)
         {
             std::cout << "protected struct LinesGeometry()" << std::endl;
-            
-            //setDrawCallback(new LinesUpdateCallback(geo_trafo, viewerStats));
+            setDrawCallback(new LinesUpdateCallback(geo_gl, viewerStats));
         }
     };
     struct LinesUpdateCallback : public virtual osg::Drawable::DrawCallback
     {
-        LinesUpdateCallback(GeoTrafo* geo_trafo, osg::Stats* viewerStats)
-            : _geo_trafo(geo_trafo),
+        LinesUpdateCallback(GeoGl* geo_gl, osg::Stats* viewerStats)
+            : _geo_gl(geo_gl),
             _viewerStats(viewerStats)
         {
- 
+            std::cout << "protected struct LinesUpdateCallback()" << std::endl;
         }
+
         /** do customized draw code.*/
         virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
         {
-            /*osg::Geometry* geom = (osg::Geometry*)drawable;
-            osg::Vec3Array* vertices = (osg::Vec3Array*)geom->getVertexArray();
-            vertices->dirty();
-            drawable->drawImplementation(renderInfo);*/
             std::cout << "protected struct LinesUpdateCallback(), virtual void drawImplementation()" << std::endl;
+            const osg::GraphicsContext::Traits* traits = coVRConfig::instance()->windows[0].context->getTraits();
+            osg::Camera* osg_cam_ = VRViewer::instance()->getCamera();
+            sync_osg_cam(camera_, osg_cam_);
+            if (LamurePointCloudPlugin::instance()->rendering_) { return; }
+            LamurePointCloudPlugin::instance()->rendering_ = true;
+            lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
+            lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
+            lamure::ren::controller* controller = lamure::ren::controller::get_instance();
+            lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
+            if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+                controller->reset_system(data_provenance_);
+            }
+            else {
+                controller->reset_system();
+            }
+            lamure::context_t context_id = controller->deduce_context_id(0);
+            for (lamure::model_t model_id = 0; model_id < num_models_; ++model_id) {
+                lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
+                cuts->send_transform(context_id, m_id, scm::math::mat4f(model_transformations_[m_id]));
+                cuts->send_threshold(context_id, m_id, settings_.lod_error_);
+                cuts->send_rendered(context_id, m_id);
+                database->get_model(m_id)->set_transform(scm::math::mat4f(model_transformations_[m_id]));
+            }
+            lamure::view_t cam_id = controller->deduce_view_id(context_id, camera_->view_id());
+            cuts->send_camera(context_id, cam_id, *camera_);
+            std::vector<scm::math::vec3d> corner_values = camera_->get_frustum_corners();
+            double top_minus_bottom = scm::math::length((corner_values[2]) - (corner_values[0]));
+            height_divided_by_top_minus_bottom_ = lamure::ren::policy::get_instance()->window_height() / top_minus_bottom;
+            cuts->send_height_divided_by_top_minus_bottom(context_id, cam_id, height_divided_by_top_minus_bottom_);
 
+            if (settings_.use_pvs_) {
+                scm::math::mat4f cm = scm::math::inverse(scm::math::mat4f(camera_->trackball_matrix()));
+                scm::math::vec3d cam_pos = scm::math::vec3d(cm[12], cm[13], cm[14]);
+                pvs->set_viewer_position(cam_pos);
+            }
+
+            if (settings_.lod_update_) {
+                if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+                    controller->dispatch(context_id, device_, data_provenance_);
+                }
+                else {
+                    controller->dispatch(context_id, device_);
+                }
+            }
+            lamure::view_t view_id = controller->deduce_view_id(context_id, camera_->view_id());
+            context_->set_rasterizer_state(no_backface_culling_rasterizer_state_);
+            auto selected_single_pass_shading_program = vis_xyz_shader_;
+            if (settings_.enable_lighting_) {
+                selected_single_pass_shading_program = vis_xyz_lighting_shader_;
+            }
+
+            context_->bind_program(selected_single_pass_shading_program);
+            context_->set_blend_state(color_no_blending_state_);
+            context_->set_depth_stencil_state(depth_state_less_);
+
+            LamurePointCloudPlugin::instance()->set_uniforms(selected_single_pass_shading_program);
+
+            if (settings_.background_image_ != "") {
+                context_->bind_texture(bg_texture_, filter_linear_, 0);
+                selected_single_pass_shading_program->uniform("background_image", true);
+            }
+
+            context_->set_viewport(scm::gl::viewport(scm::math::vec2f(traits->x, traits->y), scm::math::vec2f(traits->width, traits->height), scm::math::vec2f(0, 1)));
+            context_->apply();
+
+            scm::gl::program_ptr shader = selected_single_pass_shading_program;
+
+            if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+                context_->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_, data_provenance_));
+            }
+            else {
+                context_->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_));
+            }
+            context_->apply();
+            for (int32_t model_id = 0; model_id < num_models_; ++model_id) {
+                if (selection_.selected_model_ != -1) {
+                    model_id = selection_.selected_model_;
+                }
+                bool draw = true;
+                if (settings_.show_sparse_ && sparse_resources_[model_id].num_primitives_ > 0) {
+                    if (selection_.selected_model_ != -1) break;
+                    //else continue; //don't show lod when sparse is already shown
+                    else draw = false;
+                }
+                lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
+                lamure::ren::cut& cut = cuts->get_cut(context_id, view_id, m_id);
+                std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
+                const lamure::ren::bvh* bvh = database->get_model(m_id)->get_bvh();
+                if (bvh->get_primitive() != lamure::ren::bvh::primitive_type::POINTCLOUD) {
+                    if (selection_.selected_model_ != -1) break;
+                    //else continue;
+                    else draw = false;
+                }
+
+                //uniforms per model
+                scm::math::mat4d model_matrix = model_transformations_[model_id];
+                scm::math::mat4d projection_matrix = scm::math::mat4d(camera_->get_projection_matrix());
+                scm::math::mat4d view_matrix = camera_->get_high_precision_view_matrix();
+                scm::math::mat4d model_view_matrix = view_matrix * model_matrix;
+                scm::math::mat4d model_view_projection_matrix = projection_matrix * model_view_matrix;
+
+                shader->uniform("mvp_matrix", scm::math::mat4f(model_view_projection_matrix));
+                shader->uniform("model_matrix", scm::math::mat4f(model_matrix));
+                shader->uniform("model_view_matrix", scm::math::mat4f(model_view_matrix));
+                shader->uniform("inv_mv_matrix", scm::math::mat4f(scm::math::transpose(scm::math::inverse(model_view_matrix))));
+
+                const scm::math::mat4d viewport_scale = scm::math::make_scale(traits->width * 0.5, traits->width * 0.5, 0.5);
+                const scm::math::mat4d viewport_translate = scm::math::make_translation(1.0, 1.0, 1.0);
+                const scm::math::mat4d model_to_screen = viewport_scale * viewport_translate * model_view_projection_matrix;
+                shader->uniform("model_to_screen_matrix", scm::math::mat4f(model_to_screen));
+
+                //scm::math::vec4d x_unit_vec = scm::math::vec4d(1.0,0.0,0.0,0.0);
+                //float model_radius_scale = scm::math::length(scm::math::vec3d(model_matrix * x_unit_vec));
+                //shader->uniform("model_radius_scale", model_radius_scale);
+                shader->uniform("model_radius_scale", 1.f);
+
+                size_t surfels_per_node = database->get_primitives_per_node();
+                std::vector<scm::gl::boxf>const& bounding_box_vector = bvh->get_bounding_boxes();
+                scm::gl::frustum frustum_by_model = camera_->get_frustum_by_model(scm::math::mat4f(model_matrix));
+
+                for (auto const& node_slot_aggregate : renderable) {
+                    uint32_t node_culling_result = camera_->cull_against_frustum(frustum_by_model, bounding_box_vector[node_slot_aggregate.node_id_]);
+                    if (node_culling_result != 1) {
+                        if (settings_.use_pvs_ && pvs->is_activated() && settings_.pvs_culling_
+                            && !lamure::pvs::pvs_database::get_instance()->get_viewer_visibility(model_id, node_slot_aggregate.node_id_)) {
+                            continue;
+                        }
+                        if (settings_.show_accuracy_) {
+                            const float accuracy = 1.0 - (bvh->get_depth_of_node(node_slot_aggregate.node_id_) * 1.0) / (bvh->get_depth() - 1);
+                            shader->uniform("accuracy", accuracy);
+                        }
+                        if (settings_.show_radius_deviation_) {
+                            shader->uniform("average_radius", bvh->get_avg_primitive_extent(node_slot_aggregate.node_id_));
+                        }
+                        context_->apply();
+
+                        if (draw) {
+                            /*lamure::ren::ooc_cache* ooc_cache = lamure::ren::ooc_cache::get_instance();
+                            bool loaded = ooc_cache->is_node_resident_and_aquired(model_id, node_slot_aggregate.node_id_);
+                            lamure::ren::dataset::serialized_surfel* surfels = (lamure::ren::dataset::serialized_surfel*)ooc_cache->node_data(model_id, node_slot_aggregate.node_id_);
+                            lamure::ren::dataset::serialized_vertex* prov = (lamure::ren::dataset::serialized_vertex*)ooc_cache->node_data_provenance(model_id, node_slot_aggregate.node_id_);
+                            for (uint32_t i = 0; i < 30; ++i) {
+                                auto s = surfels[i];
+                                p->push_back(osg::Vec3f(surfels[i].x, surfels[i].y, surfels[i].z));
+                                c->push_back(osg::Vec3ui(surfels[i].r, surfels[i].g, surfels[i].b));
+                                n->push_back(osg::Vec3f(surfels[i].nx, surfels[i].ny, surfels[i].nz));
+                                pp->push_back(osg::Vec3f(prov[i].v_x_, prov[i].v_y_, prov[i].v_z_));
+                                cc->push_back(osg::Vec3f(prov[i].n_x_, prov[i].n_y_, prov[i].n_z_));
+                                nn->push_back(osg::Vec2f(prov[i].c_x_, prov[i].c_y_));
+                            };*/
+                            //points->setVertexArray(p);
+                            //points->setColorArray(c);
+                            //points->setNormalArray(n);
+                            //points->setColorBinding(osg::Geometry::BIND_OVERALL);
+                            //points->getOrCreateStateSet()->setAttributeAndModes(new osg::Point(10.0f), osg::StateAttribute::ON);
+                            //points->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, surfels_per_node));
+                            context_->draw_arrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
+                            rendered_splats_ += surfels_per_node;
+                            ++rendered_nodes_;
+                        }
+                    }
+                }
+                if (selection_.selected_model_ != -1) {
+                    break;
+                }
+            }
+            context_->bind_program(vis_xyz_shader_);
+            drawable->drawImplementation(renderInfo);
         }
-        GeoTrafo* _geo_trafo = nullptr;
+        GeoGl* _geo_gl = nullptr;
         osg::Stats* _viewerStats;
-        osg::PrimitiveSet* primitiveSet;
     };
 
     struct PointsGeometry : public osg::Geometry
     {
-        PointsGeometry(struct GeoTrafo* geo_trafo, osg::Stats* viewerStats)
+        PointsGeometry(struct GeoGl* geo_gl, osg::Stats* viewerStats)
         {
             std::cout << "protected struct PointsGeometry()" << std::endl;
-            setDrawCallback(new PointsUpdateCallback(geo_trafo, viewerStats));
+            setDrawCallback(new PointsUpdateCallback(geo_gl, viewerStats));
         }
     };
     struct PointsUpdateCallback : public virtual osg::Drawable::DrawCallback
     {
-        PointsUpdateCallback(GeoTrafo* geo_trafo, osg::Stats* viewerStats)
-            : _geo_trafo(geo_trafo),
+        PointsUpdateCallback(GeoGl* geo_gl, osg::Stats* viewerStats)
+            : _geo_gl(geo_gl),
             _viewerStats(viewerStats)
         {
             std::cout << "protected struct PointsUpdateCallback()" << std::endl;
@@ -701,16 +821,105 @@ protected:
         virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
         {
             std::cout << "protected struct PointsUpdateCallback(), virtual void drawImplementation()" << std::endl;
+
         }
-        GeoTrafo* _geo_trafo = nullptr;
+        GeoGl* _geo_gl = nullptr;
         osg::Stats* _viewerStats;
-        osg::PrimitiveSet* primitiveSet;
     };
 };
 
+
+struct DrawableNode : public osg::Drawable {
+    DrawableNode()
+    {
+    }
+    virtual void drawImplementation(osg::RenderInfo& renderInfo) {
+        std::cout << "Drawables drawImplementation, every loop?" << std::endl;
+    }
+};
+
+struct Event : public virtual osg::Drawable::EventCallback
+{
+    Event() {
+        std::cout << "Event worked" << std::endl;
+    }
+
+    virtual void drawImplementation(osg::RenderInfo& renderInfo) const
+    {
+        std::cout << "drawImplementation Event worked" << std::endl;
+        drawImplementation(renderInfo);
+    }
+};
+
+struct Draw : public virtual osg::Drawable::DrawCallback
+{
+    Draw() {
+        std::cout << "draw worked" << std::endl;
+    }
+
+    virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
+    {
+        drawable->drawImplementation(renderInfo);
+        std::cout << "Drawcallbacks drawImplementation" << std::endl;
+
+        glBegin(GL_TRIANGLES);
+        {
+            glVertex3f(-500.0f, 0.0f, -500.0f);
+            glVertex3f(500.0f, 0.0f, 500.0f);
+            glVertex3f(500.0f, 0.0f, -500);
+        }
+        glEnd();
+    }
+};
+
+
+
 unsigned int counter = 0;
 void LamurePointCloudPlugin::preFrame() {
+    if (cover->getPointerButton()->getState() == 1 /*|| cover->getPointerButton()->getState() == 0*/) {
+        if (counter == 0) {
+            std::cout << "preFrame(), " << "counter == 0" << std::endl;
+            device_.reset(new scm::gl::render_device());
+            if (!device_) {
+                std::cout << "error creating device" << std::endl;
+            }
+            context_ = device_->main_context();
+            if (!context_) {
+                std::cout << "error creating context" << std::endl;
+            }
+            //std::cout << (*device_);
 
+            plugin->init_lamure_shader();
+            plugin->create_framebuffers();
+            plugin->create_aux_resources_buffered();
+            plugin->init_render_states();
+            plugin->init_camera();
+
+            //osg::ref_ptr<struct DrawableNode> maindrawable(new DrawableNode());
+            //plugin->fix_geode->addDrawable(maindrawable);
+
+
+            /*GeoGl* geo_gl = new GeoGl();
+            LamureGroup->addChild(geo_gl);
+            geo_gl->addPointGeo(VRViewer::instance()->getViewerStats());
+            geo_gl->addTriangleGeo(VRViewer::instance()->getViewerStats());
+            geo_gl->addLineGeo(VRViewer::instance()->getViewerStats());*/
+
+            //plugin->lamure_display();
+
+            
+
+            counter = counter + 1;
+        }
+        GeoGl* geo_gl = new GeoGl();
+        LamureGroup->addChild(geo_gl);
+
+        //geo_gl->addPointGeo(VRViewer::instance()->getViewerStats());
+        //geo_gl->addTriangleGeo(VRViewer::instance()->getViewerStats());
+        geo_gl->addLineGeo(VRViewer::instance()->getViewerStats());
+
+      
+    }
 }
 
 bool LamurePointCloudPlugin::update()
@@ -727,7 +936,6 @@ bool LamurePointCloudPlugin::update()
                 std::cout << "error creating context" << std::endl;
             }
             //std::cout << (*device_);
-            //wglMakeCurrent(plugin->hdc, plugin->current_context);
 
             plugin->init_lamure_shader();
             plugin->create_framebuffers();
@@ -735,101 +943,30 @@ bool LamurePointCloudPlugin::update()
             plugin->init_render_states();
             plugin->init_camera();
 
+            //osg::ref_ptr<struct DrawableNode> maindrawable(new DrawableNode());
+            //plugin->fix_geode->addDrawable(maindrawable);
 
-            
-            
-            /*osg::ref_ptr<struct GeoTrafo> geo_trafo(new GeoTrafo());
-            LamureGroup->addChild(geo_trafo);*/
 
-            //geo_trafo->addTriangleGeo(VRViewer::instance()->getViewerStats());
-            //geo_trafo->addPoints(VRViewer::instance()->getViewerStats());
+            /*GeoGl* geo_gl = new GeoGl();
+            LamureGroup->addChild(geo_gl);
+            geo_gl->addPointGeo(VRViewer::instance()->getViewerStats());
+            geo_gl->addTriangleGeo(VRViewer::instance()->getViewerStats());
+            geo_gl->addLineGeo(VRViewer::instance()->getViewerStats());*/
 
             //plugin->lamure_display();
             counter = counter + 1;
         }
         //plugin->lamure_display();
-        
-        /*osg::Vec4Array* color = new osg::Vec4Array(1);
-        osg::Vec3Array* normal = new osg::Vec3Array(1);
-        (*color)[0].set(1, 1, 0, 1.0f);
-        (*normal)[0].set(0.0f, -1.0f, 0.0f);
-        osg::ref_ptr<osg::Geometry> temp_geo = osg::ref_ptr(new osg::Geometry());
-        temp_geo->setName("temp_geo");
-        ushort vertices[4] = { 0, 1, 2, 3 };
-        osg::DrawElementsUShort* plane = new osg::DrawElementsUShort(osg::PrimitiveSet::QUADS, 4, vertices);
-        osg::BoundingBox box = osg::BoundingBox();
-        box.init();
-        temp_geo->addPrimitiveSet(plane);
-        temp_geo->setColorArray(color);
-        temp_geo->setColorBinding(osg::Geometry::BIND_OVERALL);
-        temp_geo->setNormalArray(normal);
-        temp_geo->setNormalBinding(osg::Geometry::BIND_OVERALL);
-        temp_geo->setInitialBound(box);
-        osg::Vec3Array* coord = new osg::Vec3Array(4);
-        (*coord)[0].set(-300., -300., 0.);
-        (*coord)[1].set(300., -300., 0.);
-        (*coord)[2].set(300., 300., 0.);
-        (*coord)[3].set(-300., 300., 0.);
-        temp_geo->setVertexArray(coord);
-        temp_geo->setUseVertexBufferObjects(true);
-        temp_geo->setUseDisplayList(false);
-        osg::StateSet* stateSet = temp_geo->getOrCreateStateSet();
 
-        osg::Program* depthProgramObj = new osg::Program;
-        osg::Shader* depthFragmentObj = new osg::Shader(osg::Shader::FRAGMENT);
-        depthProgramObj->addShader(depthFragmentObj);
-        depthFragmentObj->setShaderSource(
-            "#version 120\n"
-            "#extension GL_ARB_texture_rectangle : enable\n"
-            "\n"
-            "uniform sampler2DRect col;"
-            "uniform sampler2DRect dep;"
-            "void main(void) {"
-            "   vec4 color = texture2DRect(col, gl_TexCoord[0].xy);"
-            "   gl_FragColor = color;"
-            "   gl_FragDepth = texture2DRect(dep, gl_TexCoord[0].xy).x;"
-            "}"
-        );
-        stateSet->setAttributeAndModes(depthProgramObj, osg::StateAttribute::ON);
-        temp_geo->setStateSet(stateSet);
+        /*GeoGl* geo_gl = new GeoGl();
+        LamureGroup->addChild(geo_gl);
 
-        plugin->transform->addChild(temp_geo);*/
+        geo_gl->addPointGeo(VRViewer::instance()->getViewerStats());
+        geo_gl->addTriangleGeo(VRViewer::instance()->getViewerStats());
+        geo_gl->addLineGeo(VRViewer::instance()->getViewerStats());*/
 
-        //geode->addChild(osg_context_->asDrawable());
-        // 
-        //osgViewer::GraphicsWindow* gw = coVRConfig::instance()->windows[0].window;
-        //osg::GraphicsContext* gc = gw->getOrCreateCompileContext(0);
-        //bool is_current = gc->makeContextCurrent(0);
-        //osg::GraphicsThread* gt = gc->getGraphicsThread();
-        //osg::State* state = gw->getState();
-        //osg::Camera* camera_ = coVRConfig::instance()->channels[0].camera;
-
-        //VRViewer::ViewerBase* viewer = VRViewer::instance();
-        //// collect all the relevant cameras
-        //osgViewer::ViewerBase::Cameras cameras;
-        //for (osgViewer::ViewerBase::Cameras::iterator itr = validCameras.begin();
-        //    itr != validCameras.end();
-        //    ++itr)
-        //{
-        //    if ((*itr)->getStats())
-        //    {
-        //        cameras.push_back(*itr);
-        //    }
-        //}
-
-        //wglMakeCurrent(plugin->hdc, plugin->current_context);
-
-        //plugin->lamure_display();
     };
 
-
-    //pointShader->apply(plugin->geo, plugin->drawable);
-
-    //// Get the vertex array from the geometry object
-    //osg::ref_ptr<osg::Vec3Array> vertices = dynamic_cast<osg::Vec3Array*>(plugin->drawable->getVertexArray());
-    //osg::ref_ptr<osg::Vec3Array> colors = dynamic_cast<osg::Vec3Array*>(plugin->drawable->getColorArray());
-    //vertices->dirty();
-    //colors->dirty();
     return 1;
 }
 
@@ -2640,7 +2777,7 @@ const char* LamurePointCloudPlugin::stringToConstChar(string str) {
     return cstr;
 }
 
-const LamurePointCloudPlugin* LamurePointCloudPlugin::instance() const
+LamurePointCloudPlugin* LamurePointCloudPlugin::instance()
 {
     return plugin;
 }

@@ -86,13 +86,12 @@ public:
     LamurePointCloudPlugin();
     ~LamurePointCloudPlugin();
 
-    const LamurePointCloudPlugin* instance() const;
+    static LamurePointCloudPlugin* instance();
     bool init();
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
     void preFrame();
     bool update();
-
     size_t query_video_memory_in_mb();
 
     // shared functions
@@ -147,6 +146,7 @@ private:
     float pointSizeValue = 4;
     void createGeodes(osg::Group*, const std::string&);
     bool adaptLOD = true; // LOD enable/disable
+    
 
     osg::Point* pointstate;
     osg::StateSet* stateset;
@@ -164,9 +164,7 @@ private:
     osg::ref_ptr<osg::MatrixTransform> transform;
     osg::ref_ptr<osg::Geode> geode;
     osg::ref_ptr<LamureGeometry> geometry;
-    //struct GeoTrafo geo_trafo;
-    //boost::shared_ptr<LamureDevice> lmr_device_ = NULL;
-    //boost::shared_ptr<LamureContext> lmr_context_ = NULL;
+
 
 protected:
     ui::Menu* lamureMenu = nullptr;
