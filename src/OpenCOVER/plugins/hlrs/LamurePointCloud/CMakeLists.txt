@@ -40,7 +40,9 @@ macro(pcl_project_files)
 
 endmacro(scm_project_files)
 
+
 set(LAMURE_INCLUDE_DIRS
+    ${SRC_DIR}/lamure
     ${SRC_DIR}/virtual_texturing/include
     ${SRC_DIR}/rendering/include
     ${SRC_DIR}/pvs_common/include
@@ -50,28 +52,6 @@ set(LAMURE_INCLUDE_DIRS
     ${SRC_DIR}/quality_measurement/include
 )
 
-set(FREEGLUT_INCLUDE_DIR
-    $ENV{EXTERNLIBS}/freeglut/include
-)
-set(FREEGLUT_LIBRARY
-    $ENV{EXTERNLIBS}/freeglut/lib/x64/freeglut.lib
-)
-
-set(FREEIMAGE_INCLUDE_DIR
-    $ENV{EXTERNLIBS}/FreeImage/include
-)
-set(FREEIMAGE_LIBRARY
-    $ENV{EXTERNLIBS}/FreeImage/lib/FreeImage.lib
-)
-set(FREEIMAGE_LIBRARY_DEBUG
-    $ENV{EXTERNLIBS}/FreeImage/lib/FreeImaged.lib
-)
-set(FREEIMAGEPLUS_LIBRARY
-    $ENV{EXTERNLIBS}/FreeImage/lib/FreeImagePlus.lib
-)
-set(FREEIMAGEPLUS_LIBRARY_DEBUG
-    $ENV{EXTERNLIBS}/FreeImage/lib/FreeImagePlusd.lib
-)
 
 
 pcl_project_files(SOURCE_FILES      ${SRC_DIR}/virtual_texturing/src                        *.cpp)
@@ -97,51 +77,17 @@ pcl_project_files(HEADER_FILES      ${SRC_DIR}/provenance/include/lamure/prov   
 pcl_project_files(SOURCE_FILES      ${SRC_DIR}/quality_measurement/src                      *.cpp)
 pcl_project_files(HEADER_FILES      ${SRC_DIR}/quality_measurement/include/lamure/qm        *.h)
 
-SET(HEADERS ${HEADER_FILES}
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/lamure                                       *.cpp)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/lamure                                       *.h)
+
+SET(HEADERS 
+  ${HEADER_FILES}
   LamurePointCloud.h
   LamureGeometry.h
   LamureDrawable.h
   LamureContext.h
   LamureDevice.h
 )
-  #bvh_lmr.h
-  #bvh_stream_lmr.h
-  #cache_lmr.h
-  #cache_index_lmr.h
-  #cache_queue_lmr.h
-  #camera_lmr.h
-  #controller_lmr.h
-  #cut_lmr.h
-  #cut_database_lmr.h
-  #cut_database_record_lmr.h
-  #cut_update_index_lmr.h
-  #cut_update_pool_lmr.h
-  #cut_update_queue_lmr.h
-  #dataset_lmr.h
-  #gpu_access_lmr.h
-  #gpu_cache_lmr.h
-  #gpu_context_lmr.h
-  #lod_stream_lmr.h
-  #model_database_lmr.h
-  #ooc_cache_lmr.h
-  #ooc_pool_lmr.h
-  #policy_lmr.h
-  #provenance_stream_lmr.h
-  #ray_lmr.h
-  #trackball_lmr.h
-  #bounding_box_lmr.h
-  #memory_lmr.h
-  #memory_status_lmr.h
-  #semaphore_lmr.h
-  #sphere_lmr.h
-  #types_lmr.h
-  #utils_lmr.h
-  #version_lmr.h
-  #config_lmr.h
-  #item_provenance_lmr.h
-  #platform_lmr.h
-  #atomic_counter_lmr.h
-  #data_provenance_lmr.h
 
 
 SET(SOURCES ${SOURCE_FILES}
@@ -151,38 +97,6 @@ SET(SOURCES ${SOURCE_FILES}
   #LamureContext.cpp
   #LamureDevice.cpp
 )
-  #bvh_lmr.cpp
-  #bvh_stream_lmr.cpp
-  #cache_lmr.cpp
-  #cache_index_lmr.cpp
-  #cache_queue_lmr.cpp
-  #camera_lmr.cpp
-  #controller_lmr.cpp
-  #cut_lmr.cpp
-  #cut_database_lmr.cpp
-  #cut_database_record_lmr.cpp
-  #cut_update_index_lmr.cpp
-  #cut_update_pool_lmr.cpp
-  #cut_update_queue_lmr.cpp
-  #dataset_lmr.cpp
-  #gpu_access_lmr.cpp
-  #gpu_cache_lmr.cpp
-  #gpu_context_lmr.cpp
-  #lod_stream_lmr.cpp
-  #model_database_lmr.cpp
-  #ooc_cache_lmr.cpp
-  #ooc_pool_lmr.cpp
-  #policy_lmr.cpp
-  #provenance_stream_lmr.cpp
-  #ray_lmr.cpp
-  #trackball_lmr.cpp
-  #bounding_box_lmr.cpp
-  #memory_lmr.cpp
-  #memory_status_lmr.cpp
-  #semaphore_lmr.cpp
-  #sphere_lmr.cpp
-  #utils_lmr.cpp
-
 
 set(SCHISM_INCLUDE_DIRS
     $ENV{EXTERNLIBS}/../../schism/scm_core/src
@@ -190,6 +104,19 @@ set(SCHISM_INCLUDE_DIRS
     $ENV{EXTERNLIBS}/../../schism/scm_gl_util/src
     $ENV{EXTERNLIBS}/../../schism/scm_input/src
 )
+
+
+
+set(FREEGLUT_INCLUDE_DIR $ENV{EXTERNLIBS}/freeglut/include)
+set(FREEGLUT_LIBRARY $ENV{EXTERNLIBS}/freeglut/lib/x64/freeglut.lib)
+set(FREEIMAGE_INCLUDE_DIR $ENV{EXTERNLIBS}/FreeImage/include)
+set(FREEIMAGE_LIBRARY $ENV{EXTERNLIBS}/FreeImage/lib/FreeImage.lib)
+set(FREEIMAGE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/FreeImage/lib/FreeImaged.lib)
+set(FREEIMAGEPLUS_LIBRARY $ENV{EXTERNLIBS}/FreeImage/lib/FreeImagePlus.lib)
+set(FREEIMAGEPLUS_LIBRARY_DEBUG $ENV{EXTERNLIBS}/FreeImage/lib/FreeImagePlusd.lib)
+set(FREETYPE_INCLUDE_DIR $ENV{EXTERNLIBS}/freetype/include)
+set(FREETYPE_LIBRARY_RELEASE $ENV{EXTERNLIBS}/freetype/lib/freetype.lib)
+set(FREETYPE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/freetype/lib/freetyped.lib)
 
 set(SCHISM_CORE_LIBRARY $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Release/scm_core.lib)
 set(SCHISM_CORE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Debug/scm_core-gd.lib)
@@ -200,10 +127,14 @@ set(SCHISM_GL_CORE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Debug
 set(SCHISM_GL_UTIL_LIBRARY $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Release/scm_gl_util.lib)
 set(SCHISM_GL_UTIL_LIBRARY_DEBUG $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Debug/scm_gl_util-gd.lib)
 
-set(FREETYPE_LIBRARY_RELEASE C:/src/externlibs/zebu/freetype/lib/freetype.lib)
-set(FREETYPE_LIBRARY_DEBUG C:/src/externlibs/zebu/freetype/lib/freetyped.lib)
+set(GLEW_INCLUDE_DIR $ENV{EXTERNLIBS}/glew/include)
+set(GLEW_LIBRARY $ENV{EXTERNLIBS}/glew/lib/glew32.lib)
 
-set(FREETYPE_INCLUDE_DIR_freetype2 C:/src/externlibs/freetype/include)
+set(GLFW_INCLUDE_DIR $ENV{EXTERNLIBS}/glfw/include)
+set(GLFW_LIBRARY_RELEASE $ENV{EXTERNLIBS}/glfw/lib/glfw3.lib)
+set(GLFW_LIBRARY_DEBUG $ENV{EXTERNLIBS}/glfw/lib/glfw3d.lib)
+
+
 
 link_directories(
     optimized $ENV{EXTERNLIBS}/schism/lib/win_x64/Release debug $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Debug
@@ -214,19 +145,21 @@ include_directories(
 #${COMMON_INCLUDE_DIR}
 #${PVS_COMMON_INCLUDE_DIR}
 ${FREEGLUT_INCLUDE_DIR}
-${GLUT_INCLUDE_DIR}
 ${GLM_INCLUDE_DIR}
 ${FREEIMAGE_INCLUDE_DIR}
 ${LAMURE_INCLUDE_DIRS}
 ${SCHISM_INCLUDE_DIRS}
-${GLEW_INCLUDE_DIR}
 ${Boost_INCLUDE_DIR}
+${GLEW_INCLUDE_DIR}
+${GLFW_INCLUDE_DIR}
+${FREETYPE_INCLUDE_DIR}
 )
 
 include_directories(SYSTEM 
   ${SCHISM_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIR}
 )
+
 
 cover_add_plugin(LamurePointCloud)
 covise_wnoerror(LamurePointCloud)
@@ -247,4 +180,6 @@ TARGET_LINK_LIBRARIES(LamurePointCloud
     ${FREEGLUT_LIBRARY}
     optimized ${FREEIMAGE_LIBRARY} debug ${FREEIMAGE_LIBRARY_DEBUG}
     optimized ${FREEIMAGEPLUS_LIBRARY} debug ${FREEIMAGEPLUS_LIBRARY_DEBUG}
+    optimized ${GLEW_LIBRARY} debug ${GLEW_LIBRARY}
+    optimized ${GLFW_LIBRARY_RELEASE} debug ${GLFW_LIBRARY_DEBUG}
 )

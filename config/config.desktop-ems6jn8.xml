@@ -8,7 +8,7 @@
   <GLOBAL>
     <COVER>
       <WelcomeMessage value="Welcome to OpenCOVER with custom config file" />
-      <Multisample value="on" numSamples="4" numBuffers="1" mode="DONT_CARE" />
+      <Multisample value="off" numSamples="4" numBuffers="1" mode="DONT_CARE" />
       <NavigationMode value="XForm" />
       <CollisionDist value="1500" />
       <Background r="0.5" g="0.5" b="1.0" /> 
@@ -30,7 +30,7 @@
       <RenderOnMaster value="true" />
       <Statistics value="true" />
       <DebugLevel value="2" />
-      <ContinuousRendering value="true" />
+      <ContinuousRendering value="off" />
       <trackedHMD value="off" />
       <HMDMode value="off" />
       <DebugTUI value="off" />

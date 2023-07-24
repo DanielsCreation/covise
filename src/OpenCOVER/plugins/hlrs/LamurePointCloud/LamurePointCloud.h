@@ -6,7 +6,8 @@
 #ifndef __gl_h_
     #include <GL/glew.h>
 #endif
-
+#include <GLFW/glfw3.h>
+#include <imgui_impl_glfw_gl3.h>
 
 #include <cover/coVRPluginSupport.h>
 #include <cover/coVRMSController.h>
@@ -124,7 +125,6 @@ public:
 
     // objects and pointers
     ui::Group* FileGroup;
-    std::string const strip_whitespace(std::string const& in_string);
     scm::math::mat4d load_matrix(const std::string& filename);
     void load_settings(const std::string &filename);
     bool rendering_ = false;
@@ -142,6 +142,7 @@ private:
     void selectedMenuButton(ui::Element*);
     std::vector<ImageFileEntry> pointVec;
     void clearData();
+    std::string const strip_whitespace(std::string const& in_string);
     void readMenuConfigData(const char*, std::vector<ImageFileEntry>&, ui::Group*);
     float pointSizeValue = 4;
     void createGeodes(osg::Group*, const std::string&);
@@ -164,6 +165,9 @@ private:
     osg::ref_ptr<osg::MatrixTransform> transform;
     osg::ref_ptr<osg::Geode> geode;
     osg::ref_ptr<LamureGeometry> geometry;
+
+    osg::ref_ptr<osg::Switch> _switch;
+    osg::ref_ptr<struct GeoGl> geo_gl;
 
 
 protected:
@@ -191,5 +195,36 @@ protected:
     ui::Slider* lodFarDistanceSlider = nullptr;
     ui::Slider* lodNearDistanceSlider = nullptr;
 };
+
+class COVEREXPORT PCLNode : public osg::Drawable
+{
+private:
+    bool displayVideo; // true if CoviseConfig.displayVideo is set
+    bool renderTextures;
+    std::string m_pcl_node;
+
+public:
+    PCLNode(std::string MarkerTrackingVariant);
+    virtual ~PCLNode();
+    static PCLNode* pcl_node;
+    virtual void drawImplementation(osg::RenderInfo& renderInfo) const;
+    /** Clone the type of an object, with Object* return type.
+        Must be defined by derived classes.*/
+    virtual osg::Object* cloneType() const;
+
+    /** Clone the an object, with Object* return type.
+        Must be defined by derived classes.*/
+    virtual osg::Object* clone(const osg::CopyOp&) const;
+};
+
+
+
+
+
+
+
+
+
+
 
 #endif
