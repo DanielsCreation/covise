@@ -30,7 +30,7 @@
       <RenderOnMaster value="true" />
       <Statistics value="true" />
       <DebugLevel value="2" />
-      <ContinuousRendering value="off" />
+      <ContinuousRendering value="on" />
       <trackedHMD value="off" />
       <HMDMode value="off" />
       <DebugTUI value="off" />
@@ -55,7 +55,7 @@
       
       <WindowConfig>
         <!-- <Window arch="windows" width="1600" height="900" comment="FRONT" window="0" pipeIndex="0" left="0" top="0" name="0" embedded="false" decoration="true" /> -->
-        <Window arch="windows" type="Qt" width="800" height="450" comment="FRONT" pipeIndex="0" left="0" top="0" name="0" embedded="false" /> 
+        <Window arch="windows" type="Qt" width="1600" height="900" comment="FRONT" pipeIndex="0" left="0" top="0" name="0" embedded="false" /> 
       </WindowConfig>
       
       <ScreenConfig>

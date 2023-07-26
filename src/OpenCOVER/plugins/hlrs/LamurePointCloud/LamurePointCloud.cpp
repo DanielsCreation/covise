@@ -290,7 +290,7 @@ std::map<uint32_t, provenance> provenance_;
 double fps_ = 0.0;
 uint64_t rendered_splats_ = 0;
 uint64_t rendered_nodes_ = 0;
-
+/*
 struct Window {
     Window() {
         _mouse_button_state = MouseButtonState::IDLE;
@@ -1030,7 +1030,7 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
     if (!context_) {
         std::cout << "error creating context" << std::endl;
     }
-    //std::cout << (*device_);
+    std::cout << (*device_);
 
     plugin->init_lamure_shader();
     plugin->create_framebuffers();
@@ -1038,7 +1038,7 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
     plugin->init_render_states();
     plugin->init_camera();
 
-    glfwSetErrorCallback(EventHandler::on_error);
+    /*lfwSetErrorCallback(EventHandler::on_error);
 
     if (!glfwInit()) {
         std::runtime_error("GLFW initialisation failed");
@@ -1080,7 +1080,7 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
             glfwSwapBuffers(window->_glfw_window);
         }
     }
-
+    */
     return 1;
 }
 
@@ -1989,7 +1989,7 @@ void LamurePointCloudPlugin::init_camera() {
     osg::Matrixd& proj_mat_osg = osg_cam_->getProjectionMatrix();
     scm::math::mat4f proj_mat = matConvF(proj_mat_osg);
 
-    camera_ = boost::shared_ptr<lamure::ren::camera>(new lamure::ren::camera(
+    /*camera_ = boost::shared_ptr<lamure::ren::camera>(new lamure::ren::camera(
         0,
         zNear,
         zFar,
@@ -1998,8 +1998,8 @@ void LamurePointCloudPlugin::init_camera() {
         make_look_at_matrix(center + scm::math::vec3f(0.f, 0.1f, -0.01f), center, scm::math::vec3f(0.f, 1.f, 0.f)),
         length(root_bb_max - root_bb_min),
         false,
-        false));
-
+        false));*/
+    camera_ = boost::shared_ptr<lamure::ren::camera>(new lamure::ren::camera());
     screen_quad_.reset(new scm::gl::quad_geometry(device_, scm::math::vec2f(-1.0f, -1.0f), scm::math::vec2f(1.0f, 1.0f)));
 
     //camera_ = new camera(0, make_look_at_matrix(center + scm::math::vec3f(0.f, 0.1f, -0.01f), center, scm::math::vec3f(0.f, 1.f, 0.f)), length(root_bb_max - root_bb_min));

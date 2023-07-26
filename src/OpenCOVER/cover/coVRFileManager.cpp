@@ -819,7 +819,7 @@ osg::Node *coVRFileManager::loadFile(const char *fileName, coTUIFileBrowserButto
     if (covise_key)
         fe->key = covise_key;
     fe->filebrowser = fb;
-    if (!OpenCOVER::instance()->visPlugin() && !m_settings && fe->url.valid() && fe->url.isLocal())
+    if (!OpenCOVER::instance()->visPlugin() && !m_settings && fe->url.valid() && fe->url.isLocal() && 0)
     {
         std::cerr << "Sidecar file for " << fe->url.str() << std::endl;
         m_settings = std::make_unique<SidecarConfigBridge>(fe->url.str(), coVRMSController::instance()->isMaster());
