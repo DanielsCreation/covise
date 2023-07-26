@@ -6,8 +6,10 @@
 #ifndef __gl_h_
     #include <GL/glew.h>
 #endif
-//#include <GLFW/glfw3.h>
-//#include <imgui_impl_glfw_gl3.h>
+#include <lamure/imgui.h>
+#include <lamure/imgui_internal.h>
+#include <lamure/imgui_impl_glfw_gl3.h>
+
 
 #include <cover/coVRPluginSupport.h>
 #include <cover/coVRMSController.h>

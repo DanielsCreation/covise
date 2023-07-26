@@ -22,6 +22,7 @@
 #include <boost/assign/list_of.hpp>
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/thread.hpp>
 
 //schism
 #include <scm/time.h>
@@ -75,23 +76,23 @@
 #include <scm/gl_util/primitives/primitives_fwd.h>
 #include <scm/gl_util/primitives.h>
 
-
+#include <GLFW/glfw3.h>
 
 #define ASSERT(x) if (!(x)) __debugbreak();
 #define GLCall(x) GLClearError();\
     x;\
     ASSERT(GLLogCall(#x,__FILE__, __LINE__))
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-    __declspec(dllexport) DWORD NvOptimusEnablement = 1;
-    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
-
-#ifdef __cplusplus
-}
-#endif
+//#ifdef __cplusplus
+//extern "C" {
+//#endif
+//
+//    __declspec(dllexport) DWORD NvOptimusEnablement = 1;
+//    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+//
+//#ifdef __cplusplus
+//}
+//#endif
 
 
 
@@ -149,9 +150,9 @@ void sync_osg_cam(boost::shared_ptr<lamure::ren::camera> cam_, osg::Camera* osg_
     cam_->set_view_matrix(view_mat);
 }
 
-
-int32_t render_width_ = 1280;
-int32_t render_height_ = 720;
+boost::mutex m;
+int32_t render_width_;
+int32_t render_height_;
 
 int32_t num_models_ = 0;
 std::vector<scm::math::mat4d> model_transformations_;
@@ -164,8 +165,8 @@ osg::ref_ptr<osg::Camera> osg_camera_;
 
 
 struct settings {
-    int32_t width_{ 2560 };
-    int32_t height_{ 1600 };
+    int32_t width_{ 1800 };
+    int32_t height_{ 1000 };
     int32_t frame_div_{ 1 };
     int32_t vram_{ 1024 };
     int32_t ram_{ 4096 };
@@ -177,7 +178,7 @@ struct settings {
     double fov_{ 30.0f };
     bool splatting_{ 0 };
     bool gamma_correction_{ 0 };
-    int32_t gui_{ 0 };
+    int32_t gui_{ 1 };
     int32_t travel_{ 2 };
     float travel_speed_{ 20.5f };
     int32_t max_brush_size_{ 4096 };
@@ -228,6 +229,7 @@ struct settings {
     std::map<uint32_t, std::string> aux_;
     std::string selection_{ "" };
     float max_radius_{ std::numeric_limits<float>::max() };
+    bool imgui{ 0 };
 };
 settings settings_;
 
@@ -290,7 +292,7 @@ std::map<uint32_t, provenance> provenance_;
 double fps_ = 0.0;
 uint64_t rendered_splats_ = 0;
 uint64_t rendered_nodes_ = 0;
-/*
+
 struct Window {
     Window() {
         _mouse_button_state = MouseButtonState::IDLE;
@@ -311,9 +313,6 @@ void glut_resize(int32_t w, int32_t h) {
     settings_.width_ = w;
     settings_.height_ = h;
     
-      //render_width_ = settings_.width_ / settings_.frame_div_;
-      //render_height_ = settings_.height_ / settings_.frame_div_;
-
       //create_framebuffers();
 
       //lamure::ren::policy* policy = lamure::ren::policy::get_instance();
@@ -392,7 +391,7 @@ void glut_keyboard(unsigned char key, int32_t x, int32_t y) {
         break;
     case 'C':
         std::cout << "cam_pos: " << std::endl;
-        std::cout << camera_->get_cam_pos() << "\n" << std::endl;
+        //std::cout << camera_->get_cam_pos() << "\n" << std::endl;
         break;
     case 'P':
         std::cout << "projection_matrix: " << std::endl;
@@ -400,7 +399,7 @@ void glut_keyboard(unsigned char key, int32_t x, int32_t y) {
         break;
     case 'M':
         std::cout << "cam_matrix: " << std::endl;
-        std::cout << camera_->get_cam_matrix() << "\n" << std::endl;
+        //std::cout << camera_->get_cam_matrix() << "\n" << std::endl;
         break;
     case 'V':
         std::cout << "view_matrix: " << std::endl;
@@ -523,7 +522,7 @@ public:
         }
         else if (!input_.brush_mode_ && (input_.keys_[0] || input_.keys_[1] || input_.keys_[2]))
         {
-            camera_->update_camera(x, y, settings_.width_, settings_.height_, input_.mouse_state_, input_.keys_);
+            //camera_->update_camera(x, y, settings_.width_, settings_.height_, input_.mouse_state_, input_.keys_);
         }
         else {
             //brush();
@@ -830,12 +829,6 @@ std::map<uint32_t, resource> octree_resources_;
 std::map<uint32_t, resource> image_plane_resources_;
 
 
-
-
-
-
-
-
 struct vt_info {
     uint32_t texture_id_;
     uint16_t view_id_;
@@ -881,6 +874,84 @@ LamurePointCloudPlugin::LamurePointCloudPlugin(): ui::Owner("LamurePointCloud", 
 }
 
 
+
+int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, const char* covise_key)
+{
+    std::printf("loadLMR()\n");
+
+    const osg::GraphicsContext::Traits* traits = coVRConfig::instance()->windows[0].context->getTraits();
+
+    putenv((char*)"__GL_SYNC_TO_VBLANK=0");
+
+    assert(plugin);
+    std::string lmr_file = std::string(filename);
+    plugin->load_settings(lmr_file);
+    settings_.vis_ = settings_.show_normals_ ? 1
+        : settings_.show_accuracy_ ? 2
+        : settings_.show_output_sensitivity_ ? 3
+        : settings_.channel_ > 0 ? 3 + settings_.channel_
+        : 0;
+
+    if (settings_.provenance_ && settings_.json_ != "") {
+        std::cout << "json: " << settings_.json_ << std::endl;
+        data_provenance_ = lamure::ren::Data_Provenance::parse_json(settings_.json_);
+        std::cout << "size of provenance: " << data_provenance_.get_size_in_bytes() << std::endl;
+    }
+
+    render_width_ = settings_.width_ / settings_.frame_div_;
+    render_height_ = settings_.height_ / settings_.frame_div_;
+
+    char str[200];
+    sprintf(str, "COVER.WindowConfig.Window:%d", 0);
+
+    //std::printf("render_width_: %03" PRId32 "\n", traits->width);
+    //std::printf("render_height_: %03" PRId32 "\n", traits->height);
+
+    std::printf("render_width_: %03" PRId32 "\n", render_width_);
+    std::printf("render_height_: %03" PRId32 "\n", render_height_);
+
+    lamure::ren::policy* policy = lamure::ren::policy::get_instance();
+    policy->set_max_upload_budget_in_mb(settings_.upload_);
+    policy->set_render_budget_in_mb(settings_.vram_);
+    policy->set_out_of_core_budget_in_mb(settings_.ram_);
+    policy->set_window_width(traits->width);
+    policy->set_window_height(traits->height);
+
+    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
+    for (const auto& input_file : settings_.models_) {
+        lamure::model_t model_id = database->add_model(input_file, std::to_string(num_models_));
+        model_transformations_.push_back(settings_.transforms_[num_models_] * scm::math::mat4d(scm::math::make_translation(database->get_model(num_models_)->get_bvh()->get_translation())));
+        ++num_models_;
+    }
+    std::cout << osg::DisplaySettings::instance()->getDisplayType() << std::endl;
+
+    //std::cout << "(const char*)glGetString(GL_VERSION):" << std::endl;
+    //std::cout << (GLubyte*)glGetString(GL_VERSION) << std::endl;
+
+    //HWND hwnd_ = FindWindow(NULL, "COVER");
+    //std::cout << "FindWindow(NULL, 'COVER'): " << FindWindow(NULL, "COVER") << std::endl;
+    //HWND hwnd___ = FindWindow(NULL, "OpenCOVER");
+    //std::cout << "FindWindow(NULL, 'OpenCOVER'): " << FindWindow(NULL, "OpenCOVER") << std::endl;
+    //HDC hdc_covise = GetDC(FindWindow(NULL, "COVER"));
+    //HDC hdc_opencover = GetDC(FindWindow(NULL, "OpenCOVER"));
+    //std::cout << "Vergleich der Windows: " << std::endl;
+    //std::cout << "WindowFromDC(GetDC(FindWindow(NULL, COVER)): " << WindowFromDC(GetDC(FindWindow(NULL, "COVER"))) << std::endl;
+    //std::cout << "WindowFromDC(GetDC(FindWindow(NULL, OpenCOVER))): " << WindowFromDC(GetDC(FindWindow(NULL, "OpenCOVER"))) << std::endl;
+    //std::cout << "WindowFromDC(wglGetCurrentDC()): " << WindowFromDC(wglGetCurrentDC()) << std::endl;
+    //std::cout << "Vergleich der DCs: " << std::endl;
+    //std::cout << "GetDC(FindWindow(NULL, COVER)): " << GetDC(FindWindow(NULL, "COVER")) << std::endl;
+    //std::cout << "GetDC(FindWindow(NULL, OpenCOVER)): " << GetDC(FindWindow(NULL, "OpenCOVER")) << std::endl;
+    //std::cout << "wglGetCurrentDC(): " << wglGetCurrentDC() << std::endl;
+    //SwapBuffers(hdc);
+    //HWND hwnd = FindWindow(NULL, "COVER");
+    //HDC hdc = GetDC(hwnd);
+    //HGLRC hglrc = wglCreateContext(hdc);
+    //wglMakeCurrent(hdc, hglrc);
+
+    return 1;
+}
+
+
 bool LamurePointCloudPlugin::init()
 {
     std::cout << "init()" << std::endl;
@@ -898,15 +969,13 @@ bool LamurePointCloudPlugin::init()
     std::cerr << "hostname: " << covise::coConfigConstants::getHostname() << std::endl;
 
     //Create main menu button
-    lamureMenu = new ui::Menu("LamureMenu", this);
-    lamureMenu->setText("LamurePlugin");
-
-    selectionGroup = new ui::Group(lamureMenu, "Selection");
-    selectionButtonGroup = new ui::ButtonGroup(selectionGroup, "SelectionGroup");
-    selectionButtonGroup->enableDeselect(true);
-
-    fileButtonGroup = new ui::ButtonGroup(selectionGroup, "FileButtonGroup");
-    fileButtonGroup->enableDeselect(true);
+    //lamureMenu = new ui::Menu("LamureMenu", this);
+    //lamureMenu->setText("LamurePlugin");
+    //selectionGroup = new ui::Group(lamureMenu, "Selection");
+    //selectionButtonGroup = new ui::ButtonGroup(selectionGroup, "SelectionGroup");
+    //selectionButtonGroup->enableDeselect(true);
+    //fileButtonGroup = new ui::ButtonGroup(selectionGroup, "FileButtonGroup");
+    //fileButtonGroup->enableDeselect(true);
 
     plugin->LamureGroup = new osg::Group();
     plugin->LamureGroup->setName("LamureGroup");
@@ -951,76 +1020,7 @@ bool LamurePointCloudPlugin::init()
 
     //VRSceneGraph::instance()->viewAll();
 
-
-    return 1;
-}
-
-int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, const char* covise_key)
-{
-    std::printf("loadLMR()\n");
-
-    const osg::GraphicsContext::Traits* traits = coVRConfig::instance()->windows[0].context->getTraits();
-    
-    putenv((char*)"__GL_SYNC_TO_VBLANK=0");
-
-    assert(plugin);
-    std::string lmr_file = std::string(filename);
-    plugin->load_settings(lmr_file);
-    settings_.vis_ = settings_.show_normals_ ? 1
-        : settings_.show_accuracy_ ? 2
-        : settings_.show_output_sensitivity_ ? 3
-        : settings_.channel_ > 0 ? 3 + settings_.channel_
-        : 0;
-
-    if (settings_.provenance_ && settings_.json_ != "") {
-        std::cout << "json: " << settings_.json_ << std::endl;
-        data_provenance_ = lamure::ren::Data_Provenance::parse_json(settings_.json_);
-        std::cout << "size of provenance: " << data_provenance_.get_size_in_bytes() << std::endl;
-    }
-
-    char str[200];
-    sprintf(str, "COVER.WindowConfig.Window:%d", 0);
-
-    std::printf("render_width_: %03" PRId32 "\n", traits->width);
-    std::printf("render_height_: %03" PRId32 "\n", traits->height);
-
-    lamure::ren::policy* policy = lamure::ren::policy::get_instance();
-    policy->set_max_upload_budget_in_mb(settings_.upload_);
-    policy->set_render_budget_in_mb(settings_.vram_);
-    policy->set_out_of_core_budget_in_mb(settings_.ram_);
-    policy->set_window_width(traits->width);
-    policy->set_window_height(traits->height);
-
-    lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
-    for (const auto& input_file : settings_.models_) {
-        lamure::model_t model_id = database->add_model(input_file, std::to_string(num_models_));
-        model_transformations_.push_back(settings_.transforms_[num_models_] * scm::math::mat4d(scm::math::make_translation(database->get_model(num_models_)->get_bvh()->get_translation())));
-        ++num_models_;
-    }
-    std::cout << osg::DisplaySettings::instance()->getDisplayType() << std::endl;
-
-    //std::cout << "(const char*)glGetString(GL_VERSION):" << std::endl;
-    //std::cout << (GLubyte*)glGetString(GL_VERSION) << std::endl;
-
-    //HWND hwnd_ = FindWindow(NULL, "COVER");
-    //std::cout << "FindWindow(NULL, 'COVER'): " << FindWindow(NULL, "COVER") << std::endl;
-    //HWND hwnd___ = FindWindow(NULL, "OpenCOVER");
-    //std::cout << "FindWindow(NULL, 'OpenCOVER'): " << FindWindow(NULL, "OpenCOVER") << std::endl;
-    //HDC hdc_covise = GetDC(FindWindow(NULL, "COVER"));
-    //HDC hdc_opencover = GetDC(FindWindow(NULL, "OpenCOVER"));
-    //std::cout << "Vergleich der Windows: " << std::endl;
-    //std::cout << "WindowFromDC(GetDC(FindWindow(NULL, COVER)): " << WindowFromDC(GetDC(FindWindow(NULL, "COVER"))) << std::endl;
-    //std::cout << "WindowFromDC(GetDC(FindWindow(NULL, OpenCOVER))): " << WindowFromDC(GetDC(FindWindow(NULL, "OpenCOVER"))) << std::endl;
-    //std::cout << "WindowFromDC(wglGetCurrentDC()): " << WindowFromDC(wglGetCurrentDC()) << std::endl;
-    //std::cout << "Vergleich der DCs: " << std::endl;
-    //std::cout << "GetDC(FindWindow(NULL, COVER)): " << GetDC(FindWindow(NULL, "COVER")) << std::endl;
-    //std::cout << "GetDC(FindWindow(NULL, OpenCOVER)): " << GetDC(FindWindow(NULL, "OpenCOVER")) << std::endl;
-    //std::cout << "wglGetCurrentDC(): " << wglGetCurrentDC() << std::endl;
-    //SwapBuffers(hdc);
-    //HWND hwnd = FindWindow(NULL, "COVER");
-    //HDC hdc = GetDC(hwnd);
-    //HGLRC hglrc = wglCreateContext(hdc);
-    //wglMakeCurrent(hdc, hglrc);
+    GLenum err = glfwInit();
 
     device_.reset(new scm::gl::render_device());
     if (!device_) {
@@ -1030,59 +1030,65 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
     if (!context_) {
         std::cout << "error creating context" << std::endl;
     }
-    std::cout << (*device_);
+    glfwSetErrorCallback(EventHandler::on_error);
+    std::cout << err << std::endl;
+    Window* primary_window = create_window(render_width_, render_height_, "lamure_vis", nullptr, nullptr);
+    make_context_current(primary_window);
 
+    std::cout << (*device_);
     plugin->init_lamure_shader();
     plugin->create_framebuffers();
     //plugin->create_aux_resources_buffered();
     plugin->init_render_states();
     plugin->init_camera();
+  
 
-    /*lfwSetErrorCallback(EventHandler::on_error);
-
-    if (!glfwInit()) {
-        std::runtime_error("GLFW initialisation failed");
-    }
-
-    Window* primary_window = create_window(settings_.width_, settings_.height_, "lamure_vis", nullptr, nullptr);
-    make_context_current(primary_window);
+    /*GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    std::cout << mode << std::endl;
+    int* x_pos;
+    int* y_pos;
+    int* width;
+    int* height;
+    glfwGetMonitorPos(monitor, x_pos, y_pos);
+    glfwGetMonitorPhysicalSize(monitor, width, height);
+    std::cout << *x_pos << " " << *y_pos << " " << *width << " " << *height << " " << std::endl;
+    std::cout << " " << std::endl;
+    glfwGetWindowPos(primary_window->_glfw_window, x_pos, y_pos);
+    glfwGetWindowSize(primary_window->_glfw_window, width, height);
+    std::cout << x_pos << " " << y_pos << " " << width << " " << height << " " << std::endl;
+    std::cout << *x_pos << " " << *y_pos << " " << *width << " " << *height << " " << std::endl;
+    std::cout << " " << std::endl;*/
+    
     glfwSwapInterval(1);
-
     make_context_current(primary_window);
     plugin->lamure_display();
-
     glewExperimental = GL_TRUE;
-    GLenum err = glewInit();
     if (GLEW_OK != err) {
         std::cout << "GLEW error: " << glewGetErrorString(err) << std::endl;
     }
     std::cout << "using GLEW " << glewGetString(GLEW_VERSION) << std::endl;
-
     ImGui_ImplGlfwGL3_Init(primary_window->_glfw_window, false);
     ImGui_ImplGlfwGL3_CreateDeviceObjects();
-
     while (!should_close()) {
         glfwPollEvents();
-
         for (const auto& window : _windows) {
             make_context_current(window);
-
             if (window == primary_window) {
                 plugin->lamure_display();
-
                 if (settings_.gui_) {
                     ImGui_ImplGlfwGL3_NewFrame();
                     gui_status_screen();
                     ImGui::Render();
                 }
-
             }
             glfwSwapBuffers(window->_glfw_window);
         }
     }
-    */
+    
     return 1;
 }
+
 
 
 size_t LamurePointCloudPlugin::query_video_memory_in_mb() {
