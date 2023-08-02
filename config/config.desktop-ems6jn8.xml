@@ -43,8 +43,13 @@
       <NumPBOs value="0" />
       <Stereo value="off" />
       <Stencil value="off" />
+      <CheckForOpenGLErrors value="true" />
+      <StencilBits value="8" />
+      <Stencil value="true" />
       
-      <!--  <GLVersion value="3.0" /> -->
+      
+      
+      <!--GLVersion value="3.2" /> -->
       
       <!-- 
       <TabletUI host="localhost" /> 
@@ -74,7 +79,7 @@
       <PBOConfig>
         <PBO width="2560" height="1600" windowIndex="0" />
       </PBOConfig>
-
+      
       
       <UI>
         <VRUI toolbar="false" />

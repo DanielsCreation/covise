@@ -202,7 +202,7 @@ bool WindowTypeQtPlugin::windowCreate(int i)
         new QApplication(coCommandLine::argc(), coCommandLine::argv());
         qApp->setWindowIcon(QIcon(":/icons/cover.ico"));
         //qApp->setAttribute(Qt::AA_PluginApplication);
-        qApp->setAttribute(Qt::AA_MacDontSwapCtrlAndMeta);
+        //qApp->setAttribute(Qt::AA_MacDontSwapCtrlAndMeta);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
         qApp->setAttribute(Qt::AA_DontCheckOpenGLContextThreadAffinity);
 #endif
@@ -223,8 +223,8 @@ bool WindowTypeQtPlugin::windowCreate(int i)
 
     auto window = new QtMainWindow();
     win.window = window;
-    win.window->move(conf.windows[i].ox, conf.windows[i].oy);
-    //win.window->resize(conf.windows[i].sx, conf.windows[i].sy);
+    win.window->move(conf.windows[i].ox/2, conf.windows[i].oy/2);
+    win.window->resize(conf.windows[i].sx/2, conf.windows[i].sy/2);
     if (i > 0)
         win.window->setWindowTitle(("COVER"+std::to_string(i)).c_str());
     else
@@ -365,8 +365,8 @@ bool WindowTypeQtPlugin::windowCreate(int i)
     QSurfaceFormat format;
     format.setVersion(2, 1);
     format.setProfile(QSurfaceFormat::CompatibilityProfile);
-    //format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
-    //format.setOption(QSurfaceFormat::DebugContext);
+    format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+    format.setOption(QSurfaceFormat::DebugContext);
     int bpc = covise::coCoviseConfig::getInt("bpc", "COVER.Framebuffer", 10);
     format.setRedBufferSize(bpc);
     format.setGreenBufferSize(bpc);
@@ -412,11 +412,11 @@ bool WindowTypeQtPlugin::windowCreate(int i)
         win.widget->setTextureFormat(GL_RGB10_A2);
     }
 #endif
-    win.widget->setFixedSize(conf.windows[i].sx, conf.windows[i].sy);
+    //win.widget->setFixedSize(conf.windows[i].sx, conf.windows[i].sy);
     win.window->setCentralWidget(win.widget);
     win.widget->show();
     conf.windows[i].context = win.widget->graphicsWindow();
-    conf.windows[i].doublebuffer = false;
+    conf.windows[i].doublebuffer = true;
 
     //std::cerr << "window " << i << ": ctx=" << coVRConfig::instance()->windows[i].context << std::endl;
 

@@ -1,5 +1,12 @@
+
+#define GLFW_EXPOSE_NATIVE_WIN32
 //local
 #include "LamurePointCloud.h"
+#include <osg/StateSet>
+
+#include <lamure/imgui.h>
+#include <lamure/imgui_internal.h>
+#include <lamure/imgui_impl_glfw_gl3.h>
 
 // std
 #include <iostream>
@@ -21,7 +28,6 @@
 //boost
 #include <boost/assign/list_of.hpp>
 #include <boost/regex.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
 
 //schism
@@ -57,7 +63,7 @@
 #include <cover/VRViewer.h>
 
 #include "Points.h"
-#include "LamureDrawable.h"
+#include <osgViewer/GraphicsWindow>
 //#include "LamureDevice.h"
 //#include "LamureContext.h"
 
@@ -77,11 +83,12 @@
 #include <scm/gl_util/primitives.h>
 
 #include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 
-#define ASSERT(x) if (!(x)) __debugbreak();
-#define GLCall(x) GLClearError();\
-    x;\
-    ASSERT(GLLogCall(#x,__FILE__, __LINE__))
+//#define ASSERT(x) if (!(x)) __debugbreak();
+//#define GLCall(x) GLClearError();\
+//    x;\
+//    ASSERT(GLLogCall(#x,__FILE__, __LINE__))
 
 //#ifdef __cplusplus
 //extern "C" {
@@ -157,11 +164,53 @@ int32_t render_height_;
 int32_t num_models_ = 0;
 std::vector<scm::math::mat4d> model_transformations_;
 
-scm::gl::render_device_ptr     device_;
-scm::gl::render_context_ptr    context_;
-scm::gl::quad_geometry_ptr screen_quad_;
-boost::shared_ptr<lamure::ren::camera> camera_ = NULL;
-osg::ref_ptr<osg::Camera> osg_camera_;
+scm::gl::render_device_ptr              device_;
+scm::gl::render_context_ptr             context_;
+scm::gl::quad_geometry_ptr              screen_quad_;
+boost::shared_ptr<lamure::ren::camera>  camera_ = NULL;
+osg::ref_ptr<osg::Camera>               osg_camera_;
+
+lamure::ren::Data_Provenance data_provenance_;
+float height_divided_by_top_minus_bottom_ = 0.f;
+coVRShader* pointShader = coVRShaderList::instance()->get("Points");
+
+scm::gl::program_ptr vis_xyz_shader_;
+scm::gl::program_ptr vis_xyz_pass1_shader_;
+scm::gl::program_ptr vis_xyz_pass2_shader_;
+scm::gl::program_ptr vis_xyz_pass3_shader_;
+scm::gl::program_ptr vis_xyz_lighting_shader_;
+scm::gl::program_ptr vis_xyz_pass2_lighting_shader_;
+scm::gl::program_ptr vis_xyz_pass3_lighting_shader_;
+scm::gl::program_ptr vis_xyz_qz_shader_;
+scm::gl::program_ptr vis_xyz_qz_pass1_shader_;
+scm::gl::program_ptr vis_xyz_qz_pass2_shader_;
+scm::gl::program_ptr vis_quad_shader_;
+scm::gl::program_ptr vis_line_shader_;
+scm::gl::program_ptr vis_triangle_shader_;
+scm::gl::program_ptr vis_vt_shader_;
+scm::gl::frame_buffer_ptr fbo_;
+scm::gl::texture_2d_ptr fbo_color_buffer_;
+scm::gl::texture_2d_ptr fbo_depth_buffer_;
+scm::gl::frame_buffer_ptr pass1_fbo_;
+scm::gl::frame_buffer_ptr pass2_fbo_;
+scm::gl::texture_2d_ptr pass1_depth_buffer_;
+scm::gl::texture_2d_ptr pass2_color_buffer_;
+scm::gl::texture_2d_ptr pass2_normal_buffer_;
+scm::gl::texture_2d_ptr pass2_view_space_pos_buffer_;
+scm::gl::texture_2d_ptr pass2_depth_buffer_;
+scm::gl::depth_stencil_state_ptr depth_state_disable_;
+scm::gl::depth_stencil_state_ptr depth_state_less_;
+scm::gl::depth_stencil_state_ptr depth_state_without_writing_;
+scm::gl::rasterizer_state_ptr no_backface_culling_rasterizer_state_;
+scm::gl::blend_state_ptr color_blending_state_;
+scm::gl::blend_state_ptr color_no_blending_state_;
+scm::gl::sampler_state_ptr filter_linear_;
+scm::gl::sampler_state_ptr filter_nearest_;
+scm::gl::sampler_state_ptr vt_filter_linear_;
+scm::gl::sampler_state_ptr vt_filter_nearest_;
+scm::gl::texture_2d_ptr bg_texture_;
+
+scm::time::accum_timer<scm::time::high_res_timer> frame_time_;
 
 
 struct settings {
@@ -175,7 +224,7 @@ struct settings {
     bool create_aux_resources_{ 0 };
     double near_plane_{ 0.001f };
     double far_plane_{ 1000.0f };
-    double fov_{ 30.0f };
+    float fov_{ 30.0f };
     bool splatting_{ 0 };
     bool gamma_correction_{ 0 };
     int32_t gui_{ 1 };
@@ -289,6 +338,43 @@ struct provenance {
 std::map<uint32_t, provenance> provenance_;
 
 
+
+struct resource {
+    uint64_t num_primitives_{ 0 };
+    scm::gl::buffer_ptr buffer_;
+    scm::gl::vertex_array_ptr array_;
+};
+
+resource brush_resource_;
+resource pvs_resource_;
+std::map<uint32_t, resource> bvh_resources_;
+std::map<uint32_t, resource> sparse_resources_;
+std::map<uint32_t, resource> frusta_resources_;
+std::map<uint32_t, resource> octree_resources_;
+std::map<uint32_t, resource> image_plane_resources_;
+
+
+struct vt_info {
+    uint32_t texture_id_;
+    uint16_t view_id_;
+    uint16_t context_id_;
+    uint64_t cut_id_;
+    vt::CutUpdate* cut_update_;
+    std::vector<scm::gl::texture_2d_ptr> index_texture_hierarchy_;
+    scm::gl::texture_2d_ptr physical_texture_;
+    scm::math::vec2ui physical_texture_size_;
+    scm::math::vec2ui physical_texture_tile_size_;
+    size_t size_feedback_;
+    int32_t* feedback_lod_cpu_buffer_;
+    uint32_t* feedback_count_cpu_buffer_;
+    scm::gl::buffer_ptr feedback_lod_storage_;
+    scm::gl::buffer_ptr feedback_count_storage_;
+    int toggle_visualization_;
+    bool enable_hierarchy_;
+};
+vt_info vt_;
+
+
 double fps_ = 0.0;
 uint64_t rendered_splats_ = 0;
 uint64_t rendered_nodes_ = 0;
@@ -309,23 +395,19 @@ struct Window {
     MouseButtonState _mouse_button_state;
 };
 
+std::list<Window*> _windows;
+Window* _current_context = nullptr;
+
 void glut_resize(int32_t w, int32_t h) {
     settings_.width_ = w;
     settings_.height_ = h;
-    
-      //create_framebuffers();
-
-      //lamure::ren::policy* policy = lamure::ren::policy::get_instance();
-      //policy->set_window_width(render_width_);
-      //policy->set_window_height(render_height_);
-
-      //context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(render_width_, render_height_)));
-    
+    //create_framebuffers();
+    //lamure::ren::policy* policy = lamure::ren::policy::get_instance();
+    //policy->set_window_width(render_width_);
+    //policy->set_window_height(render_height_);
+    //context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(render_width_, render_height_)));
     camera_->set_projection_matrix(settings_.fov_, float(settings_.width_) / float(settings_.height_), settings_.near_plane_, settings_.far_plane_);
-
-    gui_.ortho_matrix_ =
-        scm::math::make_ortho_matrix(0.0f, static_cast<float>(settings_.width_),
-            0.0f, static_cast<float>(settings_.height_), -1.0f, 1.0f);
+    gui_.ortho_matrix_ = scm::math::make_ortho_matrix(0.0f, static_cast<float>(settings_.width_), 0.0f, static_cast<float>(settings_.height_), -1.0f, 1.0f);
 }
 
 void update_input_keys(input& input_, uint8_t k)
@@ -337,6 +419,328 @@ void update_input_keys(input& input_, uint8_t k)
         input_.keys_[1] = io.KeysDown[k];
     if (k == 'E')
         input_.keys_[2] = io.KeysDown[k];
+}
+
+std::string
+make_short_name(const std::string& s) {
+#if 0
+    boost::filesystem::path p(s);
+    std::string filename(p.stem().string());
+    const unsigned max_length = 36;
+    if (filename.length() > max_length) {
+        std::string shortname = filename.substr(0, 12) + "..." + filename.substr(filename.length() - 21, 21);
+        return shortname;
+    }
+    return filename;
+#endif
+    const unsigned max_length = 36;
+    if (s.length() > max_length) {
+        std::string shortname = s.substr(s.length() - 36, 36);
+        return shortname;
+    }
+    return s;
+
+}
+
+
+void gui_selection_settings(settings& stgs) {
+
+    ImGui::SetNextWindowPos(ImVec2(20, 315));
+    ImGui::SetNextWindowSize(ImVec2(500.0f, 220.0f));
+
+    ImGui::Begin("Selection", &gui_.selection_settings_, ImGuiWindowFlags_MenuBar);
+
+    std::vector<std::string> model_names_short;
+    for (const auto& s : stgs.models_) {
+        model_names_short.push_back(make_short_name(s));
+    }
+
+    char** model_names = new char* [num_models_ + 1];
+    for (unsigned i = 0; i < model_names_short.size(); ++i) {
+        model_names[i] = ((char*)model_names_short[i].c_str());
+    }
+    std::string all("All");
+    model_names[num_models_] = (char*)all.c_str();
+
+#if 0
+    // old code from student
+    char* model_values[num_models_ + 1] = { };
+    for (int i = 0; i < num_models_ + 1; i++) {
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "%s%d", "Dataset ", i);
+        if (i == num_models_) {
+            snprintf(buffer, sizeof(buffer), "%s", "All");
+        }
+        model_values[i] = strdup(buffer);
+    }
+#endif
+
+
+    static int32_t dataset = selection_.selected_model_;
+    if (selection_.selected_model_ == -1) {
+        dataset = num_models_;
+    }
+
+    ImGui::Combo("Dataset", &dataset, model_names, num_models_ + 1);
+#if 0
+    // old code from student
+    ImGui::Combo("Dataset", &dataset, model_values, IM_ARRAYSIZE(model_names));
+#endif    
+
+    if (dataset == num_models_) {
+        selection_.selected_model_ = -1;
+    }
+    else {
+        selection_.selected_model_ = dataset;
+    }
+
+    if (settings_.create_aux_resources_ && settings_.atlas_file_ != "") {
+        if (ImGui::Button("Cycle Images")) {
+            if (selection_.selected_model_ != -1) {
+                if (settings_.views_.find(selection_.selected_model_) != settings_.views_.end()) {
+                    selection_.selected_view_ = (selection_.selected_view_ + 1) % settings_.views_[selection_.selected_model_].size();
+                    const auto& view = settings_.views_[selection_.selected_model_][selection_.selected_view_];
+                    auto camera_matrix = view.transform_;
+                    camera_matrix = camera_matrix
+                        //* scm::math::make_translation(0.f, 0.f, settings_.aux_point_size_*10.f) 
+                        * scm::math::make_rotation(180.f, 0.f, 0.f, 1.f);
+                    camera_->set_view_matrix(scm::math::mat4d(scm::math::inverse(camera_matrix)));
+                    camera_->set_projection_matrix(settings_.fov_, float(settings_.width_) / float(settings_.height_), settings_.near_plane_, settings_.far_plane_);
+                    selection_.selected_views_.clear();
+                    selection_.selected_views_.insert(selection_.selected_view_);
+                    settings_.show_views_ = true;
+                    settings_.splatting_ = false;
+                }
+            }
+        }
+    }
+    else {
+        ImGui::Text("No atlas file");
+    }
+    ImGui::Checkbox("Brush", &input_.brush_mode_);
+
+    ImGui::Text("Selection: %d / %d", (int32_t)selection_.brush_end_, (int32_t)settings_.max_brush_size_);
+    if (settings_.create_aux_resources_ && settings_.atlas_file_ != "") {
+        if (selection_.selected_model_ != -1 && selection_.selected_views_.size() == 1) {
+            ImGui::Text("Image: %d %s", (int32_t)selection_.selected_view_,
+                settings_.views_[selection_.selected_model_][selection_.selected_view_].image_file_.c_str());
+        }
+        else {
+            ImGui::Text("Images: %d", (int32_t)selection_.selected_views_.size());
+        }
+    }
+
+    if (ImGui::Button("Clear Selection")) {
+        selection_.selected_views_.clear();
+        selection_.brush_end_ = 0;
+        input_.brush_clear_ = false;
+    }
+
+    ImGui::End();
+
+    delete[] model_names;
+}
+
+
+void gui_view_settings() {
+    ImGui::SetNextWindowPos(ImVec2(20, 555));
+    ImGui::SetNextWindowSize(ImVec2(500.0f, 335.0f));
+    ImGui::Begin("View / LOD Settings", &gui_.view_settings_, ImGuiWindowFlags_MenuBar);
+    //if (ImGui::SliderFloat("Near Plane", &settings_.near_plane_, 0, 1.0f, "%.4f", 4.0f)) {
+    //  input_.gui_lock_ = true;
+    //}
+    //if (ImGui::SliderFloat("Far Plane", &settings_.far_plane_, 0, 1000.0f, "%.4f", 4.0f)) {
+    //  input_.gui_lock_ = true;
+    //}
+    if (ImGui::SliderFloat("Travel Speed", &settings_.travel_speed_, 0.01f, 300.0f, "%.4f", 4.0f)) {
+        input_.gui_lock_ = true;
+    }
+    if (ImGui::SliderFloat("FOV", &settings_.fov_, 18, 90.0f)) {
+        input_.gui_lock_ = true;
+    }
+
+    ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
+
+    ImGui::Checkbox("Lod Update", &settings_.lod_update_);
+    if (settings_.create_aux_resources_) {
+        ImGui::Checkbox("Show BVHs", &settings_.show_bvhs_);
+        if (settings_.show_bvhs_) {
+            settings_.splatting_ = false;
+        }
+    }
+
+    if (ImGui::SliderFloat("LOD Error", &settings_.lod_error_, 1.0f, 10.0f, "%.4f", 2.5f)) {
+        input_.gui_lock_ = true;
+    }
+    if (ImGui::SliderFloat("LOD Point Scale", &settings_.lod_point_scale_, 0.1f, 2.0f, "%.4f", 1.0f)) {
+        input_.gui_lock_ = true;
+    }
+
+    ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
+
+    if (settings_.pvs_ != "") {
+        //ImGui::Text("PVS: %s", settings_.pvs_.c_str());
+        ImGui::Checkbox("Use PVS", &settings_.use_pvs_);
+        lamure::pvs::pvs_database::get_instance()->activate(settings_.use_pvs_);
+
+        ImGui::Checkbox("PVS Culling", &settings_.pvs_culling_);
+        ImGui::Checkbox("Show PVS", &settings_.show_pvs_);
+        if (settings_.show_pvs_) {
+            settings_.splatting_ = false;
+        }
+    }
+    else {
+        ImGui::Text("No pvs file");
+    }
+
+    ImGui::End();
+}
+
+
+void gui_visual_settings() {
+
+    uint32_t num_attributes = 5 + data_provenance_.get_size_in_bytes() / sizeof(float);
+
+    const char* vis_values[] = {
+      "Color", "Normals", "Accuracy",
+      "Radius Deviation", "Output Sensitivity",
+      "Provenance 1", "Provenance 2", "Provenance 3",
+      "Provenance 4", "Provenance 5", "Provenance 6", "Provenance 7" };
+    static int it = settings_.vis_;
+
+    ImGui::SetNextWindowPos(ImVec2(settings_.width_ - 520, 20));
+    ImGui::SetNextWindowSize(ImVec2(500.0f, 305.0f));
+    ImGui::Begin("Visual Settings", &gui_.visual_settings_, ImGuiWindowFlags_MenuBar);
+
+    uint32_t num_vis_entries = (5 + data_provenance_.get_size_in_bytes() / sizeof(float));
+    ImGui::Combo("Vis", &it, vis_values, num_vis_entries);
+    settings_.vis_ = it;
+
+    if (settings_.vis_ > num_vis_entries) {
+        settings_.vis_ = 0;
+    }
+    settings_.show_normals_ = (settings_.vis_ == 1);
+    settings_.show_accuracy_ = (settings_.vis_ == 2);
+    settings_.show_radius_deviation_ = (settings_.vis_ == 3);
+    settings_.show_output_sensitivity_ = (settings_.vis_ == 4);
+    if (settings_.vis_ > 4) {
+        settings_.channel_ = (settings_.vis_ - 4);
+    }
+    else {
+        settings_.channel_ = 0;
+    }
+
+
+    ImGui::Checkbox("Splatting", &settings_.splatting_);
+    ImGui::Checkbox("Enable Lighting", &settings_.enable_lighting_);
+    ImGui::Checkbox("Use Material Color", &settings_.use_material_color_);
+    ImGui::Checkbox("Gamma Correction", &settings_.gamma_correction_);
+
+    static ImVec4 color_mat_diff = ImColor(0.6f, 0.6f, 0.6f, 1.0f);
+    ImGui::Text("Material Diffuse");
+    ImGui::ColorEdit3("Diffuse", (float*)&color_mat_diff, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoAlpha);
+    settings_.material_diffuse_.x = color_mat_diff.x;
+    settings_.material_diffuse_.y = color_mat_diff.y;
+    settings_.material_diffuse_.z = color_mat_diff.z;
+    /*
+        static ImVec4 color_mat_spec = ImColor(0.4f, 0.4f, 0.4f, 1.0f);
+        ImGui::Text("Material Specular");
+        ImGui::ColorEdit3("Specular", (float*)&color_mat_spec, ImGuiColorEditFlags_Float);
+        settings_.material_specular_.x = color_mat_spec.x;
+        settings_.material_specular_.y = color_mat_spec.y;
+        settings_.material_specular_.z = color_mat_spec.z;
+
+        static ImVec4 color_ambient_light = ImColor(0.1f, 0.1f, 0.1f, 1.0f);
+        ImGui::Text("Ambient Light Color");
+        ImGui::ColorEdit3("Ambient", (float*)&color_ambient_light, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoAlpha);
+        settings_.ambient_light_color_.x = color_ambient_light.x;
+        settings_.ambient_light_color_.y = color_ambient_light.y;
+        settings_.ambient_light_color_.z = color_ambient_light.z;
+
+        static ImVec4 color_point_light = ImColor(1.0f, 1.0f, 1.0f, 1.0f);
+        ImGui::Text("Point Light Color");
+        ImGui::ColorEdit3("Point", (float*)&color_point_light, ImGuiColorEditFlags_Float);
+        settings_.point_light_color_.x = color_point_light.x;
+        settings_.point_light_color_.y = color_point_light.y;
+        settings_.point_light_color_.z = color_point_light.z;
+    */
+    static ImVec4 background_color = ImColor(settings_.background_color_.x, settings_.background_color_.y, settings_.background_color_.z, 1.0f);
+    ImGui::Text("Background Color");
+    ImGui::ColorEdit3("Background", (float*)&background_color, ImGuiColorEditFlags_Float);
+    settings_.background_color_.x = background_color.x;
+    settings_.background_color_.y = background_color.y;
+    settings_.background_color_.z = background_color.z;
+
+    ImGui::End();
+}
+
+
+void gui_provenance_settings() {
+
+    ImGui::SetNextWindowPos(ImVec2(settings_.width_ - 520, 345));
+    ImGui::SetNextWindowSize(ImVec2(500.0f, 450.0f));
+    ImGui::Begin("Provenance Settings", &gui_.provenance_settings_, ImGuiWindowFlags_MenuBar);
+
+    if (ImGui::SliderFloat("AUX Point Size", &settings_.aux_point_size_, 0.1f, 10.0f, "%.4f", 4.0f)) {
+        input_.gui_lock_ = true;
+    }
+    if (ImGui::SliderFloat("AUX Point Scale", &settings_.aux_point_scale_, 0.1f, 2.0f, "%.4f", 4.0f)) {
+        input_.gui_lock_ = true;
+    }
+    if (ImGui::SliderFloat("AUX Focal Length", &settings_.aux_focal_length_, 0.1f, 2.0f, "%.4f", 4.0f)) {
+        input_.gui_lock_ = true;
+    }
+
+    if (settings_.create_aux_resources_) {
+        ImGui::Checkbox("Show Sparse", &settings_.show_sparse_);
+        if (settings_.show_sparse_) {
+            settings_.enable_lighting_ = false;
+            settings_.splatting_ = false;
+        }
+
+        ImGui::Checkbox("Show Views", &settings_.show_views_);
+        if (settings_.show_views_) {
+            settings_.splatting_ = false;
+        }
+
+        if (settings_.atlas_file_ != "") {
+            ImGui::Checkbox("Show Photos", &settings_.show_photos_);
+            if (settings_.show_photos_) {
+                settings_.splatting_ = false;
+            }
+        }
+
+        ImGui::Checkbox("Show Octrees", &settings_.show_octrees_);
+        if (settings_.show_octrees_) {
+            settings_.splatting_ = false;
+        }
+    }
+    else {
+        ImGui::Text("No aux file");
+    }
+
+    ImGui::Checkbox("Heatmap", &settings_.heatmap_);
+
+
+    ImGui::InputFloat("Heatmap MIN", &settings_.heatmap_min_);
+    ImGui::InputFloat("Heatmap MAX", &settings_.heatmap_max_);
+
+    static ImVec4 color_heatmap_min = ImColor(68.0f / 255.0f, 0.0f, 84.0f / 255.0f, 1.0f);
+    ImGui::Text("Heatmap Color Min");
+    ImGui::ColorEdit3("Heatmap Min", (float*)&color_heatmap_min, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoAlpha);
+    settings_.heatmap_color_min_.x = color_heatmap_min.x;
+    settings_.heatmap_color_min_.y = color_heatmap_min.y;
+    settings_.heatmap_color_min_.z = color_heatmap_min.z;
+
+    static ImVec4 color_heatmap_max = ImColor(251.f / 255.f, 231.f / 255.f, 35.f / 255.f, 1.0f);
+    ImGui::Text("Heatmap Color Max");
+    ImGui::ColorEdit3("Heatmap Max", (float*)&color_heatmap_max, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoAlpha);
+    settings_.heatmap_color_max_.x = color_heatmap_max.x;
+    settings_.heatmap_color_max_.y = color_heatmap_max.y;
+    settings_.heatmap_color_max_.z = color_heatmap_max.z;
+
+
+    ImGui::End();
 }
 
 void gui_status_screen() {
@@ -368,18 +772,18 @@ void gui_status_screen() {
     else {
         ImGui::Text("No provenance file");
     }
-    //if (gui_.selection_settings_) {
-    //    gui_selection_settings(settings_);
-    //}
-    //if (gui_.view_settings_) {
-    //    gui_view_settings();
-    //}
-    //if (gui_.visual_settings_) {
-    //    gui_visual_settings();
-    //}
-    //if (settings_.provenance_ && gui_.provenance_settings_ && settings_.create_aux_resources_) {
-    //    gui_provenance_settings();
-    //}
+    if (gui_.selection_settings_) {
+        gui_selection_settings(settings_);
+    }
+    if (gui_.view_settings_) {
+        gui_view_settings();
+    }
+    if (gui_.visual_settings_) {
+        gui_visual_settings();
+    }
+    if (settings_.provenance_ && gui_.provenance_settings_ && settings_.create_aux_resources_) {
+        gui_provenance_settings();
+    }
     ImGui::End();
 }
 
@@ -440,9 +844,6 @@ void glut_keyboard(unsigned char key, int32_t x, int32_t y) {
         break;
     }
 }
-
-std::list<Window*> _windows;
-Window* _current_context = nullptr;
 
 
 class EventHandler {
@@ -558,7 +959,6 @@ public:
     }
 };
 
-
 void make_context_current(Window* _window) {
     if (_window != nullptr) {
         glfwMakeContextCurrent(_window->_glfw_window);
@@ -583,7 +983,6 @@ Window* create_window(unsigned int width, unsigned int height, const std::string
     glfwWindowHint(GLFW_FOCUSED, 1);
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
     //glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, false);
-
 
     if (share != nullptr) {
         new_window->_glfw_window = glfwCreateWindow(width, height, title.c_str(), monitor, share->_glfw_window);
@@ -611,7 +1010,6 @@ Window* create_window(unsigned int width, unsigned int height, const std::string
 }
 
 
-
 bool should_close() {
     if (_windows.empty())
         return true;
@@ -636,50 +1034,8 @@ bool should_close() {
     }
     return _windows.empty();
 }
+
 //*/
-
-
-lamure::ren::Data_Provenance data_provenance_;
-float height_divided_by_top_minus_bottom_ = 0.f;
-coVRShader* pointShader = coVRShaderList::instance()->get("Points");
-
-scm::gl::program_ptr vis_xyz_shader_;
-scm::gl::program_ptr vis_xyz_pass1_shader_;
-scm::gl::program_ptr vis_xyz_pass2_shader_;
-scm::gl::program_ptr vis_xyz_pass3_shader_;
-scm::gl::program_ptr vis_xyz_lighting_shader_;
-scm::gl::program_ptr vis_xyz_pass2_lighting_shader_;
-scm::gl::program_ptr vis_xyz_pass3_lighting_shader_;
-scm::gl::program_ptr vis_xyz_qz_shader_;
-scm::gl::program_ptr vis_xyz_qz_pass1_shader_;
-scm::gl::program_ptr vis_xyz_qz_pass2_shader_;
-scm::gl::program_ptr vis_quad_shader_;
-scm::gl::program_ptr vis_line_shader_;
-scm::gl::program_ptr vis_triangle_shader_;
-scm::gl::program_ptr vis_vt_shader_;
-scm::gl::frame_buffer_ptr fbo_;
-scm::gl::texture_2d_ptr fbo_color_buffer_;
-scm::gl::texture_2d_ptr fbo_depth_buffer_;
-scm::gl::frame_buffer_ptr pass1_fbo_;
-scm::gl::frame_buffer_ptr pass2_fbo_;
-scm::gl::texture_2d_ptr pass1_depth_buffer_;
-scm::gl::texture_2d_ptr pass2_color_buffer_;
-scm::gl::texture_2d_ptr pass2_normal_buffer_;
-scm::gl::texture_2d_ptr pass2_view_space_pos_buffer_;
-scm::gl::texture_2d_ptr pass2_depth_buffer_;
-scm::gl::depth_stencil_state_ptr depth_state_disable_;
-scm::gl::depth_stencil_state_ptr depth_state_less_;
-scm::gl::depth_stencil_state_ptr depth_state_without_writing_;
-scm::gl::rasterizer_state_ptr no_backface_culling_rasterizer_state_;
-scm::gl::blend_state_ptr color_blending_state_;
-scm::gl::blend_state_ptr color_no_blending_state_;
-scm::gl::sampler_state_ptr filter_linear_;
-scm::gl::sampler_state_ptr filter_nearest_;
-scm::gl::sampler_state_ptr vt_filter_linear_;
-scm::gl::sampler_state_ptr vt_filter_nearest_;
-scm::gl::texture_2d_ptr bg_texture_;
-
-scm::time::accum_timer<scm::time::high_res_timer> frame_time_;
 
 
 struct GeoGl : public osg::Group
@@ -806,49 +1162,12 @@ protected:
         virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
         {
             std::cout << "PointsUpdateCallback(), drawImplementation()" << std::endl;
-            //bLamurePointCloudPlugin::instance()->lamure_display();
+            //LamurePointCloudPlugin::instance()->lamure_display();
         }
         GeoGl* _geo_gl = nullptr;
         osg::Stats* _viewerStats;
     };
 };
-
-
-struct resource {
-    uint64_t num_primitives_{ 0 };
-    scm::gl::buffer_ptr buffer_;
-    scm::gl::vertex_array_ptr array_;
-};
-
-resource brush_resource_;
-resource pvs_resource_;
-std::map<uint32_t, resource> bvh_resources_;
-std::map<uint32_t, resource> sparse_resources_;
-std::map<uint32_t, resource> frusta_resources_;
-std::map<uint32_t, resource> octree_resources_;
-std::map<uint32_t, resource> image_plane_resources_;
-
-
-struct vt_info {
-    uint32_t texture_id_;
-    uint16_t view_id_;
-    uint16_t context_id_;
-    uint64_t cut_id_;
-    vt::CutUpdate* cut_update_;
-    std::vector<scm::gl::texture_2d_ptr> index_texture_hierarchy_;
-    scm::gl::texture_2d_ptr physical_texture_;
-    scm::math::vec2ui physical_texture_size_;
-    scm::math::vec2ui physical_texture_tile_size_;
-    size_t size_feedback_;
-    int32_t* feedback_lod_cpu_buffer_;
-    uint32_t* feedback_count_cpu_buffer_;
-    scm::gl::buffer_ptr feedback_lod_storage_;
-    scm::gl::buffer_ptr feedback_count_storage_;
-    int toggle_visualization_;
-    bool enable_hierarchy_;
-};
-vt_info vt_;
-
 
 
 using namespace osg;
@@ -874,14 +1193,9 @@ LamurePointCloudPlugin::LamurePointCloudPlugin(): ui::Owner("LamurePointCloud", 
 }
 
 
-
 int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, const char* covise_key)
 {
     std::printf("loadLMR()\n");
-
-    const osg::GraphicsContext::Traits* traits = coVRConfig::instance()->windows[0].context->getTraits();
-
-    putenv((char*)"__GL_SYNC_TO_VBLANK=0");
 
     assert(plugin);
     std::string lmr_file = std::string(filename);
@@ -904,9 +1218,6 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
     char str[200];
     sprintf(str, "COVER.WindowConfig.Window:%d", 0);
 
-    //std::printf("render_width_: %03" PRId32 "\n", traits->width);
-    //std::printf("render_height_: %03" PRId32 "\n", traits->height);
-
     std::printf("render_width_: %03" PRId32 "\n", render_width_);
     std::printf("render_height_: %03" PRId32 "\n", render_height_);
 
@@ -914,8 +1225,8 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
     policy->set_max_upload_budget_in_mb(settings_.upload_);
     policy->set_render_budget_in_mb(settings_.vram_);
     policy->set_out_of_core_budget_in_mb(settings_.ram_);
-    policy->set_window_width(traits->width);
-    policy->set_window_height(traits->height);
+    policy->set_window_width(render_width_);
+    policy->set_window_height(render_height_);
 
     lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
     for (const auto& input_file : settings_.models_) {
@@ -923,10 +1234,6 @@ int LamurePointCloudPlugin::loadLMR(const char* filename, osg::Group* parent, co
         model_transformations_.push_back(settings_.transforms_[num_models_] * scm::math::mat4d(scm::math::make_translation(database->get_model(num_models_)->get_bvh()->get_translation())));
         ++num_models_;
     }
-    std::cout << osg::DisplaySettings::instance()->getDisplayType() << std::endl;
-
-    //std::cout << "(const char*)glGetString(GL_VERSION):" << std::endl;
-    //std::cout << (GLubyte*)glGetString(GL_VERSION) << std::endl;
 
     //HWND hwnd_ = FindWindow(NULL, "COVER");
     //std::cout << "FindWindow(NULL, 'COVER'): " << FindWindow(NULL, "COVER") << std::endl;
@@ -962,9 +1269,31 @@ bool LamurePointCloudPlugin::init()
     //cover->addPlugin("Move");
     //cover->addPlugin("Annotation");
 
-    plugin->current_context = wglGetCurrentContext();
-    plugin->hwnd = FindWindow(NULL, "OpenCOVER");
-    plugin->hdc = GetDC(plugin->hwnd);
+
+    
+
+    //BOOL wglCopyContext( HGLRC unnamedParam1, HGLRC unnamedParam2, UINT  unnamedParam3 );
+    //HGLRC wglCreateContext( HDC unnamedParam1 );
+    //BOOL SwapBuffers( HDC unnamedParam1 );
+    //wglMakeCurrent(hdc, hglrc);
+    //BOOL wglShareLists( HGLRC unnamedParam1, HGLRC unnamedParam2 );
+    //PROC wglGetProcAddress( LPCSTR unnamedParam1 );
+
+    //plugin->HGLRC_cover = wglGetCurrentContext();
+    //plugin->HGLRC_opencover = wglGetCurrentContext();
+
+    plugin->last_context = wglGetCurrentContext();
+
+    plugin->hwnd_opencover = FindWindow(NULL, "OpenCOVER");
+    plugin->hwnd_cover = FindWindow(NULL, "COVER");
+
+    plugin->hdc_opencover = GetDC(plugin->hwnd_opencover);
+    plugin->hdc_cover = GetDC(plugin->hwnd_cover);
+
+    osgViewer::ViewerBase::Contexts ctx_vec;
+    VRViewer::instance()->getContexts(ctx_vec, false);
+
+    coVRConfig::instance()->windows[0].context->getTraits();
 
     std::cerr << "hostname: " << covise::coConfigConstants::getHostname() << std::endl;
 
@@ -989,105 +1318,114 @@ bool LamurePointCloudPlugin::init()
     plugin->geode->setName("LamureGeode");
     plugin->transform->addChild(plugin->geode);
 
-    plugin->geo_gl = new GeoGl();
-    plugin->LamureGroup->addChild(plugin->geo_gl);
+    GeoGl* geo_gl = new GeoGl();
+    LamureGroup->addChild(geo_gl);
 
+    //geo_gl->addPointGeo(VRViewer::instance()->getViewerStats());
+    //geo_gl->addTriangleGeo(VRViewer::instance()->getViewerStats());
+    //geo_gl->addLineGeo(VRViewer::instance()->getViewerStats());
+
+    osg::ref_ptr<Geode> geo1(osg::ref_ptr(new osg::Geode()));
+    cover->getScene()->addChild(geo1);
+    plugin->draw1 = osg::ref_ptr(new LamureDrawable());
+    geo1->addChild(plugin->draw1);
     
-    /*plugin->pointSet = new PointSet[1];
-    plugin->pointSet[0].colors = new Color[1024];
-    plugin->pointSet[0].points = new ::Point[1024];
-    plugin->pointSet[0].size = 1024;
-
-    for (int n = 0; n < 1024; ++n)
-    {
-        plugin->pointSet[0].points[n].coordinates.x() = -500 + n;
-        plugin->pointSet[0].points[n].coordinates.y() = -500 + n;
-        plugin->pointSet[0].points[n].coordinates.z() = -500 + n;
-
-        plugin->pointSet[0].colors[n].r = n / 1024.0;
-        plugin->pointSet[0].colors[n].g = (n + 500) / 2048.0;
-        plugin->pointSet[0].colors[n].b = (n + 500) / 4096.0;
-    }
-
-    plugin->geometry = new LamureGeometry(&plugin->pointSet[0]);
-    plugin->geode->addDrawable(plugin->geometry.get());*/
-
-    //std::cout << covise::coConfigDefaultPaths::getDefaultTransformFileName() << std::endl;
-    //std::cout << covise::coConfigDefaultPaths::getDefaultLocalConfigFileName() << std::endl;
-    //std::cout << covise::coConfigDefaultPaths::getDefaultGlobalConfigFileName() << std::endl;
-
     //VRViewer::instance()->statsDisplay->showStats(coVRStatsDisplay::VIEWER_SCENE_STATS, VRViewer::instance());
-
     //VRSceneGraph::instance()->viewAll();
 
-    GLenum err = glfwInit();
-
-    device_.reset(new scm::gl::render_device());
-    if (!device_) {
-        std::cout << "error creating device" << std::endl;
-    }
-    context_ = device_->main_context();
-    if (!context_) {
-        std::cout << "error creating context" << std::endl;
-    }
-    glfwSetErrorCallback(EventHandler::on_error);
-    std::cout << err << std::endl;
-    Window* primary_window = create_window(render_width_, render_height_, "lamure_vis", nullptr, nullptr);
-    make_context_current(primary_window);
-
-    std::cout << (*device_);
-    plugin->init_lamure_shader();
-    plugin->create_framebuffers();
-    //plugin->create_aux_resources_buffered();
-    plugin->init_render_states();
-    plugin->init_camera();
-  
-
-    /*GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-    std::cout << mode << std::endl;
-    int* x_pos;
-    int* y_pos;
-    int* width;
-    int* height;
-    glfwGetMonitorPos(monitor, x_pos, y_pos);
-    glfwGetMonitorPhysicalSize(monitor, width, height);
-    std::cout << *x_pos << " " << *y_pos << " " << *width << " " << *height << " " << std::endl;
-    std::cout << " " << std::endl;
-    glfwGetWindowPos(primary_window->_glfw_window, x_pos, y_pos);
-    glfwGetWindowSize(primary_window->_glfw_window, width, height);
-    std::cout << x_pos << " " << y_pos << " " << width << " " << height << " " << std::endl;
-    std::cout << *x_pos << " " << *y_pos << " " << *width << " " << *height << " " << std::endl;
-    std::cout << " " << std::endl;*/
-    
-    glfwSwapInterval(1);
-    make_context_current(primary_window);
-    plugin->lamure_display();
-    glewExperimental = GL_TRUE;
-    if (GLEW_OK != err) {
-        std::cout << "GLEW error: " << glewGetErrorString(err) << std::endl;
-    }
-    std::cout << "using GLEW " << glewGetString(GLEW_VERSION) << std::endl;
-    ImGui_ImplGlfwGL3_Init(primary_window->_glfw_window, false);
-    ImGui_ImplGlfwGL3_CreateDeviceObjects();
-    while (!should_close()) {
-        glfwPollEvents();
-        for (const auto& window : _windows) {
-            make_context_current(window);
-            if (window == primary_window) {
-                plugin->lamure_display();
-                if (settings_.gui_) {
-                    ImGui_ImplGlfwGL3_NewFrame();
-                    gui_status_screen();
-                    ImGui::Render();
-                }
-            }
-            glfwSwapBuffers(window->_glfw_window);
+    if (settings_.imgui) {
+        GLenum err = glfwInit();
+        device_.reset(new scm::gl::render_device());
+        if (!device_) {
+            std::cout << "error creating device" << std::endl;
         }
+        context_ = device_->main_context();
+        if (!context_) {
+            std::cout << "error creating context" << std::endl;
+        }
+        std::cout << (*device_);
+        device_->dump_memory_info(std::cout);
+        glfwSetErrorCallback(EventHandler::on_error);
+
+        Window* _current_context = create_window(render_width_, render_height_, "lamure_vis", nullptr, nullptr);
+        make_context_current(_current_context);
+
+        plugin->init_lamure_shader();
+        plugin->create_framebuffers();
+        //plugin->create_aux_resources_buffered();
+        plugin->init_render_states();
+        plugin->init_camera();
+
+        glfwSwapInterval(1);
+        make_context_current(_current_context);
+        plugin->lamure_display();
+        glewExperimental = GL_TRUE;
+        if (GLEW_OK != err) { std::cout << "GLEW error: " << glewGetErrorString(err) << std::endl; }
+        std::cout << "using GLEW " << glewGetString(GLEW_VERSION) << std::endl;
+        ImGui_ImplGlfwGL3_Init(_current_context->_glfw_window, false);
+        ImGui_ImplGlfwGL3_CreateDeviceObjects();
+        while (!should_close()) {
+            glfwPollEvents();
+            for (const auto& window : _windows) {
+                make_context_current(window);
+                if (window == _current_context) {
+                    plugin->lamure_display();
+                    if (settings_.gui_) {
+                        //ImGui_ImplGlfwGL3_NewFrame();
+                        //gui_status_screen();
+                        //ImGui::Render();
+                    }
+                }
+                glfwSwapBuffers(window->_glfw_window);
+            }
+        }
+
     }
-    
+    else {   
+        
+    }
     return 1;
 }
+
+unsigned int counter_preDraw = 0;
+void LamurePointCloudPlugin::preDraw() {
+    //if (counter_preDraw == 1 && settings_.imgui == 0) {
+    //    GLenum err = glfwInit();
+    //    device_.reset(new scm::gl::render_device());
+    //    if (!device_) {
+    //        std::cout << "error creating device" << std::endl;
+    //    }
+    //    context_ = device_->main_context();
+    //    if (!context_) {
+    //        std::cout << "error creating context" << std::endl;
+    //    }
+    //    std::cout << (*device_);
+    //    device_->dump_memory_info(std::cout);
+
+    //    glfwSetErrorCallback(EventHandler::on_error);
+    //    Window* _current_context = create_window(render_width_, render_height_, "lamure_vis", nullptr, nullptr);
+    //    make_context_current(_current_context);
+
+    //    plugin->init_lamure_shader();
+    //    plugin->create_framebuffers();
+    //    //plugin->create_aux_resources_buffered();
+    //    plugin->init_render_states();
+    //    plugin->init_camera();
+
+    //    glfwSwapInterval(1);
+    //    make_context_current(_current_context);
+    //    plugin->lamure_display();
+    //    glewExperimental = GL_TRUE;
+    //    if (GLEW_OK != err) {
+    //        std::cout << "GLEW error: " << glewGetErrorString(err) << std::endl;
+    //    }
+    //    std::cout << "using GLEW " << glewGetString(GLEW_VERSION) << std::endl;
+    //    ImGui_ImplGlfwGL3_Init(_current_context->_glfw_window, false);
+    //    ImGui_ImplGlfwGL3_CreateDeviceObjects();
+    //    counter_preDraw = counter_preDraw + 1;
+    //}
+}
+
 
 
 
@@ -1096,7 +1434,6 @@ size_t LamurePointCloudPlugin::query_video_memory_in_mb() {
     glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &size_in_kb);
     return size_t(size_in_kb) / 1024;
 }
-
 
 
 struct DrawableNode : public osg::Drawable {
@@ -1145,44 +1482,96 @@ struct Draw : public virtual osg::Drawable::DrawCallback
 
 unsigned int counter = 0;
 void LamurePointCloudPlugin::preFrame() {
-    if (cover->getPointerButton()->getState() == 1 && counter == 0) {
-        //std::cout << "preFrame(), " << "counter == 0" << std::endl;
-        //device_.reset(new scm::gl::render_device());
-        //if (!device_) {
-        //    std::cout << "error creating device" << std::endl;
-        //}
-        //context_ = device_->main_context();
-        //if (!context_) {
-        //    std::cout << "error creating context" << std::endl;
-        //}
-        //std::cout << (*device_);
+    plugin->current_context = wglGetCurrentContext();
+    if (cover->getPointerButton()->getState() == 1 && counter == 0 && settings_.imgui == 0) {
 
-        //plugin->init_lamure_shader();
-        //plugin->create_framebuffers();
+        osg::StateSet* myStateSet = new osg::StateSet;
+        VRViewer::instance()->getCamera()->getGraphicsContext()->getState()->captureCurrentState(*myStateSet);
+        osg::GraphicsContext* gc = coVRConfig::instance()->windows[0].context;
+
+        bool ddd = gc->getTraits()->doubleBuffer;
+        std::cout << VRViewer::instance()->getCamera()->getRenderTargetImplementation() << std::endl;
+        
+
+        device_.reset(new scm::gl::render_device());
+        if (!device_) {
+            std::cout << "error creating device" << std::endl;
+        }
+        context_ = device_->main_context();
+        if (!context_) {
+            std::cout << "error creating context" << std::endl;
+        }
+        std::cout << (*device_);
+        device_->dump_memory_info(std::cout);
+
+        plugin->init_lamure_shader();
+        plugin->create_framebuffers();
         //plugin->create_aux_resources_buffered();
-        //plugin->init_render_states();
-        //plugin->init_camera();
+        plugin->init_render_states();
+        plugin->init_camera();
 
-        //osg::ref_ptr<struct DrawableNode> maindrawable(new DrawableNode());
-        //plugin->fix_geode->addDrawable(maindrawable);
+        //VRViewer::instance()->getCamera()->getGraphicsContext()->getState()->reset();
+        plugin->current_context = wglGetCurrentContext();
+        VRViewer::instance()->getCamera()->getGraphicsContext()->getState()->apply(myStateSet);
 
-        //GeoGl* geo_gl = new GeoGl();
-        //LamureGroup->addChild(geo_gl);
-        //geo_gl->addTriangleGeo(VRViewer::instance()->getViewerStats());
-        //geo_gl->addPointGeo(VRViewer::instance()->getViewerStats());
-        //geo_gl->addLineGeo(VRViewer::instance()->getViewerStats());
-
-        //plugin->lamure_display();
-        //counter = counter + 1;
+        counter = counter + 1;
+        //gc->makeCurrent();
+        //osg::State* state_2 = gc->getState();
     }
+    if (counter >= 1) {
+        plugin->lamure_display();
 
+    }
     
 }
 
 bool LamurePointCloudPlugin::update()
 {
-    if (cover->getPointerButton()->getState() == 1 /*|| cover->getPointerButton()->getState() == 0*/) {
+    if (cover->getPointerButton()->getState() == 1) {
         if (counter == 0) {
+
+            //counter = counter + 1;
+
+            //osgViewer::GraphicsWindow* gw = coVRConfig::instance()->windows[0].window;
+            //int x, y, px, py;
+            //gw->getWindowRectangle(px, py, x, y);
+            //const char* gc_name = stringToConstChar(gw->getWindowName());
+
+
+            // attempt to add win32 window with own context as a child of opencover window to mimic the opencover window and 
+            // in order to create scm render device without causing problems in opencover context
+            //GLenum err = glfwInit();
+            //glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+            //glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+            //glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+            //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_ANY_PROFILE);
+            //glfwWindowHint(GLFW_RESIZABLE, 1);
+            //glfwWindowHint(GLFW_FOCUSED, 0);
+            //glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
+            //GLFWwindow* window_glfw = glfwCreateWindow(px, py, gc_name, nullptr, nullptr);
+            //HWND hwnd_glfw = glfwGetWin32Window(window_glfw);
+            //DWORD style = GetWindowLong(hwnd_glfw, GWL_STYLE);
+            //style &= ~(WS_POPUP | WS_CAPTION);
+            //style |= WS_CHILD;
+            //SetWindowLong(hwnd_glfw, GWL_STYLE, style);
+            //float sc = cover->getScale();
+            //SetParent(hwnd_glfw, plugin->hwnd);
+            //MoveWindow(hwnd_glfw, px * sc, py * sc, x * sc, y * sc, 0); //place b at (x,y,w,h) in a
+            //UpdateWindow(hwnd_glfw);
+            //glfwMakeContextCurrent(window_glfw);
+
+            //osg::GraphicsContext::Traits traits = *(gc->getTraits()); 
+            //osg::ref_ptr<osgViewer::GraphicsWindowEmbedded> m_gc (new osgViewer::GraphicsWindowEmbedded(&traits));
+            //m_gc->makeCurrent();
+
+            //osg::ref_ptr<osg::StateSet> currentState = new osg::StateSet;
+            //gc->getState()->captureCurrentState(*currentState);
+            //gc->getState()->pushStateSet(currentState.get());
+
+
+            //gc->getState()->popStateSet();
+
+
             /*std::cout << "preFrame(), " << "counter == 0" << std::endl;
             device_.reset(new scm::gl::render_device());
             if (!device_) {
@@ -1225,9 +1614,7 @@ bool LamurePointCloudPlugin::update()
             ImGui_ImplGlfwGL3_Init(primary_window->_glfw_window, false);
             ImGui_ImplGlfwGL3_CreateDeviceObjects();*/
             
-
             //lamure_display();
-            //counter = counter + 1;
         }
         
         /*
@@ -1254,11 +1641,328 @@ bool LamurePointCloudPlugin::update()
         geo_gl->addTriangleGeo(VRViewer::instance()->getViewerStats());
         geo_gl->addLineGeo(VRViewer::instance()->getViewerStats());
         */
-
     };
-
     return 1;
 }
+
+
+void LamurePointCloudPlugin::postFrame() {
+    
+    /*
+    if (first_pass) {
+        device_.reset(new scm::gl::render_device());
+        if (!device_) {
+            std::cout << "error creating device" << std::endl;
+        }
+        context_ = device_->main_context();
+        if (!context_) {
+            std::cout << "error creating context" << std::endl;
+        }
+        std::cout << (*device_);
+        device_->dump_memory_info(std::cout);
+    }
+    plugin->lamure_display();*/
+}
+
+/*
+bool LamurePointCloudPlugin::ImplGlfwGL3_CreateFontsTexture() {
+    // Build texture atlas
+    ImGuiIO& io = ImGui::GetIO();
+    unsigned char* pixels;
+    int width, height;
+    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);   // Load as RGBA 32-bits (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders. If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
+
+    // Upload texture to graphics system
+    GLint last_texture;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
+    glGenTextures(1, &g_FontTexture);
+    glBindTexture(GL_TEXTURE_2D, g_FontTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+    // Store our identifier
+    io.Fonts->TexID = (void*)(intptr_t)g_FontTexture;
+
+    // Restore state
+    glBindTexture(GL_TEXTURE_2D, last_texture);
+
+    return true;
+
+}
+
+void LamurePointCloudPlugin::ImplGlfwGL3_RenderDrawLists(draw_data) {
+    ImGuiIO& io = ImGui::GetIO();
+    int fb_width = (int)(io.DisplaySize.x * io.DisplayFramebufferScale.x);
+    int fb_height = (int)(io.DisplaySize.y * io.DisplayFramebufferScale.y);
+    if (fb_width == 0 || fb_height == 0)
+        return;
+    draw_data->ScaleClipRects(io.DisplayFramebufferScale);
+    // Backup GL state
+    GLenum last_active_texture; glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture);
+    glActiveTexture(GL_TEXTURE0);
+    GLint last_program; glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
+    GLint last_texture; glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
+    GLint last_sampler; glGetIntegerv(GL_SAMPLER_BINDING, &last_sampler);
+    GLint last_array_buffer; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
+    GLint last_element_array_buffer; glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &last_element_array_buffer);
+    GLint last_vertex_array; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
+    GLint last_polygon_mode[2]; glGetIntegerv(GL_POLYGON_MODE, last_polygon_mode);
+    GLint last_viewport[4]; glGetIntegerv(GL_VIEWPORT, last_viewport);
+    GLint last_scissor_box[4]; glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box);
+    GLenum last_blend_src_rgb; glGetIntegerv(GL_BLEND_SRC_RGB, (GLint*)&last_blend_src_rgb);
+    GLenum last_blend_dst_rgb; glGetIntegerv(GL_BLEND_DST_RGB, (GLint*)&last_blend_dst_rgb);
+    GLenum last_blend_src_alpha; glGetIntegerv(GL_BLEND_SRC_ALPHA, (GLint*)&last_blend_src_alpha);
+    GLenum last_blend_dst_alpha; glGetIntegerv(GL_BLEND_DST_ALPHA, (GLint*)&last_blend_dst_alpha);
+    GLenum last_blend_equation_rgb; glGetIntegerv(GL_BLEND_EQUATION_RGB, (GLint*)&last_blend_equation_rgb);
+    GLenum last_blend_equation_alpha; glGetIntegerv(GL_BLEND_EQUATION_ALPHA, (GLint*)&last_blend_equation_alpha);
+    GLboolean last_enable_blend = glIsEnabled(GL_BLEND);
+    GLboolean last_enable_cull_face = glIsEnabled(GL_CULL_FACE);
+    GLboolean last_enable_depth_test = glIsEnabled(GL_DEPTH_TEST);
+    GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
+
+    // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
+    glEnable(GL_BLEND);
+    glBlendEquation(GL_FUNC_ADD);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_SCISSOR_TEST);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+    // Setup viewport, orthographic projection matrix
+    glViewport(0, 0, (GLsizei)fb_width, (GLsizei)fb_height);
+    const float ortho_projection[4][4] =
+    {
+        { 2.0f / io.DisplaySize.x, 0.0f,                   0.0f, 0.0f },
+        { 0.0f,                  2.0f / -io.DisplaySize.y, 0.0f, 0.0f },
+        { 0.0f,                  0.0f,                  -1.0f, 0.0f },
+        {-1.0f,                  1.0f,                   0.0f, 1.0f },
+    };
+    glUseProgram(g_ShaderHandle);
+    glUniform1i(g_AttribLocationTex, 0);
+    glUniformMatrix4fv(g_AttribLocationProjMtx, 1, GL_FALSE, &ortho_projection[0][0]);
+    glBindVertexArray(g_VaoHandle);
+    glBindSampler(0, 0); // Rely on combined texture/sampler state.
+
+    for (int n = 0; n < draw_data->CmdListsCount; n++)
+    {
+        const ImDrawList* cmd_list = draw_data->CmdLists[n];
+        const ImDrawIdx* idx_buffer_offset = 0;
+
+        glBindBuffer(GL_ARRAY_BUFFER, g_VboHandle);
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)cmd_list->VtxBuffer.Size * sizeof(ImDrawVert), (const GLvoid*)cmd_list->VtxBuffer.Data, GL_STREAM_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_ElementsHandle);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)cmd_list->IdxBuffer.Size * sizeof(ImDrawIdx), (const GLvoid*)cmd_list->IdxBuffer.Data, GL_STREAM_DRAW);
+
+        for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
+        {
+            const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
+            if (pcmd->UserCallback)
+            {
+                pcmd->UserCallback(cmd_list, pcmd);
+            }
+            else
+            {
+                glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
+                glScissor((int)pcmd->ClipRect.x, (int)(fb_height - pcmd->ClipRect.w), (int)(pcmd->ClipRect.z - pcmd->ClipRect.x), (int)(pcmd->ClipRect.w - pcmd->ClipRect.y));
+                glDrawElements(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, sizeof(ImDrawIdx) == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, idx_buffer_offset);
+            }
+            idx_buffer_offset += pcmd->ElemCount;
+        }
+    }
+    // Restore modified GL state
+    glUseProgram(last_program);
+    glBindTexture(GL_TEXTURE_2D, last_texture);
+    glBindSampler(0, last_sampler);
+    glActiveTexture(last_active_texture);
+    glBindVertexArray(last_vertex_array);
+    glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last_element_array_buffer);
+    glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
+    glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
+    if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+    if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+    if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+    if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
+    glPolygonMode(GL_FRONT_AND_BACK, last_polygon_mode[0]);
+    glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
+    glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3])
+}
+
+void LamurePointCloudPlugin::ImplGlfwGL3_CreateDeviceObjects() {
+// Backup GL state
+    GLint last_texture, last_array_buffer, last_vertex_array;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
+
+    const GLchar *vertex_shader =
+        "#version 330\n"
+        "uniform mat4 ProjMtx;\n"
+        "in vec2 Position;\n"
+        "in vec2 UV;\n"
+        "in vec4 Color;\n"
+        "out vec2 Frag_UV;\n"
+        "out vec4 Frag_Color;\n"
+        "void main()\n"
+        "{\n"
+        "	Frag_UV = UV;\n"
+        "	Frag_Color = Color;\n"
+        "	gl_Position = ProjMtx * vec4(Position.xy,0,1);\n"
+        "}\n";
+
+    const GLchar* fragment_shader =
+        "#version 330\n"
+        "uniform sampler2D Texture;\n"
+        "in vec2 Frag_UV;\n"
+        "in vec4 Frag_Color;\n"
+        "out vec4 Out_Color;\n"
+        "void main()\n"
+        "{\n"
+        "	Out_Color = Frag_Color * texture( Texture, Frag_UV.st);\n"
+        "}\n";
+
+    g_ShaderHandle = glCreateProgram();
+    g_VertHandle = glCreateShader(GL_VERTEX_SHADER);
+    g_FragHandle = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(g_VertHandle, 1, &vertex_shader, 0);
+    glShaderSource(g_FragHandle, 1, &fragment_shader, 0);
+    glCompileShader(g_VertHandle);
+    glCompileShader(g_FragHandle);
+    glAttachShader(g_ShaderHandle, g_VertHandle);
+    glAttachShader(g_ShaderHandle, g_FragHandle);
+    glLinkProgram(g_ShaderHandle);
+
+    g_AttribLocationTex = glGetUniformLocation(g_ShaderHandle, "Texture");
+    g_AttribLocationProjMtx = glGetUniformLocation(g_ShaderHandle, "ProjMtx");
+    g_AttribLocationPosition = glGetAttribLocation(g_ShaderHandle, "Position");
+    g_AttribLocationUV = glGetAttribLocation(g_ShaderHandle, "UV");
+    g_AttribLocationColor = glGetAttribLocation(g_ShaderHandle, "Color");
+
+    glGenBuffers(1, &g_VboHandle);
+    glGenBuffers(1, &g_ElementsHandle);
+
+    glGenVertexArrays(1, &g_VaoHandle);
+    glBindVertexArray(g_VaoHandle);
+    glBindBuffer(GL_ARRAY_BUFFER, g_VboHandle);
+    glEnableVertexAttribArray(g_AttribLocationPosition);
+    glEnableVertexAttribArray(g_AttribLocationUV);
+    glEnableVertexAttribArray(g_AttribLocationColor);
+
+#define OFFSETOF(TYPE, ELEMENT) ((size_t)&(((TYPE *)0)->ELEMENT))
+    glVertexAttribPointer(g_AttribLocationPosition, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)OFFSETOF(ImDrawVert, pos));
+    glVertexAttribPointer(g_AttribLocationUV, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)OFFSETOF(ImDrawVert, uv));
+    glVertexAttribPointer(g_AttribLocationColor, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (GLvoid*)OFFSETOF(ImDrawVert, col));
+#undef OFFSETOF
+
+    ImGui_ImplGlfwGL3_CreateFontsTexture();
+
+    // Restore modified GL state
+    glBindTexture(GL_TEXTURE_2D, last_texture);
+    glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
+    glBindVertexArray(last_vertex_array);
+
+    return true;
+}
+
+void    ImGui_ImplGlfwGL3_InvalidateDeviceObjects()
+{
+    if (g_VaoHandle) glDeleteVertexArrays(1, &g_VaoHandle);
+    if (g_VboHandle) glDeleteBuffers(1, &g_VboHandle);
+    if (g_ElementsHandle) glDeleteBuffers(1, &g_ElementsHandle);
+    g_VaoHandle = g_VboHandle = g_ElementsHandle = 0;
+
+    if (g_ShaderHandle && g_VertHandle) glDetachShader(g_ShaderHandle, g_VertHandle);
+    if (g_VertHandle) glDeleteShader(g_VertHandle);
+    g_VertHandle = 0;
+
+    if (g_ShaderHandle && g_FragHandle) glDetachShader(g_ShaderHandle, g_FragHandle);
+    if (g_FragHandle) glDeleteShader(g_FragHandle);
+    g_FragHandle = 0;
+
+    if (g_ShaderHandle) glDeleteProgram(g_ShaderHandle);
+    g_ShaderHandle = 0;
+
+    if (g_FontTexture)
+    {
+        glDeleteTextures(1, &g_FontTexture);
+        ImGui::GetIO().Fonts->TexID = 0;
+        g_FontTexture = 0;
+    }
+}
+
+
+void LamurePointCloudPlugin::Render()
+{
+    ImGuiContext& g = *GImGui;
+    IM_ASSERT(g.Initialized);   // Forgot to call ImGui::NewFrame()
+
+    if (g.FrameCountEnded != g.FrameCount)
+        ImGui::EndFrame();
+    g.FrameCountRendered = g.FrameCount;
+
+    // Skip render altogether if alpha is 0.0
+    // Note that vertex buffers have been created and are wasted, so it is best practice that you don't create windows in the first place, or consistently respond to Begin() returning false.
+    if (g.Style.Alpha > 0.0f)
+    {
+        // Gather windows to render
+        g.IO.MetricsRenderVertices = g.IO.MetricsRenderIndices = g.IO.MetricsActiveWindows = 0;
+        for (int i = 0; i < IM_ARRAYSIZE(g.RenderDrawLists); i++)
+            g.RenderDrawLists[i].resize(0);
+        for (int i = 0; i != g.Windows.Size; i++)
+        {
+            ImGuiWindow* window = g.Windows[i];
+            if (window->Active && window->HiddenFrames <= 0 && (window->Flags & (ImGuiWindowFlags_ChildWindow)) == 0)
+                AddWindowToRenderListSelectLayer(window);
+        }
+
+        // Flatten layers
+        int n = g.RenderDrawLists[0].Size;
+        int flattened_size = n;
+        for (int i = 1; i < IM_ARRAYSIZE(g.RenderDrawLists); i++)
+            flattened_size += g.RenderDrawLists[i].Size;
+        g.RenderDrawLists[0].resize(flattened_size);
+        for (int i = 1; i < IM_ARRAYSIZE(g.RenderDrawLists); i++)
+        {
+            ImVector<ImDrawList*>& layer = g.RenderDrawLists[i];
+            if (layer.empty())
+                continue;
+            memcpy(&g.RenderDrawLists[0][n], &layer[0], layer.Size * sizeof(ImDrawList*));
+            n += layer.Size;
+        }
+
+        // Draw software mouse cursor if requested
+        if (g.IO.MouseDrawCursor)
+        {
+            const ImGuiMouseCursorData& cursor_data = g.MouseCursorData[g.MouseCursor];
+            const ImVec2 pos = g.IO.MousePos - cursor_data.HotOffset;
+            const ImVec2 size = cursor_data.Size;
+            const ImTextureID tex_id = g.IO.Fonts->TexID;
+            g.OverlayDrawList.PushTextureID(tex_id);
+            g.OverlayDrawList.AddImage(tex_id, pos + ImVec2(1, 0), pos + ImVec2(1, 0) + size, cursor_data.TexUvMin[1], cursor_data.TexUvMax[1], IM_COL32(0, 0, 0, 48));        // Shadow
+            g.OverlayDrawList.AddImage(tex_id, pos + ImVec2(2, 0), pos + ImVec2(2, 0) + size, cursor_data.TexUvMin[1], cursor_data.TexUvMax[1], IM_COL32(0, 0, 0, 48));        // Shadow
+            g.OverlayDrawList.AddImage(tex_id, pos, pos + size, cursor_data.TexUvMin[1], cursor_data.TexUvMax[1], IM_COL32(0, 0, 0, 255));       // Black border
+            g.OverlayDrawList.AddImage(tex_id, pos, pos + size, cursor_data.TexUvMin[0], cursor_data.TexUvMax[0], IM_COL32(255, 255, 255, 255)); // White fill
+            g.OverlayDrawList.PopTextureID();
+        }
+        if (!g.OverlayDrawList.VtxBuffer.empty())
+            AddDrawListToRenderList(g.RenderDrawLists[0], &g.OverlayDrawList);
+
+        // Setup draw data
+        g.RenderDrawData.Valid = true;
+        g.RenderDrawData.CmdLists = (g.RenderDrawLists[0].Size > 0) ? &g.RenderDrawLists[0][0] : NULL;
+        g.RenderDrawData.CmdListsCount = g.RenderDrawLists[0].Size;
+        g.RenderDrawData.TotalVtxCount = g.IO.MetricsRenderVertices;
+        g.RenderDrawData.TotalIdxCount = g.IO.MetricsRenderIndices;
+
+        // Render. If user hasn't set a callback then they may retrieve the draw data via GetDrawData()
+        if (g.RenderDrawData.CmdListsCount > 0 && g.IO.RenderDrawListsFn != NULL)
+            g.IO.RenderDrawListsFn(&g.RenderDrawData);
+    }
+}
+*/
 
 void LamurePointCloudPlugin::lamure_display() {
     const osg::GraphicsContext::Traits* traits = coVRConfig::instance()->windows[0].context->getTraits();
@@ -1377,11 +2081,13 @@ void LamurePointCloudPlugin::lamure_display() {
     }
     else {
         //single pass
-        context_->clear_color_buffer(fbo_, 0, scm::math::vec4f(settings_.background_color_.x, settings_.background_color_.y, settings_.background_color_.z, 1.0f));
+        context_->clear_color_buffer(fbo_, 0,
+            scm::math::vec4f(settings_.background_color_.x, settings_.background_color_.y, settings_.background_color_.z, 1.0f));
         context_->clear_depth_stencil_buffer(fbo_);
         context_->set_frame_buffer(fbo_);
 
         auto selected_single_pass_shading_program = vis_xyz_shader_;
+
         if (settings_.enable_lighting_) {
             selected_single_pass_shading_program = vis_xyz_lighting_shader_;
         }
@@ -1390,19 +2096,20 @@ void LamurePointCloudPlugin::lamure_display() {
         context_->set_blend_state(color_no_blending_state_);
         context_->set_depth_stencil_state(depth_state_less_);
 
-        set_uniforms(selected_single_pass_shading_program);
-        if (settings_.background_image_ != "") {
-            context_->bind_texture(bg_texture_, filter_linear_, 0);
-            selected_single_pass_shading_program->uniform("background_image", true);
-        }
+        plugin->set_uniforms(selected_single_pass_shading_program);
+        /*if (settings_.background_image_ != "") {
+          context_->bind_texture(bg_texture_, filter_linear_, 0);
+          selected_single_pass_shading_program->uniform("background_image", true);
+        }*/
 
-        context_->set_viewport(scm::gl::viewport(scm::math::vec2f(traits->x, traits->y), scm::math::vec2f(traits->width, traits->height), scm::math::vec2f(0, 1)));
+        context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(render_width_, render_height_)));
         context_->apply();
 
         plugin->draw_all_models(context_id, view_id, selected_single_pass_shading_program);
+
         context_->bind_program(vis_xyz_shader_);
-        //plugin->draw_brush(vis_xyz_shader_);
-        //plugin->draw_resources(context_id, view_id);
+        plugin->draw_brush(vis_xyz_shader_);
+        plugin->draw_resources(context_id, view_id);
     }
 
     //PASS 4: fullscreen quad
@@ -1413,10 +2120,10 @@ void LamurePointCloudPlugin::lamure_display() {
     context_->bind_program(vis_quad_shader_);
     context_->bind_texture(fbo_color_buffer_, filter_linear_, 0);
     vis_quad_shader_->uniform("gamma_correction", (bool)settings_.gamma_correction_);
-    context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(settings_.width_, settings_.height_)));
-    context_->set_viewport(scm::gl::viewport(scm::math::vec2f(traits->x, traits->y), scm::math::vec2f(traits->width, traits->height), scm::math::vec2f(0, 1)));
+    context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(traits->width, traits->height)));
     context_->apply();
     screen_quad_->draw(context_);
+
 
     rendering_ = false;
     frame_time_.stop();
@@ -1489,24 +2196,6 @@ void LamurePointCloudPlugin::draw_all_models(const lamure::context_t context_id,
         std::vector<scm::gl::boxf>const& bounding_box_vector = bvh->get_bounding_boxes();
         scm::gl::frustum frustum_by_model = camera_->get_frustum_by_model(scm::math::mat4f(model_matrix));
 
-        //osg::ref_ptr<osg::State> state = new osg::State();
-        //state->setVertexPointer(renderable.size(), GL_POINT, 32, nullptr, GL_FALSE);
-        //osg::BufferTemplate<std::vector<lamure::ren::dataset::serialized_surfel>>* bt(new osg::BufferTemplate<std::vector<lamure::ren::dataset::serialized_surfel>>);
-        //ref_ptr<osg::Geometry> points(new osg::Geometry);
-        //unsigned int num = points->getNumPrimitiveSets();
-        //for (unsigned int i = 0; i < num; i++) {
-        //    points->removePrimitiveSet(i);
-        //};
-
-        //plugin->transform->addChild(points);
-        osg::ref_ptr<osg::Vec3Array> p(new osg::Vec3Array());
-        osg::ref_ptr<osg::Vec3uiArray> c(new osg::Vec3uiArray());
-        osg::ref_ptr<osg::Vec3Array> n(new osg::Vec3Array());
-
-        //osg::ref_ptr<osg::Vec3Array> pp(new osg::Vec3Array());
-        //osg::ref_ptr<osg::Vec3Array> cc(new osg::Vec3Array());
-        //osg::ref_ptr<osg::Vec2Array> nn(new osg::Vec2Array());
-
         for (auto const& node_slot_aggregate : renderable) {
             uint32_t node_culling_result = camera_->cull_against_frustum(frustum_by_model, bounding_box_vector[node_slot_aggregate.node_id_]);
             if (node_culling_result != 1) {
@@ -1524,40 +2213,7 @@ void LamurePointCloudPlugin::draw_all_models(const lamure::context_t context_id,
                 context_->apply();
 
                 if (draw) {
-                    lamure::ren::ooc_cache* ooc_cache = lamure::ren::ooc_cache::get_instance();
-                    bool loaded = ooc_cache->is_node_resident_and_aquired(model_id, node_slot_aggregate.node_id_);
-                    lamure::ren::dataset::serialized_surfel* surfels = (lamure::ren::dataset::serialized_surfel*)ooc_cache->node_data(model_id, node_slot_aggregate.node_id_);
-                    //lamure::ren::dataset::serialized_vertex* prov = (lamure::ren::dataset::serialized_vertex*)ooc_cache->node_data_provenance(model_id, node_slot_aggregate.node_id_);
-                    for (uint32_t i = 0; i < 30; ++i) {
-                        auto s = surfels[i];
-                        p->push_back(osg::Vec3f(surfels[i].x, surfels[i].y, surfels[i].z));
-                        c->push_back(osg::Vec3ui(surfels[i].r, surfels[i].g, surfels[i].b));
-                        n->push_back(osg::Vec3f(surfels[i].nx, surfels[i].ny, surfels[i].nz));
-                        //pp->push_back(osg::Vec3f(prov[i].v_x_, prov[i].v_y_, prov[i].v_z_));
-                        //cc->push_back(osg::Vec3f(prov[i].n_x_, prov[i].n_y_, prov[i].n_z_));
-                        //nn->push_back(osg::Vec2f(prov[i].c_x_, prov[i].c_y_));
-                    };
-                    //points->setVertexArray(p);
-                    //points->setColorArray(c);
-                    //points->setNormalArray(n);
-                    //points->setColorBinding(osg::Geometry::BIND_OVERALL);
-                    //points->getOrCreateStateSet()->setAttributeAndModes(new osg::Point(10.0f), osg::StateAttribute::ON);
-                    //points->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, surfels_per_node));
                     context_->draw_arrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
-
-                    osg::GLExtensions* glapi = new osg::GLExtensions(0);
-                    scm::gl::vertex_array_ptr vap = context_->current_vertex_array();
-                    //scm::gl::render_context::binding_state_type bst = context_->binding_state_type;
-
-                    osg::Uniform* uni = new osg::Uniform();
-
-                    unsigned int id = 0;
-                    //new osg::GLBufferObject(id, vap.get(), id);
-
-
-
-                    scm::gl::frame_buffer_ptr fbp = context_->current_frame_buffer();
-
                     rendered_splats_ += surfels_per_node;
                     ++rendered_nodes_;
                 }
@@ -2119,14 +2775,14 @@ void LamurePointCloudPlugin::init_lamure_shader()
             || !read_shader(shader_root_path + "/vis/vis_xyz_qz_pass1.glslv", vis_xyz_qz_pass1_vs_source)
             || !read_shader(shader_root_path + "/vis/vis_xyz_qz_pass2.glslv", vis_xyz_qz_pass2_vs_source)
 
-            || !read_shader(shader_root_path + "/vis/vis_xyz.glslv", vis_xyz_vs_lighting_source, true)
-            || !read_shader(shader_root_path + "/vis/vis_xyz.glslg", vis_xyz_gs_lighting_source, true)
-            || !read_shader(shader_root_path + "/vis/vis_xyz.glslf", vis_xyz_fs_lighting_source, true)
-            || !read_shader(shader_root_path + "/vis/vis_xyz_pass2.glslv", vis_xyz_pass2_vs_lighting_source, true)
-            || !read_shader(shader_root_path + "/vis/vis_xyz_pass2.glslg", vis_xyz_pass2_gs_lighting_source, true)
-            || !read_shader(shader_root_path + "/vis/vis_xyz_pass2.glslf", vis_xyz_pass2_fs_lighting_source, true)
-            || !read_shader(shader_root_path + "/vis/vis_xyz_pass3.glslv", vis_xyz_pass3_vs_lighting_source, true)
-            || !read_shader(shader_root_path + "/vis/vis_xyz_pass3.glslf", vis_xyz_pass3_fs_lighting_source, true)
+            || !read_shader(shader_root_path + "/vis/vis_xyz.glslv", vis_xyz_vs_lighting_source, false)
+            || !read_shader(shader_root_path + "/vis/vis_xyz.glslg", vis_xyz_gs_lighting_source, false)
+            || !read_shader(shader_root_path + "/vis/vis_xyz.glslf", vis_xyz_fs_lighting_source, false)
+            || !read_shader(shader_root_path + "/vis/vis_xyz_pass2.glslv", vis_xyz_pass2_vs_lighting_source, false)
+            || !read_shader(shader_root_path + "/vis/vis_xyz_pass2.glslg", vis_xyz_pass2_gs_lighting_source, false)
+            || !read_shader(shader_root_path + "/vis/vis_xyz_pass2.glslf", vis_xyz_pass2_fs_lighting_source, false)
+            || !read_shader(shader_root_path + "/vis/vis_xyz_pass3.glslv", vis_xyz_pass3_vs_lighting_source, false)
+            || !read_shader(shader_root_path + "/vis/vis_xyz_pass3.glslf", vis_xyz_pass3_fs_lighting_source, false)
             ) {
             std::cout << "error reading shader files" << std::endl;
             exit(1);
@@ -2265,19 +2921,19 @@ void LamurePointCloudPlugin::create_framebuffers() {
     fbo_->attach_color_buffer(0, fbo_color_buffer_);
     fbo_->attach_depth_stencil_buffer(fbo_depth_buffer_);
 
-    pass1_fbo_ = device_->create_frame_buffer();
-    pass1_depth_buffer_ = device_->create_texture_2d(scm::math::vec2ui(render_width_, render_height_), scm::gl::FORMAT_D24, 1, 1, 1);
-    pass1_fbo_->attach_depth_stencil_buffer(pass1_depth_buffer_);
+    //pass1_fbo_ = device_->create_frame_buffer();
+    //pass1_depth_buffer_ = device_->create_texture_2d(scm::math::vec2ui(render_width_, render_height_), scm::gl::FORMAT_D24, 1, 1, 1);
+    //pass1_fbo_->attach_depth_stencil_buffer(pass1_depth_buffer_);
 
-    pass2_fbo_ = device_->create_frame_buffer();
-    pass2_color_buffer_ = device_->create_texture_2d(scm::math::vec2ui(render_width_, render_height_), scm::gl::FORMAT_RGBA_32F, 1, 1, 1);
-    pass2_fbo_->attach_color_buffer(0, pass2_color_buffer_);
-    pass2_fbo_->attach_depth_stencil_buffer(pass1_depth_buffer_);
+    //pass2_fbo_ = device_->create_frame_buffer();
+    //pass2_color_buffer_ = device_->create_texture_2d(scm::math::vec2ui(render_width_, render_height_), scm::gl::FORMAT_RGBA_32F, 1, 1, 1);
+    //pass2_fbo_->attach_color_buffer(0, pass2_color_buffer_);
+    //pass2_fbo_->attach_depth_stencil_buffer(pass1_depth_buffer_);
 
-    pass2_normal_buffer_ = device_->create_texture_2d(scm::math::vec2ui(render_width_, render_height_), scm::gl::FORMAT_RGB_32F, 1, 1, 1);
-    pass2_fbo_->attach_color_buffer(1, pass2_normal_buffer_);
-    pass2_view_space_pos_buffer_ = device_->create_texture_2d(scm::math::vec2ui(render_width_, render_height_), scm::gl::FORMAT_RGB_32F, 1, 1, 1);
-    pass2_fbo_->attach_color_buffer(2, pass2_view_space_pos_buffer_);
+    //pass2_normal_buffer_ = device_->create_texture_2d(scm::math::vec2ui(render_width_, render_height_), scm::gl::FORMAT_RGB_32F, 1, 1, 1);
+    //pass2_fbo_->attach_color_buffer(1, pass2_normal_buffer_);
+    //pass2_view_space_pos_buffer_ = device_->create_texture_2d(scm::math::vec2ui(render_width_, render_height_), scm::gl::FORMAT_RGB_32F, 1, 1, 1);
+    //pass2_fbo_->attach_color_buffer(2, pass2_view_space_pos_buffer_);
 }
 
 void LamurePointCloudPlugin::init_render_states() {
@@ -2329,8 +2985,7 @@ void LamurePointCloudPlugin::set_uniforms(scm::gl::program_ptr shader) {
 
 
 void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, const lamure::view_t view_id) {
-    const osg::GraphicsContext::Traits* traits = NULL;
-    traits = coVRConfig::instance()->windows[0].context->getTraits();
+
     if (sparse_resources_.size() > 0) {
         if ((settings_.show_sparse_ || settings_.show_views_) && sparse_resources_.size() > 0) {
 
@@ -2338,7 +2993,7 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
             context_->set_blend_state(color_no_blending_state_);
             context_->set_depth_stencil_state(depth_state_less_);
 
-            set_uniforms(vis_xyz_shader_);
+            LamurePointCloudPlugin::instance()->set_uniforms(vis_xyz_shader_);
 
             scm::math::mat4d model_matrix = scm::math::mat4d::identity();
             scm::math::mat4d projection_matrix = scm::math::mat4d(camera_->get_projection_matrix());
@@ -2350,9 +3005,7 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
             vis_xyz_shader_->uniform("model_matrix", scm::math::mat4f(model_matrix));
             vis_xyz_shader_->uniform("model_view_matrix", scm::math::mat4f(model_view_matrix));
             vis_xyz_shader_->uniform("inv_mv_matrix", scm::math::mat4f(scm::math::transpose(scm::math::inverse(model_view_matrix))));
-
             vis_xyz_shader_->uniform("point_size_factor", settings_.aux_point_scale_);
-
             vis_xyz_shader_->uniform("model_to_screen_matrix", scm::math::mat4f::identity());
             vis_xyz_shader_->uniform("model_radius_scale", 1.f);
 
@@ -2361,7 +3014,6 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
 
             vis_xyz_shader_->uniform("eye", eye);
             vis_xyz_shader_->uniform("face_eye", true);
-
             vis_xyz_shader_->uniform("show_normals", false);
             vis_xyz_shader_->uniform("show_accuracy", false);
             vis_xyz_shader_->uniform("show_radius_deviation", false);
@@ -2372,14 +3024,11 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
                 if (selection_.selected_model_ != -1) {
                     model_id = selection_.selected_model_;
                 }
-
                 auto s_res = sparse_resources_[model_id];
                 if (s_res.num_primitives_ > 0) {
                     context_->bind_vertex_array(s_res.array_);
-                    //context_->apply();
-
+                    context_->apply();
                     uint32_t num_views = provenance_[model_id].num_views_;
-
                     if (settings_.show_views_) {
                         if (selection_.selected_views_.empty()) {
                             context_->draw_arrays(scm::gl::PRIMITIVE_POINT_LIST, 0, num_views);
@@ -2394,35 +3043,26 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
                         context_->draw_arrays(scm::gl::PRIMITIVE_POINT_LIST, num_views,
                             s_res.num_primitives_ - num_views);
                     }
-
                 }
-
                 if (selection_.selected_model_ != -1) {
                     break;
                 }
             }
-
         }
 
         // draw image_plane resources with vt system
         if (settings_.show_photos_ && !settings_.atlas_file_.empty()) {
             context_->bind_program(vis_vt_shader_);
-
-            uint64_t color_cut_id =
-                (((uint64_t)vt_.texture_id_) << 32) | ((uint64_t)vt_.view_id_ << 16) | ((uint64_t)vt_.context_id_);
-            //uint32_t max_depth_level_color = (*vt::CutDatabase::get_instance().get_cut_map())[color_cut_id]->get_atlas()->getDepth() - 1;
-
+            uint64_t color_cut_id = (((uint64_t)vt_.texture_id_) << 32) | ((uint64_t)vt_.view_id_ << 16) | ((uint64_t)vt_.context_id_);
+            uint32_t max_depth_level_color = (*vt::CutDatabase::get_instance().get_cut_map())[color_cut_id]->get_atlas()->getDepth() - 1;
             scm::math::mat4f view_matrix = camera_->get_view_matrix();
             scm::math::mat4f projection_matrix = scm::math::mat4f(camera_->get_projection_matrix());
-
             vis_vt_shader_->uniform("model_view_matrix", view_matrix);
             vis_vt_shader_->uniform("projection_matrix", projection_matrix);
-
             vis_vt_shader_->uniform("physical_texture_dim", vt_.physical_texture_size_);
-            //vis_vt_shader_->uniform("max_level", max_depth_level_color);
+            vis_vt_shader_->uniform("max_level", max_depth_level_color);
             vis_vt_shader_->uniform("tile_size", scm::math::vec2((uint32_t)vt::VTConfig::get_instance().get_size_tile()));
             vis_vt_shader_->uniform("tile_padding", scm::math::vec2((uint32_t)vt::VTConfig::get_instance().get_size_padding()));
-
             vis_vt_shader_->uniform("enable_hierarchy", vt_.enable_hierarchy_);
             vis_vt_shader_->uniform("toggle_visualization", vt_.toggle_visualization_);
 
@@ -2430,15 +3070,12 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
                 std::string texture_string = "hierarchical_idx_textures";
                 vis_vt_shader_->uniform(texture_string, i, int((i)));
             }
-
             vis_vt_shader_->uniform("physical_texture_array", 17);
-
-            //context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(render_width_, render_height_)));
+            context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(render_width_, render_height_)));
             context_->set_depth_stencil_state(depth_state_less_);
             context_->set_rasterizer_state(no_backface_culling_rasterizer_state_);
             context_->set_blend_state(color_no_blending_state_);
-            //context_->sync();
-
+            context_->sync();
             //apply_vt_cut_update();
 
             for (uint16_t i = 0; i < vt_.index_texture_hierarchy_.size(); ++i) {
@@ -2447,16 +3084,16 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
             context_->bind_texture(vt_.physical_texture_, vt_filter_linear_, 17);
             context_->bind_storage_buffer(vt_.feedback_lod_storage_, 0);
             context_->bind_storage_buffer(vt_.feedback_count_storage_, 1);
-            //context_->apply();
-
+            context_->apply();
             for (int32_t model_id = 0; model_id < num_models_; ++model_id) {
                 if (selection_.selected_model_ != -1) {
                     model_id = selection_.selected_model_;
                 }
                 auto t_res = image_plane_resources_[model_id];
+
                 if (t_res.num_primitives_ > 0) {
                     context_->bind_vertex_array(t_res.array_);
-                    //context_->apply();
+                    context_->apply();
                     if (selection_.selected_views_.empty()) {
                         context_->draw_arrays(scm::gl::PRIMITIVE_TRIANGLE_LIST, 0, t_res.num_primitives_);
                     }
@@ -2470,7 +3107,9 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
                     break;
                 }
             }
-            //context_->sync();
+            context_->sync();
+            //collect_vt_feedback();
+
         }
 
         if (settings_.show_views_ || settings_.show_octrees_) {
@@ -2492,7 +3131,7 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
                     auto f_res = frusta_resources_[model_id];
                     if (f_res.num_primitives_ > 0) {
                         context_->bind_vertex_array(f_res.array_);
-                        //context_->apply();
+                        context_->apply();
                         if (selection_.selected_views_.empty()) {
                             context_->draw_arrays(scm::gl::PRIMITIVE_LINE_LIST, 0, f_res.num_primitives_);
                         }
@@ -2503,12 +3142,11 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
                         }
                     }
                 }
-
                 if (settings_.show_octrees_) {
                     auto o_res = octree_resources_[model_id];
                     if (o_res.num_primitives_ > 0) {
                         context_->bind_vertex_array(o_res.array_);
-                        //context_->apply();
+                        context_->apply();
                         context_->draw_arrays(scm::gl::PRIMITIVE_LINE_LIST, 0, o_res.num_primitives_);
                     }
                 }
@@ -2518,27 +3156,20 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
             }
         }
     }
-
     if (settings_.show_bvhs_) {
-
         lamure::ren::controller* controller = lamure::ren::controller::get_instance();
         lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
         lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
-        //lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
-
+        lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
         context_->bind_program(vis_line_shader_);
-
         scm::math::mat4f projection_matrix = scm::math::mat4f(camera_->get_projection_matrix());
         scm::math::mat4f view_matrix = camera_->get_view_matrix();
-
         vis_line_shader_->uniform("view_matrix", view_matrix);
         vis_line_shader_->uniform("projection_matrix", projection_matrix);
-
         for (int32_t model_id = 0; model_id < num_models_; ++model_id) {
             if (selection_.selected_model_ != -1) {
                 model_id = selection_.selected_model_;
             }
-
             bool draw = true;
             lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
             lamure::ren::cut& cut = cuts->get_cut(context_id, view_id, m_id);
@@ -2548,29 +3179,28 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
                 if (selection_.selected_model_ != -1) break;
                 else draw = false;
             }
-
             if (draw) {
                 //uniforms per model
                 scm::math::mat4d model_matrix = model_transformations_[model_id];
                 vis_line_shader_->uniform("model_matrix", scm::math::mat4f(model_matrix));
+
                 std::vector<scm::gl::boxf>const& bounding_box_vector = bvh->get_bounding_boxes();
                 scm::gl::frustum frustum_by_model = camera_->get_frustum_by_model(scm::math::mat4f(model_matrix));
+
                 auto bvh_res = bvh_resources_[model_id];
                 if (bvh_res.num_primitives_ > 0) {
                     context_->bind_vertex_array(bvh_res.array_);
-                    //context_->apply();
+                    context_->apply();
 
                     for (auto const& node_slot_aggregate : renderable) {
                         uint32_t node_culling_result = camera_->cull_against_frustum(
                             frustum_by_model,
                             bounding_box_vector[node_slot_aggregate.node_id_]);
-
                         if (node_culling_result != 1) {
-
-                            /*if (settings_.use_pvs_ && pvs->is_activated() && settings_.pvs_culling_ && !lamure::pvs::pvs_database::get_instance()->get_viewer_visibility(model_id, node_slot_aggregate.node_id_)) {
+                            if (settings_.use_pvs_ && pvs->is_activated() && settings_.pvs_culling_
+                                && !lamure::pvs::pvs_database::get_instance()->get_viewer_visibility(model_id, node_slot_aggregate.node_id_)) {
                                 continue;
-                            }*/
-
+                            }
                             context_->draw_arrays(scm::gl::PRIMITIVE_LINE_LIST, node_slot_aggregate.node_id_ * 24, 24);
                         }
                     }
@@ -2580,6 +3210,7 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
                 break;
             }
         }
+
     }
 
     if (settings_.pvs_ != "" && settings_.show_pvs_) {
@@ -2593,10 +3224,11 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
             vis_line_shader_->uniform("projection_matrix", projection_matrix);
 
             context_->bind_vertex_array(pvs_resource_.array_);
-            //context_->apply();
+            context_->apply();
             context_->draw_arrays(scm::gl::PRIMITIVE_LINE_LIST, 0, pvs_resource_.num_primitives_);
         }
     }
+
 }
 
 void LamurePointCloudPlugin::draw_brush(scm::gl::program_ptr shader) {
@@ -3100,4 +3732,6 @@ void debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsi
         break;
     }
 }
+
+
 

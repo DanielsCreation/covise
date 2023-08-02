@@ -6,10 +6,6 @@
 #ifndef __gl_h_
     #include <GL/glew.h>
 #endif
-#include <lamure/imgui.h>
-#include <lamure/imgui_internal.h>
-#include <lamure/imgui_impl_glfw_gl3.h>
-
 
 #include <cover/coVRPluginSupport.h>
 #include <cover/coVRMSController.h>
@@ -49,7 +45,9 @@
 #include <osgViewer/ViewerEventHandlers>
 #include <osg/LineStipple>
 #include <osg/BufferTemplate>
+#include <osg/State>
 
+#include "LamureDrawable.h"
 #include "LamureGeometry.h"
 #include <lamure/types.h>
 #include <scm/gl_core/shader_objects/shader_objects_fwd.h>
@@ -91,10 +89,13 @@ public:
 
     static LamurePointCloudPlugin* instance();
     bool init();
+    void config();
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
     void preFrame();
     bool update();
+    void postFrame();
+    void preDraw();
     size_t query_video_memory_in_mb();
 
     // shared functions
@@ -130,9 +131,17 @@ public:
     scm::math::mat4d load_matrix(const std::string& filename);
     void load_settings(const std::string &filename);
     bool rendering_ = false;
+
+    HGLRC HGLRC_opencover;
+    HDC hdc_opencover;
+    HWND hwnd_opencover;
+
+    HGLRC HGLRC_cover;
+    HDC hdc_cover;
+    HWND hwnd_cover;
+
+    HGLRC last_context;
     HGLRC current_context;
-    HDC hdc;
-    HWND hwnd;
 
     // substitutions
     //osg::ref_ptr<LamureDevice> lmr_device = NULL;
@@ -167,9 +176,10 @@ private:
     osg::ref_ptr<osg::MatrixTransform> transform;
     osg::ref_ptr<osg::Geode> geode;
     osg::ref_ptr<LamureGeometry> geometry;
+    osg::ref_ptr<LamureDrawable> draw1;
 
     osg::ref_ptr<osg::Switch> _switch;
-    osg::ref_ptr<struct GeoGl> geo_gl;
+    //osg::ref_ptr<struct GeoGl> geo_gl;
 
 
 protected:
@@ -197,36 +207,6 @@ protected:
     ui::Slider* lodFarDistanceSlider = nullptr;
     ui::Slider* lodNearDistanceSlider = nullptr;
 };
-
-class COVEREXPORT PCLNode : public osg::Drawable
-{
-private:
-    bool displayVideo; // true if CoviseConfig.displayVideo is set
-    bool renderTextures;
-    std::string m_pcl_node;
-
-public:
-    PCLNode(std::string MarkerTrackingVariant);
-    virtual ~PCLNode();
-    static PCLNode* pcl_node;
-    virtual void drawImplementation(osg::RenderInfo& renderInfo) const;
-    /** Clone the type of an object, with Object* return type.
-        Must be defined by derived classes.*/
-    virtual osg::Object* cloneType() const;
-
-    /** Clone the an object, with Object* return type.
-        Must be defined by derived classes.*/
-    virtual osg::Object* clone(const osg::CopyOp&) const;
-};
-
-
-
-
-
-
-
-
-
 
 
 #endif

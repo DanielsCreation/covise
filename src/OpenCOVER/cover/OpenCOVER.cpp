@@ -93,6 +93,7 @@
 #include "ui/Group.h"
 #include "ui/Manager.h"
 #include <OpenConfig/access.h>
+//#include <C:/src/covise/src/OpenCOVER/plugins/hlrs/LamurePointCloud/LamureDrawable.h>
 
 
 #ifdef _OPENMP
@@ -612,6 +613,7 @@ bool OpenCOVER::init()
     coVRTui::instance();
 
     MarkerTracking::instance();
+    //LamureDrawable::instance();
 
     if (cover->debugLevel(4))
         fprintf(stderr, "Calling pfConfig\n");
@@ -711,10 +713,9 @@ bool OpenCOVER::init()
     }
 
     coVRLighting::instance()->initMenu();
-
     MarkerTracking::instance()->config(); // setup Rendering Node
+    //LamureDrawable::instance()->config();
     VRSceneGraph::instance()->config();
-
     coVRTui::instance()->config();
 
     if (cover->debugLevel(5))
@@ -1309,6 +1310,7 @@ bool OpenCOVER::frame()
         }
     }
     MarkerTracking::instance()->update();
+    //LamureDrawable::instance()->update();
 
     // print frame rate
     fl_time = cover->frameRealTime();

@@ -62,12 +62,12 @@ SET(SOURCES
 )
 
 set(SCHISM_INCLUDE_DIRS
-    $ENV{EXTERNLIBS}/schism/include
-    $ENV{EXTERNLIBS}/schism/include/scm_core/src
-    $ENV{EXTERNLIBS}/schism/include/scm_gl_core/src
-    $ENV{EXTERNLIBS}/schism/include/scm_gl_util/src
-    $ENV{EXTERNLIBS}/schism/include/scm_input/src
-    $ENV{EXTERNLIBS}/schism/include/scm_cl_core/src
+    $ENV{EXTERNLIBS}/../../schism
+    $ENV{EXTERNLIBS}/../../schism/scm_core/src
+    $ENV{EXTERNLIBS}/../../schism/scm_gl_core/src
+    $ENV{EXTERNLIBS}/../../schism/scm_gl_util/src
+    $ENV{EXTERNLIBS}/../../schism/scm_input/src
+    $ENV{EXTERNLIBS}/../../schism/scm_cl_core/src
 )
 
 #set(FREEGLUT_INCLUDE_DIR $ENV{EXTERNLIBS}/freeglut/include)
@@ -81,12 +81,12 @@ set(SCHISM_INCLUDE_DIRS
 #set(FREETYPE_LIBRARY_RELEASE $ENV{EXTERNLIBS}/freetype/lib/freetype.lib)
 #set(FREETYPE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/freetype/lib/freetyped.lib)
 
-set(SCHISM_CORE_LIBRARY $ENV{EXTERNLIBS}/schism/lib/scm_core.lib)
-set(SCHISM_CORE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/schism/lib/scm_core-gd.lib)
-set(SCHISM_GL_CORE_LIBRARY $ENV{EXTERNLIBS}/schism/lib/scm_gl_core.lib)
-set(SCHISM_GL_CORE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/schism/lib/scm_gl_core-gd.lib)
-set(SCHISM_GL_UTIL_LIBRARY $ENV{EXTERNLIBS}/schism/lib/scm_gl_util.lib)
-set(SCHISM_GL_UTIL_LIBRARY_DEBUG $ENV{EXTERNLIBS}/schism/lib/scm_gl_util-gd.lib)
+set(SCHISM_CORE_LIBRARY $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Release/scm_core.lib)
+set(SCHISM_CORE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Debug/scm_core-gd.lib)
+set(SCHISM_GL_CORE_LIBRARY $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Release/scm_gl_core.lib)
+set(SCHISM_GL_CORE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Debug/scm_gl_core-gd.lib)
+set(SCHISM_GL_UTIL_LIBRARY $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Release/scm_gl_util.lib)
+set(SCHISM_GL_UTIL_LIBRARY_DEBUG $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Debug/scm_gl_util-gd.lib)
 
 set(GLEW_INCLUDE_DIR $ENV{EXTERNLIBS}/glew/include)
 set(GLEW_LIBRARY $ENV{EXTERNLIBS}/glew/lib/glew32.lib)
@@ -117,37 +117,37 @@ covise_wnoerror(LamurePointCloud)
 
 target_link_libraries(LamurePointCloud
 #${FREEGLUT_LIBRARY}
-optimized ${LAMURE_RENDERING_LIBRARY} 
-debug ${LAMURE_RENDERING_LIBRARY_DEBUG}
-optimized ${LAMURE_COMMON_LIBRARY} 
-debug ${LAMURE_COMMON_LIBRARY_DEBUG}
-optimized ${LAMURE_PVS_COMMON_LIBRARY} 
-debug ${LAMURE_PVS_COMMON_LIBRARY_DEBUG}
-optimized ${LAMUREVT_LIBRARY} 
-debug ${LAMUREVT_LIBRARY_DEBUG}
-optimized ${LAMURE_QUALITY_MEASUREMENT_LIBRARY} 
-debug ${LAMURE_QUALITY_MEASUREMENT_LIBRARY_DEBUG}
-optimized ${LAMURE_PVS_PREPROCESSING_LIBRARY} 
-debug ${LAMURE_PVS_PREPROCESSING_LIBRARY_DEBUG}
-optimized ${LAMURE_PREPROCESSING_LIBRARY} 
-debug ${LAMURE_PREPROCESSING_LIBRARY_DEBUG}
-optimized ${FREEIMAGEPLUS_LIBRARY} 
-debug ${FREEIMAGEPLUS_LIBRARY_DEBUG}
-optimized ${GLEW_LIBRARY} 
-debug ${GLEW_LIBRARY}
-optimized ${FREETYPE_LIBRARY_RELEASE} 
-debug ${FREETYPE_LIBRARY_DEBUG}
-optimized ${GLFW_LIBRARY_RELEASE} 
-debug ${GLFW_LIBRARY_DEBUG}
-optimized ${SCHISM_CORE_LIBRARY} 
-debug ${SCHISM_CORE_LIBRARY_DEBUG}
-optimized ${SCHISM_GL_CORE_LIBRARY} 
-debug ${SCHISM_GL_CORE_LIBRARY_DEBUG}
-optimized ${SCHISM_GL_UTIL_LIBRARY} 
-debug ${SCHISM_GL_UTIL_LIBRARY_DEBUG}
-optimized ${Boost_TIMER_LIBRARY_RELEASE} 
-debug ${Boost_TIMER_LIBRARY_DEBUG}
-optimized ${FREEIMAGE_LIBRARY} 
-debug ${FREEIMAGE_LIBRARY_DEBUG}
+#optimized ${LAMURE_RENDERING_LIBRARY} 
+${LAMURE_RENDERING_LIBRARY_DEBUG}
+#optimized ${LAMURE_COMMON_LIBRARY} 
+${LAMURE_COMMON_LIBRARY_DEBUG}
+#optimized ${LAMURE_PVS_COMMON_LIBRARY} 
+${LAMURE_PVS_COMMON_LIBRARY_DEBUG}
+#optimized ${LAMUREVT_LIBRARY} 
+${LAMUREVT_LIBRARY_DEBUG}
+#optimized ${LAMURE_QUALITY_MEASUREMENT_LIBRARY} 
+${LAMURE_QUALITY_MEASUREMENT_LIBRARY_DEBUG}
+#optimized ${LAMURE_PVS_PREPROCESSING_LIBRARY} 
+${LAMURE_PVS_PREPROCESSING_LIBRARY_DEBUG}
+#optimized ${LAMURE_PREPROCESSING_LIBRARY} 
+${LAMURE_PREPROCESSING_LIBRARY_DEBUG}
+#optimized ${FREEIMAGEPLUS_LIBRARY} 
+${FREEIMAGEPLUS_LIBRARY_DEBUG}
+#optimized ${GLEW_LIBRARY} 
+${GLEW_LIBRARY}
+#optimized ${FREETYPE_LIBRARY_RELEASE} 
+${FREETYPE_LIBRARY_DEBUG}
+#optimized ${GLFW_LIBRARY_RELEASE} 
+${GLFW_LIBRARY_DEBUG}
+#optimized ${SCHISM_CORE_LIBRARY} 
+${SCHISM_CORE_LIBRARY_DEBUG}
+#optimized ${SCHISM_GL_CORE_LIBRARY} 
+${SCHISM_GL_CORE_LIBRARY_DEBUG}
+#optimized ${SCHISM_GL_UTIL_LIBRARY} 
+${SCHISM_GL_UTIL_LIBRARY_DEBUG}
+#optimized ${Boost_TIMER_LIBRARY_RELEASE} 
+${Boost_TIMER_LIBRARY_DEBUG}
+#optimized ${FREEIMAGE_LIBRARY} 
+${FREEIMAGE_LIBRARY_DEBUG}
 )
 
