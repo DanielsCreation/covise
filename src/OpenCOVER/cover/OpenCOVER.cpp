@@ -588,6 +588,7 @@ bool OpenCOVER::init()
         fprintf(stderr, "COVISE_PATH: %s\n", getenv("COVISE_PATH"));
         fprintf(stderr, "DISPLAY: %s\n", getenv("DISPLAY"));
         fprintf(stderr, "PWD: %s\n", getenv("PWD"));
+
     }
 
 #if 0
@@ -600,6 +601,11 @@ bool OpenCOVER::init()
 #endif
 
     exitFlag = false;
+
+    LPCTSTR osg_notify = "OSG_NOTIFY_LEVEL";
+    LPCTSTR osg_info = "INFO";
+
+    bool ret = SetEnvironmentVariableA(osg_notify, osg_info);
 
     readConfigFile();
 

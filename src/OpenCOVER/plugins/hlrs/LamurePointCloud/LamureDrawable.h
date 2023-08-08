@@ -115,9 +115,11 @@ public:
 //
 //};
 
-static unsigned int CreateShader(const std::string& vertexShader, const std::string& fragmentShader, unsigned int osgid);
+static unsigned int CreateShader(const std::string& vertexShader, const std::string& fragmentShader, uint8_t ctx_id);
 
-static unsigned int CompileShader(unsigned int type, const std::string& source, unsigned int osgid);
+static unsigned int CompileShader(unsigned int type, const std::string& source, uint8_t ctx_id);
+
+
 
 #endif
 

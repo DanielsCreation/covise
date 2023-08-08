@@ -93,13 +93,14 @@ public:
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
     void preFrame();
-    bool update();
+    //bool update();
     void postFrame();
-    void preDraw();
+    //void preDraw();
     size_t query_video_memory_in_mb();
 
     // shared functions
     void init_lamure_shader();
+    void init_rtt_camera();
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
     void create_aux_resources_buffered();
@@ -123,25 +124,30 @@ public:
     scm::gl::data_format get_tex_format();
     void apply_vt_cut_update();
     //float get_atlas_scale_factor();
-    void lines_from_min_max(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, std::vector<scm::math::vec3f> lines);
+    void lines_from_min_max(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, std::vector<scm::math::vec3f>& lines);
     void lines_from_min_max_buffered(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, osg::ref_ptr<osg::Vec3Array>& lines);
-
+    void lines_from_min_max(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, vector<scm::math::vec3f>* lines);
+    
     // objects and pointers
     ui::Group* FileGroup;
     scm::math::mat4d load_matrix(const std::string& filename);
     void load_settings(const std::string &filename);
     bool rendering_ = false;
 
-    HGLRC HGLRC_opencover;
-    HDC hdc_opencover;
+    
+
+    HWND hwnd_cover;
     HWND hwnd_opencover;
 
     HGLRC HGLRC_cover;
-    HDC hdc_cover;
-    HWND hwnd_cover;
+    HGLRC HGLRC_opencover; 
+    HGLRC HGLRC_current;
+    HGLRC HGLRC_last;
 
-    HGLRC last_context;
-    HGLRC current_context;
+    HDC hdc_cover;
+    HDC hdc_opencover;
+    HDC hdc_current; 
+    HDC hdc_last;
 
     // substitutions
     //osg::ref_ptr<LamureDevice> lmr_device = NULL;
@@ -179,7 +185,11 @@ private:
     osg::ref_ptr<LamureDrawable> draw1;
 
     osg::ref_ptr<osg::Switch> _switch;
-    //osg::ref_ptr<struct GeoGl> geo_gl;
+    osg::ref_ptr<struct GeoGl> geo_gl;
+
+
+
+    static const osg::GraphicsContext::Traits* traits;
 
 
 protected:
@@ -207,6 +217,52 @@ protected:
     ui::Slider* lodFarDistanceSlider = nullptr;
     ui::Slider* lodNearDistanceSlider = nullptr;
 };
+
+
+static unsigned int CreateShader(const std::string& vertexShader, const std::string& fragmentShader, uint8_t ctx_id)
+{
+    osg::GLExtensions* gl_api = new osg::GLExtensions(ctx_id);
+    unsigned int program = gl_api->glCreateProgram();
+    unsigned int vs = CompileShader(GL_VERTEX_SHADER, vertexShader, ctx_id);
+    unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, fragmentShader, ctx_id);
+
+    gl_api->glAttachShader(program, vs);
+    gl_api->glAttachShader(program, fs);
+    gl_api->glLinkProgram(program);
+    gl_api->glValidateProgram(program);
+
+    gl_api->glDeleteProgram(vs);
+    gl_api->glDeleteProgram(fs);
+    return 1;
+}
+
+static unsigned int CompileShader(unsigned int type, const std::string& source, uint8_t ctx_id)
+{
+    osg::GLExtensions* gl_api = new osg::GLExtensions(ctx_id);
+    unsigned int id = gl_api->glCreateShader(type);
+    const char* src = source.c_str();
+    gl_api->glShaderSource(id, 1, &src, nullptr);
+    gl_api->glCompileShader(id);
+
+    int result;
+    gl_api->glGetShaderiv(id, GL_COMPILE_STATUS, &result);
+    if (result == false)
+    {
+        int length;
+        gl_api->glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
+        char* message = (char*)alloca(length * sizeof(char));
+        gl_api->glGetShaderInfoLog(id, length, &length, message);
+        std::cout << "Failed to compile " <<
+            (type == GL_VERTEX_SHADER ? "vertex" : "fragment") << " shader!" << std::endl;
+        std::cout << message << std::endl;
+        gl_api->glDeleteProgram(id);
+        return 0;
+    };
+
+    return id;
+}
+
+
 
 
 #endif

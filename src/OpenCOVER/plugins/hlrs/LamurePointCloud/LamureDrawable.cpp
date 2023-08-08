@@ -10,6 +10,7 @@
 #include <GL/glew.h>
 #endif
  
+#include "LamurePointCloud.h"
 #include "LamureDrawable.h"
 #include <cover/coVRConfig.h>
 #include <cover/coVRPluginSupport.h>
@@ -43,12 +44,12 @@ void LamureDrawable::config() {
 }
 
 void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const {
-
+    uint8_t ctx_id = renderInfo.getContextID();
+    osg::GLExtensions* gl_api = new osg::GLExtensions(ctx_id);
     std::cout << "getUseDisplayList(): " << getUseDisplayList() << std::endl;
     std::cout << "getUseVertexArrayObject(): " << getUseVertexArrayObject() << std::endl;
     std::cout << "renderInfo.getState()->getUseStateAttributeFixedFunction(): " << renderInfo.getState()->getUseStateAttributeFixedFunction() << std::endl;
     std::cout << "getUseVertexBufferObjects(): " << getUseVertexBufferObjects() << std::endl;
-
 
     renderInfo.getState()->useVertexArrayObject(true);
     renderInfo.getState()->setUseStateAttributeShaders(true);
@@ -56,17 +57,62 @@ void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const {
     renderInfo.getState()->setUseModelViewAndProjectionUniforms(false);
 
 
+    float position[6] = {
+         0.5f, -0.5f,  // Vertex 1 (X, Y)
+        -0.5f, -0.5f,  // Vertex 2 (X, Y)
+        -0.5f,  0.5f   // Vertex 3 (X, Y)
+    };
 
+    GLuint vbo;
+    gl_api->glGenBuffers(1, &vbo);
+    gl_api->glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    gl_api->glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), position, GL_STATIC_DRAW);
+
+    gl_api->glEnableVertexAttribArray(0);
+    gl_api->glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
+
+    std::string vertexShader =
+        "#version 330 core\n"
+        "\n"
+        "layout(location = 0) in vec4 position;"
+        "\n"
+        "void main()\n"
+        "{\n"
+        "   gl_Position = position;\n"
+        "}\n";
+
+    std::cout << vertexShader << std::endl;
+
+    std::string fragmentShader =
+        "#version 330 core\n"
+        "\n"
+        "out vec4 color;"
+        "\n"
+        "void main()\n"
+        "{\n"
+        "   color = vec4(1.0, 1.0, 1.0, 1.0);\n"
+        "}\n";
+
+    std::cout << fragmentShader << std::endl;
+
+    GLuint vshader = CreateShader(vertexShader, fragmentShader, ctx_id);
+    gl_api->glUseProgram(vshader);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    
+
+
+    /*
     float data_vertices[9] =
     {
         -300.0f, 0.0f, -300.0f,
         0.0f, 0.0f, 300.0f,
         300.0f, 0.0f, -300.0f
     };
+
     std::string vertexShader =
-        "#version 330 core\n"
+        "#version 110 core\n"
         "\n"
-        "layout(location = 0) in vec3 position;"
+        "layout(location = 0) in vec3 position;\n"
         "\n"
         "void main()\n"
         "{\n"
@@ -75,7 +121,7 @@ void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const {
     std::cout << vertexShader << std::endl;
 
     std::string fragmentShader =
-        "#version 330 core\n"
+        "#version 110 core\n"
         "\n"
         "layout(location = 0) out vec4 color;"
         "\n"
@@ -136,42 +182,11 @@ void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const {
     glVertexAttribPointer(position_attrib_index, 3, GL_FLOAT, false, 3 * sizeof(float), (GLvoid*)vertex_position_offset); // vertex_data is a float*, 3 per vertex, representing the position of each vertex
     glDrawElements(GL_POINTS, 3, GL_UNSIGNED_INT, NULL);
     //glDisableVertexAttribArray(position_attrib_index);
+    */
 
 
-
-
-    //float data_vertices[9] = {
-    //    -500.0f, 0.0f, 500.0f, // Vertex 1 (X, Y, Z) 
-    //    500.0f, 0.0f, 500.0f, // Vertex 2 (X, Y, Z) 
-    //    0.0f, 0.0f, 0.0f  // Vertex 3 (X, Y, Z) 
-    //};
-    //GLuint vbo;
-    //glGenBuffers(1, &vbo); // Generate 1 buffer
-    //glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(data_vertices), data_vertices, GL_STATIC_DRAW);
-    //std::string vertexShader =
-    //    "#version 110 core\n"
-    //    "\n"
-    //    "layout(location = 0) in vec3 position;"
-    //    "\n"
-    //    "void main()\n"
-    //    "{\n"
-    //    "   gl_Position = vec4(position, 1.0);\n"
-    //    "}\n";
-    //std::cout << vertexShader << std::endl;
-    //std::string fragmentShader =
-    //    "#version 110 core\n"
-    //    "\n"
-    //    "out vec4 color;"
-    //    "\n"
-    //    "void main()\n"
-    //    "{\n"
-    //    "   color = vec4(1.0, 1.0, 1.0, 1.0);\n"
-    //    "}\n";
-    //std::cout << fragmentShader << std::endl;
     //const char* vertex_shader_source = vertexShader.c_str();
     //const char* fragment_shader_source = fragmentShader.c_str();
-    //GLuint vshader = glCreateShader(GL_VERTEX_SHADER);
     //glShaderSource(vshader, 1, &vertex_shader_source, NULL); // vertex_shader_source is a GLchar* containing glsl shader source code
     //glCompileShader(vshader);
     //GLint vertex_compiled;
@@ -186,6 +201,7 @@ void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const {
     //GLuint fshader = glCreateShader(GL_FRAGMENT_SHADER);
     //glShaderSource(fshader, 1, &fragment_shader_source, NULL); // fragment_shader_source is a GLchar* containing glsl shader source code
     //glCompileShader(fshader);
+
     //GLint fragment_compiled;
     //glGetShaderiv(fshader, GL_COMPILE_STATUS, &fragment_compiled);
     //if (fragment_compiled != GL_TRUE)
@@ -202,6 +218,7 @@ void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const {
     //glBindFragDataLocation(program, 0, "color");
     //GLint num_uniforms;
     //glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &num_uniforms);
+
     //GLchar uniform_name[256];
     //GLsizei length;
     //GLint size;
@@ -213,8 +230,8 @@ void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const {
     //    std::cout << i << "glGetActiveUniform:" << std::endl;
     //    std::cout << i << ": " << uniform_name << ", type: " << type << std::endl;
     //}
-    //glDrawArrays(GL_TRIANGLES, 0, 3);
     //glDisableVertexAttribArray(posAttrib);
+
 
 }
 
@@ -264,47 +281,6 @@ osg::Object* LamureDrawable::clone(const osg::CopyOp&) const {
 }
 
 
-static unsigned int CreateShader(const std::string& vertexShader, const std::string& fragmentShader, unsigned int osgid)
-{
-    unsigned int program = glCreateProgram();
-    unsigned int vs = CompileShader(GL_VERTEX_SHADER, vertexShader, osgid);
-    unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, fragmentShader, osgid);
-
-    glAttachShader(program, vs);
-    glAttachShader(program, fs);
-    glLinkProgram(program);
-    glValidateProgram(program);
-
-    glDeleteProgram(vs);
-    glDeleteProgram(fs);
-    return 1;
-}
-
-
-static unsigned int CompileShader(unsigned int type, const std::string& source, unsigned int osgid)
-{
-    unsigned int id = glCreateShader(type);
-    const char* src = source.c_str();
-    glShaderSource(id, 1, &src, nullptr);
-    glCompileShader(id);
-
-    int result;
-    glGetShaderiv(id, GL_COMPILE_STATUS, &result);
-    if (result == false)
-    {
-        int length;
-        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
-        char* message = (char*)alloca(length * sizeof(char));
-        glGetShaderInfoLog(id, length, &length, message);
-        std::cout << "Failed to compile " <<
-            (type == GL_VERTEX_SHADER ? "vertex" : "fragment") << " shader!" << std::endl;
-        std::cout << message << std::endl;
-        glDeleteProgram(id);
-        return 0;
-    };
-
-    return id;
-}
 
 
 /*

@@ -30,7 +30,7 @@
       <RenderOnMaster value="true" />
       <Statistics value="true" />
       <DebugLevel value="2" />
-      <ContinuousRendering value="on" />
+      <ContinuousRendering value="off" />
       <trackedHMD value="off" />
       <HMDMode value="off" />
       <DebugTUI value="off" />
@@ -43,9 +43,10 @@
       <NumPBOs value="0" />
       <Stereo value="off" />
       <Stencil value="off" />
-      <CheckForOpenGLErrors value="true" />
+      <CheckForOpenGLErrors value="false" />
       <StencilBits value="8" />
       <Stencil value="true" />
+      <Notify value="INFO" />
       
       
       
