@@ -13,18 +13,16 @@ namespace ren
 {
 std::mutex camera::transform_update_mutex_;
 
-camera::camera(const view_t view_id, float near_plane, float far_plane_value_, scm::math::mat4f const& view, scm::math::mat4f const& proj, scm::math::mat4f const& init_tb_mat, float distance, bool fast_travel, bool touch_screen_mode)
+camera::camera(const view_t view_id, float near_plane, scm::math::mat4f const &view, scm::math::mat4f const &proj)
     : view_id_(view_id), view_matrix_(view), projection_matrix_(proj), near_plane_value_(near_plane), far_plane_value_(1000.0f), trackball_init_x_(0.0), trackball_init_y_(0.0), dolly_sens_(0.5f),
-    is_in_touch_screen_mode_(0), sum_trans_x_(0), sum_trans_y_(0), sum_trans_z_(0), sum_rot_x_(0), sum_rot_y_(0), sum_rot_z_(0), cam_state_(CAM_STATE_GUA)
+      is_in_touch_screen_mode_(0), sum_trans_x_(0), sum_trans_y_(0), sum_trans_z_(0), sum_rot_x_(0), sum_rot_y_(0), sum_rot_z_(0), cam_state_(CAM_STATE_GUA)
 {
     frustum_ = scm::gl::frustum(proj * view);
-    trackball_.set_transform(scm::math::mat4d(init_tb_mat));
-    trackball_.dolly(distance);
 }
 
-camera::camera(const view_t view_id, scm::math::mat4f const& init_tb_mat, float distance, bool fast_travel, bool touch_screen_mode)
+camera::camera(const view_t view_id, scm::math::mat4f const &init_tb_mat, float distance, bool fast_travel, bool touch_screen_mode)
     : view_id_(view_id), near_plane_value_(0), far_plane_value_(0), trackball_init_x_(0.0), trackball_init_y_(0.0), dolly_sens_(fast_travel ? 20.0 : 0.5), is_in_touch_screen_mode_(touch_screen_mode),
-    sum_trans_x_(0), sum_trans_y_(0), sum_trans_z_(0), sum_rot_x_(0), sum_rot_y_(0), sum_rot_z_(0), cam_state_(CAM_STATE_LAMURE)
+      sum_trans_x_(0), sum_trans_y_(0), sum_trans_z_(0), sum_rot_x_(0), sum_rot_y_(0), sum_rot_z_(0), cam_state_(CAM_STATE_LAMURE)
 {
     // set_projection_matrix(30.0f, float(800)/float(600), 0.01f, 100.0f);
     // scm::math::perspective_matrix(projection_matrix_, 60.f, float(800)/float(600), 0.1f, 100.0f);
@@ -350,6 +348,7 @@ scm::math::mat4f camera::get_cam_matrix()
     scm::math::mat4f cm = scm::math::inverse(scm::math::mat4f(this->trackball_.transform()));
     return cm;
 }
+
 
 }
 }

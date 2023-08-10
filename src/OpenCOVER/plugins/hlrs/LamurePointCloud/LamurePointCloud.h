@@ -101,13 +101,14 @@ public:
     // shared functions
     void init_lamure_shader();
     void init_rtt_camera();
+    void sync_cameras();
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
     void create_aux_resources_buffered();
     void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
     void draw_brush(scm::gl::program_ptr shader);
     void set_uniforms(scm::gl::program_ptr shader);
-    
+    float get_atlas_scale_factor();
     void create_framebuffers();
     void init_render_states();
     void init_camera();
@@ -179,27 +180,34 @@ private:
     osg::ref_ptr<osg::Group> LamureGroup;
     osg::ref_ptr<osg::StateSet> state;
     osg::ref_ptr<osg::Node> file;
-    osg::ref_ptr<osg::MatrixTransform> transform;
     osg::ref_ptr<osg::Geode> geode;
     osg::ref_ptr<LamureGeometry> geometry;
     osg::ref_ptr<LamureDrawable> draw1;
 
     osg::ref_ptr<osg::Switch> _switch;
-    osg::ref_ptr<struct GeoGl> geo_gl;
+    osg::ref_ptr<struct GLGrp> gl_grp;
 
 
-
-    static const osg::GraphicsContext::Traits* traits;
+public:
+    osg::ref_ptr<osg::MatrixTransform> transform;
 
 
 protected:
-    ui::Menu* lamureMenu = nullptr;
+    ui::Menu* menu = nullptr;
+    ui::Group* group = nullptr;
+
+    ui::ButtonGroup* bg1 = nullptr;
+
+    ui::Button* b11 = nullptr;
+    ui::Button* b12 = nullptr;
+    ui::Button* b13 = nullptr;
+    ui::Button* b14 = nullptr;
+
+
+    ui::ButtonGroup* bg2 = nullptr;
+    ui::ButtonGroup* fileButtonGroup = nullptr;
     ui::Menu* loadMenu = nullptr;
     ui::Group* loadGroup = nullptr;
-    ui::Group* selectionGroup = nullptr;
-
-    ui::Button* singleSelectButton = nullptr;
-    ui::Button* translationButton = nullptr;
     ui::Button* rotPointsButton = nullptr;
     ui::Button* rotAxisButton = nullptr;
     ui::Button* moveButton = nullptr;
@@ -208,8 +216,6 @@ protected:
     ui::Button* deselectButton = nullptr;
     ui::Button* createNurbsSurface = nullptr;
     //ui::Button *deleteButton = nullptr;
-    ui::ButtonGroup* selectionButtonGroup = nullptr;
-    ui::ButtonGroup* fileButtonGroup = nullptr;
     ui::Group* viewGroup = nullptr;
     ui::Button* adaptLODButton = nullptr;
     ui::Slider* pointSizeSlider = nullptr;
