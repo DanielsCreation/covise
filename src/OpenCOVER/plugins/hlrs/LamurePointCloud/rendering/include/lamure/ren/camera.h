@@ -59,6 +59,7 @@ class camera
     void set_projection_matrix(float opening_angle, float aspect_ratio, float near, float far);
 
     void set_view_matrix(scm::math::mat4d const &in_view);
+    void set_projection_matrix_lmr(scm::math::mat4d const& in_proj);
 
     void calc_view_to_screen_space_matrix(scm::math::vec2f const &win_dimensions);
     void set_trackball_matrix(scm::math::mat4d const &tb_matrix) { trackball_.set_transform(tb_matrix); }
@@ -92,6 +93,7 @@ class camera
 
     void                        translate(const float& x, const float& y, const float& z);
     void                        rotate(const float& x, const float& y, const float& z);
+
 
   protected:
     enum camera_state

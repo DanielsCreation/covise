@@ -52,6 +52,8 @@
 #include <lamure/types.h>
 #include <scm/gl_core/shader_objects/shader_objects_fwd.h>
 #include <lamure/ren/camera.h>
+#include <lamure/lmr_camera.h>
+#include <lamure/ren/trackball.h>
 
 
 namespace opencover {
@@ -114,6 +116,7 @@ public:
     void init_camera();
     void lamure_display();
     void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader);
+    void sync_cameras(lmr_camera* lamure_camera, osg::Camera* osg_camera);
 
     // util
     bool parse_prefix(std::string& in_string, std::string const& prefix);
@@ -150,10 +153,6 @@ public:
     HDC hdc_current; 
     HDC hdc_last;
 
-    // substitutions
-    //osg::ref_ptr<LamureDevice> lmr_device = NULL;
-    //osg::ref_ptr<LamureContext> lmr_device = NULL;
-
 
 private:
     static LamurePointCloudPlugin* plugin;
@@ -175,24 +174,17 @@ private:
     osg::Vec3Array* colors;
     osg::ElementBufferObject* primitiveBufferArray;
     PointSet* pointSet = nullptr;
-
-
     osg::ref_ptr<osg::Group> LamureGroup;
-    osg::ref_ptr<osg::StateSet> state;
     osg::ref_ptr<osg::Node> file;
     osg::ref_ptr<osg::Geode> geode;
     osg::ref_ptr<LamureGeometry> geometry;
     osg::ref_ptr<LamureDrawable> draw1;
-
     osg::ref_ptr<osg::Switch> _switch;
-    osg::ref_ptr<struct GLGrp> gl_grp;
 
 
 public:
+    osg::ref_ptr<struct GLGrp> gl_grp;
     osg::ref_ptr<osg::MatrixTransform> transform;
-
-
-protected:
     ui::Menu* menu = nullptr;
     ui::Group* group = nullptr;
 
@@ -202,8 +194,11 @@ protected:
     ui::Button* b12 = nullptr;
     ui::Button* b13 = nullptr;
     ui::Button* b14 = nullptr;
+    ui::Button* b15 = nullptr;
 
 
+
+protected:
     ui::ButtonGroup* bg2 = nullptr;
     ui::ButtonGroup* fileButtonGroup = nullptr;
     ui::Menu* loadMenu = nullptr;

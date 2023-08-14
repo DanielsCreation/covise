@@ -16,7 +16,11 @@
 #include <vector>
 #include <string>
 
+
 #if WIN32
+
+#define VT_BUILD_STATIC
+
 #ifndef VT_BUILD_STATIC
 #if defined(lamure_virtual_texturing_EXPORTS)
 #define VIRTUAL_TEXTURING_DLL __declspec(dllexport)

@@ -144,6 +144,12 @@ void camera::set_projection_matrix(float opening_angle, float aspect_ratio, floa
 
     frustum_ = scm::gl::frustum(this->projection_matrix_ * scm::math::mat4f(trackball_.transform()));
 }
+void camera::set_projection_matrix_lmr(scm::math::mat4d const& in_proj) {
+
+    this->projection_matrix_ = in_proj;
+}
+
+
 void camera::set_view_matrix(scm::math::mat4d const &in_view)
 {
     switch(cam_state_)

@@ -6,50 +6,65 @@ USING(LamurePointCloud)
 
 
 set(LAMURE_INCLUDE_DIRS
-    $ENV{EXTERNLIBS}/lamure/include
-    $ENV{EXTERNLIBS}/lamure/include/virtual_texturing/include
-    $ENV{EXTERNLIBS}/lamure/include/rendering/include
-    $ENV{EXTERNLIBS}/lamure/include/pvs_common/include
-    $ENV{EXTERNLIBS}/lamure/include/common/include
-    $ENV{EXTERNLIBS}/lamure/include/pvs_preprocessing/include
-    $ENV{EXTERNLIBS}/lamure/include/provenance/include
-    $ENV{EXTERNLIBS}/lamure/include/quality_measurement/include
+    #$ENV{EXTERNLIBS}/lamure/include
+    #$ENV{EXTERNLIBS}/lamure/include/virtual_texturing/include
+    #$ENV{EXTERNLIBS}/lamure/include/rendering/include
+    #$ENV{EXTERNLIBS}/lamure/include/pvs_common/include
+    #$ENV{EXTERNLIBS}/lamure/include/common/include
+    #$ENV{EXTERNLIBS}/lamure/include/pvs_preprocessing/include
+    #$ENV{EXTERNLIBS}/lamure/include/provenance/include
+    #$ENV{EXTERNLIBS}/lamure/include/quality_measurement/include
+    ${SRC_DIR}/lamure/include
+    ${SRC_DIR}/virtual_texturing/include
+    ${SRC_DIR}/rendering/include
+    ${SRC_DIR}/pvs_common/include
+    ${SRC_DIR}/common/include
+    ${SRC_DIR}/pvs_preprocessing/include
+    ${SRC_DIR}/provenance/include
+    ${SRC_DIR}/quality_measurement/include
 )
 
 
-#pcl_project_files(SOURCE_FILES      ${SRC_DIR}/virtual_texturing/src                        *.cpp)
-#pcl_project_files(SOURCE_FILES      ${SRC_DIR}/virtual_texturing/src/..                     *.cpp)
-#pcl_project_files(HEADER_FILES      ${SRC_DIR}/virtual_texturing/include/lamure/vt          *.h)
-#pcl_project_files(HEADER_FILES      ${SRC_DIR}/virtual_texturing/include/lamure/vt/..       *.h)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/virtual_texturing/src                            *.cpp)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/virtual_texturing/src/ext                        *.cpp)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/virtual_texturing/src/ooc                        *.cpp)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/virtual_texturing/src/pre                        *.cpp)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/virtual_texturing/src/ren                        *.cpp)
 
-#pcl_project_files(SOURCE_FILES      ${SRC_DIR}/rendering/src                                *.cpp)
-#pcl_project_files(HEADER_FILES      ${SRC_DIR}/rendering/include/lamure/ren                 *.h)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/virtual_texturing/include/lamure/vt              *.h)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/virtual_texturing/include/lamure/vt/ext          *.h)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/virtual_texturing/include/lamure/vt/ooc          *.h)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/virtual_texturing/include/lamure/vt/pre          *.h)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/virtual_texturing/include/lamure/vt/ren          *.h)
 
-#pcl_project_files(SOURCE_FILES      ${SRC_DIR}/pvs_common/src                               *.cpp)
-#pcl_project_files(HEADER_FILES      ${SRC_DIR}/pvs_common/include/lamure/pvs                *.h)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/rendering/src                                    *.cpp)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/rendering/include/lamure/ren                     *.h)
 
-#pcl_project_files(SOURCE_FILES      ${SRC_DIR}/common/src                                   *.cpp)
-#pcl_project_files(HEADER_FILES      ${SRC_DIR}/common/include/lamure                        *.h)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/pvs_common/src                                   *.cpp)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/pvs_common/include/lamure/pvs                    *.h)
 
-#pcl_project_files(SOURCE_FILES      ${SRC_DIR}/pvs_preprocessing/src                        *.cpp)
-#pcl_project_files(HEADER_FILES      ${SRC_DIR}/pvs_preprocessing/include/lamure/pvs         *.h)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/common/src                                       *.cpp)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/common/include/lamure                            *.h)
 
-#pcl_project_files(SOURCE_FILES      ${SRC_DIR}/provenance/src                               *.cpp)
-#pcl_project_files(HEADER_FILES      ${SRC_DIR}/provenance/include/lamure/prov               *.h)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/pvs_preprocessing/src                            *.cpp)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/pvs_preprocessing/include/lamure/pvs             *.h)
 
-#pcl_project_files(SOURCE_FILES      ${SRC_DIR}/quality_measurement/src                      *.cpp)
-#pcl_project_files(HEADER_FILES      ${SRC_DIR}/quality_measurement/include/lamure/qm        *.h)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/provenance/src                                   *.cpp)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/provenance/include/lamure/prov                   *.h)
 
-pcl_project_files(SOURCE_FILES      ${SRC_DIR}/lamure                                       *.cpp)
-pcl_project_files(HEADER_FILES      ${SRC_DIR}/lamure                                       *.h)
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/quality_measurement/src                          *.cpp)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/quality_measurement/include/lamure/qm            *.h)
+
+pcl_project_files(SOURCE_FILES      ${SRC_DIR}/lamure                                           *.cpp)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/lamure                                           *.h)
 
 SET(HEADERS 
   ${HEADER_FILES}
   LamurePointCloud.h
   LamureGeometry.h
   LamureDrawable.h
-  LamureContext.h
-  LamureDevice.h
+  #LamureContext.h
+  #LamureDevice.h
 )
 
 SET(SOURCES 
@@ -70,16 +85,16 @@ set(SCHISM_INCLUDE_DIRS
     $ENV{EXTERNLIBS}/../../schism/scm_cl_core/src
 )
 
-#set(FREEGLUT_INCLUDE_DIR $ENV{EXTERNLIBS}/freeglut/include)
-#set(FREEGLUT_LIBRARY $ENV{EXTERNLIBS}/freeglut/lib/x64/freeglut.lib)
-#set(FREEIMAGE_INCLUDE_DIR $ENV{EXTERNLIBS}/FreeImage/include)
-#set(FREEIMAGE_LIBRARY $ENV{EXTERNLIBS}/FreeImage/lib/FreeImage.lib)
-#set(FREEIMAGE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/FreeImage/lib/FreeImaged.lib)
-#set(FREEIMAGEPLUS_LIBRARY $ENV{EXTERNLIBS}/FreeImage/lib/FreeImagePlus.lib)
-#set(FREEIMAGEPLUS_LIBRARY_DEBUG $ENV{EXTERNLIBS}/FreeImage/lib/FreeImagePlusd.lib)
-#set(FREETYPE_INCLUDE_DIR $ENV{EXTERNLIBS}/freetype/include)
-#set(FREETYPE_LIBRARY_RELEASE $ENV{EXTERNLIBS}/freetype/lib/freetype.lib)
-#set(FREETYPE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/freetype/lib/freetyped.lib)
+set(FREEGLUT_INCLUDE_DIR $ENV{EXTERNLIBS}/freeglut/include)
+set(FREEGLUT_LIBRARY $ENV{EXTERNLIBS}/freeglut/lib/x64/freeglut.lib)
+set(FREEIMAGE_INCLUDE_DIR $ENV{EXTERNLIBS}/FreeImage/include)
+set(FREEIMAGE_LIBRARY $ENV{EXTERNLIBS}/FreeImage/lib/FreeImage.lib)
+set(FREEIMAGE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/FreeImage/lib/FreeImaged.lib)
+set(FREEIMAGEPLUS_LIBRARY $ENV{EXTERNLIBS}/FreeImage/lib/FreeImagePlus.lib)
+set(FREEIMAGEPLUS_LIBRARY_DEBUG $ENV{EXTERNLIBS}/FreeImage/lib/FreeImagePlusd.lib)
+set(FREETYPE_INCLUDE_DIR $ENV{EXTERNLIBS}/freetype/include)
+set(FREETYPE_LIBRARY_RELEASE $ENV{EXTERNLIBS}/freetype/lib/freetype.lib)
+set(FREETYPE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/freetype/lib/freetyped.lib)
 
 set(SCHISM_CORE_LIBRARY $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Release/scm_core.lib)
 set(SCHISM_CORE_LIBRARY_DEBUG $ENV{EXTERNLIBS}/../../schism/lib/win_x64/Debug/scm_core-gd.lib)
@@ -108,7 +123,6 @@ ${SCHISM_INCLUDE_DIRS}
 ${Boost_INCLUDE_DIR}
 ${GLEW_INCLUDE_DIR}
 ${GLFW_INCLUDE_DIR}
-${FREETYPE_INCLUDE_DIR}
 )
 
 
@@ -116,21 +130,20 @@ cover_add_plugin(LamurePointCloud)
 covise_wnoerror(LamurePointCloud)
 
 target_link_libraries(LamurePointCloud
-#${FREEGLUT_LIBRARY}
 #optimized ${LAMURE_RENDERING_LIBRARY} 
-${LAMURE_RENDERING_LIBRARY_DEBUG}
+#${LAMURE_RENDERING_LIBRARY_DEBUG}
 #optimized ${LAMURE_COMMON_LIBRARY} 
-${LAMURE_COMMON_LIBRARY_DEBUG}
+#${LAMURE_COMMON_LIBRARY_DEBUG}
 #optimized ${LAMURE_PVS_COMMON_LIBRARY} 
-${LAMURE_PVS_COMMON_LIBRARY_DEBUG}
+#${LAMURE_PVS_COMMON_LIBRARY_DEBUG}
 #optimized ${LAMUREVT_LIBRARY} 
-${LAMUREVT_LIBRARY_DEBUG}
+#${LAMUREVT_LIBRARY_DEBUG}
 #optimized ${LAMURE_QUALITY_MEASUREMENT_LIBRARY} 
-${LAMURE_QUALITY_MEASUREMENT_LIBRARY_DEBUG}
+#${LAMURE_QUALITY_MEASUREMENT_LIBRARY_DEBUG}
 #optimized ${LAMURE_PVS_PREPROCESSING_LIBRARY} 
-${LAMURE_PVS_PREPROCESSING_LIBRARY_DEBUG}
+#${LAMURE_PVS_PREPROCESSING_LIBRARY_DEBUG}
 #optimized ${LAMURE_PREPROCESSING_LIBRARY} 
-${LAMURE_PREPROCESSING_LIBRARY_DEBUG}
+#${LAMURE_PREPROCESSING_LIBRARY_DEBUG}
 #optimized ${FREEIMAGEPLUS_LIBRARY} 
 ${FREEIMAGEPLUS_LIBRARY_DEBUG}
 #optimized ${GLEW_LIBRARY} 
@@ -149,5 +162,6 @@ ${SCHISM_GL_UTIL_LIBRARY_DEBUG}
 ${Boost_TIMER_LIBRARY_DEBUG}
 #optimized ${FREEIMAGE_LIBRARY} 
 ${FREEIMAGE_LIBRARY_DEBUG}
+${FREEGLUT_LIBRARY}
 )
 
