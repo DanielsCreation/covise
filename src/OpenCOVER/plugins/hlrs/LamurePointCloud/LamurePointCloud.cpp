@@ -1280,10 +1280,11 @@ protected:
             }
 
             // set framebuffer
-            context_->clear_color_buffer(fbo_, 0, scm::math::vec4f(settings_.background_color_.x, settings_.background_color_.y, settings_.background_color_.z, 1.0f));
-            context_->clear_depth_stencil_buffer(fbo_);
             context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(traits->width, traits->height)));
             context_->set_frame_buffer(fbo_);
+            context_->clear_color_buffer(fbo_, 0, scm::math::vec4f(settings_.background_color_.x, settings_.background_color_.y, settings_.background_color_.z, 1.0f));
+            context_->clear_depth_stencil_buffer(fbo_);
+            context_->apply_frame_buffer();
 
             auto shader = vis_surfel_shader_;
 
