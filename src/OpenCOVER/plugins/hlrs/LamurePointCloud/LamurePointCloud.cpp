@@ -1141,7 +1141,7 @@ protected:
 
 
             renderInfo.getState()->useVertexBufferObject(true);
-            renderInfo.getState()->useVertexArrayObject(false);
+            renderInfo.getState()->useVertexArrayObject(true);
             renderInfo.getState()->setUseStateAttributeShaders(false);
             renderInfo.getState()->setUseStateAttributeFixedFunction(false);
             renderInfo.getState()->setUseModelViewAndProjectionUniforms(false);
@@ -1155,7 +1155,7 @@ protected:
             stateset->setMode(GL_POLYGON_MODE, osg::StateAttribute::OFF);
 
             // Backup GL state
-            GLenum last_active_texture; glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture);
+            //GLenum last_active_texture; glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture);
             //glActiveTexture(GL_TEXTURE0);
             GLint last_program; glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
             GLint last_texture; glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
@@ -1184,9 +1184,9 @@ protected:
             glPushMatrix();
             glDepthMask(false);
 
-            glMatrixMode(GL_MODELVIEW);
+            //glMatrixMode(GL_MODELVIEW);
             //glLoadIdentity();
-            glMatrixMode(GL_PROJECTION);
+            //glMatrixMode(GL_PROJECTION);
             //glLoadIdentity();
 
             GLfloat vm[16];
@@ -1352,7 +1352,14 @@ protected:
                 context_->bind_program(shader);
                 context_->apply_program();
 
+                //osg::Vec3Array* p = new osg::Vec3Array();
+                //osg::Vec3uiArray* c = new osg::Vec3uiArray();
+                //osg::Vec3Array* n = new osg::Vec3Array();
 
+                //osg::Vec3Array* pp = new osg::Vec3Array();
+                //osg::Vec3Array* cc = new osg::Vec3Array();
+                //osg::Vec2Array* nn = new osg::Vec2Array();
+                
 
                 bool draw = true;
                 for (auto const& node_slot_aggregate : renderable) {
@@ -1366,67 +1373,61 @@ protected:
                             rendered_splats_ += surfels_per_node;
                             ++rendered_nodes_;
 
-                            lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
-                            lamure::ren::ooc_cache* ooc_cache = lamure::ren::ooc_cache::get_instance();
+                            //lamure::ren::ooc_cache* ooc_cache = lamure::ren::ooc_cache::get_instance();
+                            //lamure::ren::dataset::serialized_surfel* surfels = (lamure::ren::dataset::serialized_surfel*)ooc_cache->node_data(model_id, node_slot_aggregate.node_id_);
+                            //lamure::ren::dataset::serialized_vertex* prov = (lamure::ren::dataset::serialized_vertex*)ooc_cache->node_data_provenance(model_id, node_slot_aggregate.node_id_);
 
-                            char* node_data = ooc_cache->node_data(model_id, node_slot_aggregate.node_id_);
-                            char* node_data_provenance = ooc_cache->node_data_provenance(model_id, node_slot_aggregate.node_id_);
-
-                            for (int i = 0; i < surfels_per_node; i++) {
-
-                            }
-
-                            memcpy(current_gpu_storage_ + slot_count * database->get_slot_size(), node_data, database->get_slot_size());
-
-                            if (_data_provenance.get_size_in_bytes() > 0)
-                            {
-                                memcpy(current_gpu_storage_provenance_ + slot_count * database->get_primitives_per_node() * _data_provenance.get_size_in_bytes(), node_data_provenance,
-                                    database->get_primitives_per_node() * _data_provenance.get_size_in_bytes());
-                            }
-
-
-                            ++slot_count;
-                                
-                            
-
-
-                        if (bool draw = true) { draw = false;
-                        }
-
-                            //glEnableVertexAttribArray(0);
-                            //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 20, 0);
-                            //glDisableVertexAttribArray(0);
+                            //for (uint32_t i = 0; i < 30; ++i) {
+                            //    auto s = surfels[i];
+                            //    p->push_back(osg::Vec3f(surfels[i].x, surfels[i].y, surfels[i].z));
+                            //    c->push_back(osg::Vec3ui(surfels[i].r, surfels[i].g, surfels[i].b));
+                            //    n->push_back(osg::Vec3f(surfels[i].nx, surfels[i].ny, surfels[i].nz));
+                            //    if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
+                            //        pp->push_back(osg::Vec3f(prov[i].v_x_, prov[i].v_y_, prov[i].v_z_));
+                            //        cc->push_back(osg::Vec3f(prov[i].n_x_, prov[i].n_y_, prov[i].n_z_));
+                            //        nn->push_back(osg::Vec2f(prov[i].c_x_, prov[i].c_y_));
+                            //    }
+                            //}
+                            //std::cout << "node_id: " << node_slot_aggregate.node_id_ << "  " << "slot_id: " << node_slot_aggregate.slot_id_ << std::endl;
                         }
                     }
-
                 }
-                
-                
+                //PASS 4: fullscreen quad
+                //context_->clear_default_depth_stencil_buffer();
+                //context_->clear_default_color_buffer();
+                //context_->set_default_frame_buffer();
+                //context_->set_depth_stencil_state(depth_state_disable_);
+                //context_->bind_program(vis_quad_shader_);
+                //context_->bind_texture(fbo_color_buffer_, filter_linear_, 0);
+                //vis_quad_shader_->uniform("gamma_correction", (bool)settings_.gamma_correction_);
+                //context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(traits->width, traits->height)));
+                //context_->apply();
+                //screen_quad_->draw(context_);
             }
-            
-
             glMatrixMode(GL_MODELVIEW);
             glPopMatrix();
             glMatrixMode(GL_PROJECTION);
             glPopMatrix();
 
+            LamurePointCloudPlugin::instance()->rendering_ = false;
+
             // Restore modified GL state
-            glUseProgram(last_program);
-            glBindTexture(GL_TEXTURE_2D, last_texture);
-            glBindSampler(0, last_sampler);
-            glActiveTexture(last_active_texture);
-            glBindVertexArray(last_vertex_array);
-            glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last_element_array_buffer);
-            glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
-            glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
-            if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
-            if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
-            if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-            if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
-            glPolygonMode(GL_FRONT_AND_BACK, last_polygon_mode[0]);
-            glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
-            glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
+            //glUseProgram(last_program);
+            //glBindTexture(GL_TEXTURE_2D, last_texture);
+            //glBindSampler(0, last_sampler);
+            //glActiveTexture(last_active_texture);
+            //glBindVertexArray(last_vertex_array);
+            //glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
+            //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last_element_array_buffer);
+            //glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
+            //glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
+            //if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+            //if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+            //if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+            //if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
+            //glPolygonMode(GL_FRONT_AND_BACK, last_polygon_mode[0]);
+            //glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
+            //glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
 
             drawable->drawImplementation(renderInfo);
         }
@@ -1506,7 +1507,7 @@ protected:
                 GLuint vboId;
                 glGenBuffers(1, &vboId);
                 glBindBuffer(GL_ARRAY_BUFFER, vboId);
-                glBufferData(GL_ARRAY_BUFFER, bvh_resources_osg_[model_id].num_primitives_ * 3 * sizeof(float), &position[0], GL_STREAM_DRAW);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(position), &position[0], GL_STREAM_DRAW);
                 glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
                 glEnableVertexAttribArray(0);
 
@@ -1519,7 +1520,7 @@ protected:
                     "uniform mat4 projection;\n"
                     "void main()\n"
                     "{\n"
-                    "   gl_Position = mts * vec4(position, 1.0);\n"
+                    "   gl_Position = projection * view * vec4(position, 1.0);\n"
                     "}\n";
                 std::cout << "vertexShader" << std::endl;
 
@@ -1557,8 +1558,7 @@ protected:
 
                 glUniformMatrix4fv(glGetUniformLocation(program, "view"), 1, GL_FALSE, &vm[0]);
                 glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_FALSE, &pm[0]);
-
-                glDrawArrays(GL_LINES, 0, (GLint)(bvh_resources_osg_[model_id].num_primitives_));
+                glDrawArrays(GL_TRIANGLES, 0, 3);
                 glDisableVertexAttribArray(0);
                 drawable->drawImplementation(renderInfo);
             }
@@ -2196,7 +2196,7 @@ bool LamurePointCloudPlugin::init() {
         plugin->create_aux_resources();
         plugin->init_render_states();
         plugin->init_camera();
-        plugin->lamure_display();
+        //plugin->lamure_display();
 
         // Restore modified GL state
         glUseProgram(last_program);
@@ -3620,7 +3620,7 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
                 vis_vt_shader_->uniform(texture_string, i, int((i)));
             }
             vis_vt_shader_->uniform("physical_texture_array", 17);
-            context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(render_width_, render_height_)));
+            context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(traits->width, traits->height)));
             context_->set_depth_stencil_state(depth_state_less_);
             context_->set_rasterizer_state(no_backface_culling_rasterizer_state_);
             context_->set_blend_state(color_no_blending_state_);
