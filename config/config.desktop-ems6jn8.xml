@@ -93,16 +93,18 @@
         <MouseNav value="on" />
       </Input>
       
-      <Menu>
+
+      <Menu>Visible
+        <Visible value="false" />
         <Position x="900" y="0" z="700" />
         <Size value=".7" />
       </Menu>
+
       
       <VRB>
         <Server value="off" />
         <RemoteFetch value="off" />
       </VRB>
-      
       
       
       <Plugin>

@@ -107,6 +107,7 @@ public:
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
     void create_aux_resources_buffered();
+    void create_bvh_resources();
     void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
     void draw_brush(scm::gl::program_ptr shader);
     void set_uniforms(scm::gl::program_ptr shader);
@@ -130,7 +131,6 @@ public:
     //float get_atlas_scale_factor();
     void lines_from_min_max(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, std::vector<scm::math::vec3f>& lines);
     void lines_from_min_max_buffered(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, osg::ref_ptr<osg::Vec3Array>& lines);
-    void lines_from_min_max(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, vector<scm::math::vec3f>* lines);
     
     // objects and pointers
     ui::Group* FileGroup;
@@ -182,7 +182,12 @@ private:
     osg::ref_ptr<osg::Switch> _switch;
 
 
+
 public:
+    void printNodePath(osg::ref_ptr<osg::Node> pointer);
+    float* getSerializedBvhCorners(const std::vector<scm::gl::boxf>);
+    float* getSerializedBvhMinMax(const std::vector<scm::gl::boxf>);
+    float* VecToArr(std::vector<std::vector<float>> vec);
     osg::ref_ptr<struct GLGrp> gl_grp;
     osg::ref_ptr<osg::MatrixTransform> transform;
     ui::Menu* menu = nullptr;
@@ -195,6 +200,15 @@ public:
     ui::Button* b13 = nullptr;
     ui::Button* b14 = nullptr;
     ui::Button* b15 = nullptr;
+
+    osg::ref_ptr<osg::Geometry> _triangleGeometry;
+    osg::ref_ptr<osg::StateSet> _triangleStateSet;
+
+    osg::ref_ptr<osg::Geometry> _lineGeometry;
+    osg::ref_ptr<osg::StateSet> _lineStateSet;
+
+    osg::ref_ptr<osg::Geometry> _pointGeometry;
+    osg::ref_ptr<osg::StateSet> _pointStateSet;
 
 
 
@@ -217,6 +231,10 @@ protected:
 
     ui::Slider* lodFarDistanceSlider = nullptr;
     ui::Slider* lodNearDistanceSlider = nullptr;
+
+
+
+    void setUpStateSets();
 };
 
 
