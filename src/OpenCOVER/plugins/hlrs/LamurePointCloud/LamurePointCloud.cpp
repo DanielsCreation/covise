@@ -363,18 +363,53 @@ struct resource {
     uint64_t num_primitives_{ 0 };
     scm::gl::buffer_ptr buffer_;
     scm::gl::vertex_array_ptr array_;
+
     float* positions_;
-    uint32_t positions_size_;
-    int* idx_serialized;
-    std::vector<int*> idx_arr;
+    int positions_size_;
+
     std::vector<std::vector<int>> idx_vec;
-    int idx_per_node;
+    std::vector<std::array<float, 3>> vert_min;
+    std::vector<std::array<float, 3>> vert_max;
+
+    std::array<uint8_t, 72> bb_inx =
+    {
+                0, 1, 2,
+                3, 1, 2,
+                3, 1, 2,
+                3, 1, 5,
+                3, 1, 5,
+                0, 1, 5,
+                0, 1, 5,
+                0, 1, 2,
+
+                0, 4, 2,
+                3, 4, 2,
+                3, 4, 2,
+                3, 4, 5,
+                3, 4, 5,
+                0, 4, 5,
+                0, 4, 5,
+                0, 4, 2,
+
+                0, 1, 2,
+                0, 4, 2,
+                0, 1, 5,
+                0, 4, 5,
+                3, 1, 5,
+                3, 4, 5,
+                3, 1, 2,
+                3, 4, 2,
+    };
+
+    int32_t num_idx_per_node;
     GLuint gl_id;
+    GLuint buffer_id_;
+    GLuint array_id_;
 };
 
 resource brush_resource_;
 resource pvs_resource_;
-resource bvh_line_resource;
+resource bvh_line_resource_;
 
 std::map<uint32_t, resource> bvh_resources_;
 std::map<uint32_t, resource> sparse_resources_;
@@ -1180,13 +1215,30 @@ float* LamurePointCloudPlugin::VecToArr(std::vector<std::vector<float>> vec) {
     return newarr;
 }
 
+int* LamurePointCloudPlugin::VecToArr(std::vector<std::vector<int>> vec) {
+    std::size_t totalsize = 0;
+
+    for (int i = 0; i < vec.size(); i++) {
+        totalsize += vec[i].size();
+    }
+
+    int* newarr = new int[totalsize];
+
+    int index = 0;
+    for (int i = 0; i < vec.size(); i++) {
+        std::copy(vec[i].begin(), vec[i].end(), &newarr[index]);
+        index += vec[i].size();
+    }
+
+    return newarr;
+}
 
 
-float* LamurePointCloudPlugin::getSerializedBvhCorners(const std::vector<scm::gl::boxf> bounding_boxes) {
 
-    std::vector<vector<float>> vecOfVec;
+std::vector<std::vector<float>> LamurePointCloudPlugin::getSerializedBvhCorners(const std::vector<scm::gl::boxf> bounding_boxes) {
 
     std::size_t totalsize = 0;
+    std::vector<vector<float>> vecOfVec;
 
     for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
 
@@ -1221,24 +1273,21 @@ float* LamurePointCloudPlugin::getSerializedBvhCorners(const std::vector<scm::gl
                             max_vertex.x, max_vertex.y, min_vertex.z };
 
         vecOfVec.push_back(vect);
-        totalsize += vect.size();
+        //totalsize += vect.size();
     }
 
-    float* serialized_corners = new float[totalsize];
+    //float* serialized_corners = new float[totalsize];
+    //int index = 0;
+    //for (int i = 0; i < vecOfVec.size(); i++) {
+    //    std::copy(vecOfVec[i].begin(), vecOfVec[i].end(), &serialized_corners[index]);
+    //    index += vecOfVec[i].size();
+    //}
 
-    int index = 0;
-    for (int i = 0; i < vecOfVec.size(); i++) {
-        std::copy(vecOfVec[i].begin(), vecOfVec[i].end(), &serialized_corners[index]);
-        index += vecOfVec[i].size();
-    }
-
-    return serialized_corners;
+    return vecOfVec;
 }
 
-float* LamurePointCloudPlugin::getSerializedBvhMinMax(const std::vector<scm::gl::boxf> bounding_boxes) {
+std::vector<vector<float>> LamurePointCloudPlugin::getSerializedBvhMinMax(const std::vector<scm::gl::boxf> bounding_boxes) {
     std::vector<vector<float>> vecOfVec;
-
-    std::size_t totalsize = 0;
 
     for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
 
@@ -1249,17 +1298,8 @@ float* LamurePointCloudPlugin::getSerializedBvhMinMax(const std::vector<scm::gl:
                     min_vertex.x, min_vertex.y, min_vertex.z,
                     max_vertex.x, max_vertex.y, max_vertex.z };
         vecOfVec.push_back(elements);
-        totalsize += elements.size();
     }
-    float* serialized_elements = new float[totalsize];
-
-    int index = 0;
-    for (int i = 0; i < vecOfVec.size(); i++) {
-        std::copy(vecOfVec[i].begin(), vecOfVec[i].end(), &serialized_elements[index]);
-        index += vecOfVec[i].size();
-    }
-
-    return serialized_elements;
+    return vecOfVec;
 }
 
 
@@ -1629,16 +1669,16 @@ protected:
             scm::math::mat4d gl_projection_matrix_d = scm::math::mat4d(pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10], pm[11], pm[12], pm[13], pm[14], pm[15]);
 
 
-            unsigned int program = glCreateProgram();
-            unsigned int vs = CompileShader(GL_VERTEX_SHADER, vis_line_vs_source, 0);
-            unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, vis_line_fs_source, 0);
-            glAttachShader(program, vs);
-            glAttachShader(program, fs);
-            glLinkProgram(program);
-            glValidateProgram(program);
-            glDeleteProgram(vs);
-            glDeleteProgram(fs);
-            glUseProgram(program);
+            //unsigned int program = glCreateProgram();
+            //unsigned int vs = CompileShader(GL_VERTEX_SHADER, vis_line_vs_source, 0);
+            //unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, vis_line_fs_source, 0);
+            //glAttachShader(program, vs);
+            //glAttachShader(program, fs);
+            //glLinkProgram(program);
+            //glValidateProgram(program);
+            //glDeleteProgram(vs);
+            //glDeleteProgram(fs);
+            //glUseProgram(program);
 
 
             //initialize lamure objects
@@ -1669,6 +1709,7 @@ protected:
             height_divided_by_top_minus_bottom_ = lamure::ren::policy::get_instance()->window_height() / top_minus_bottom;
             cuts->send_height_divided_by_top_minus_bottom(context_id, view_id, height_divided_by_top_minus_bottom_);
 
+
             // dispatch new data if lod_update is set
             if (settings_.lod_update_) {
                 if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
@@ -1685,7 +1726,8 @@ protected:
                 scm::math::mat4d model_matrix = model_info_.model_transformations_[model_id];
                 scm::math::mat4d view_matrix = gl_view_matrix_d;
                 scm::math::mat4d projection_matrix = gl_projection_matrix_d;
-                scm::math::mat4f mvp_matrix = scm::math::mat4f(projection_matrix * view_matrix * model_matrix);
+                scm::math::mat4d model_view_matrix = view_matrix * model_matrix;
+                scm::math::mat4d mvp_matrix = projection_matrix * model_view_matrix;
 
                 float* mm = scm::math::mat4f(model_matrix).data_array;
                 float* vm = scm::math::mat4f(view_matrix).data_array;
@@ -1694,41 +1736,52 @@ protected:
 
                 auto bvh_res = bvh_resources_[model_id];
 
-                GLuint vbo;
-                glGenBuffers(1, &vbo);
-                glBindBuffer(GL_ARRAY_BUFFER, vbo);
-                glBufferData(GL_ARRAY_BUFFER, bvh_res.positions_size_, &bvh_res.positions_[0], GL_STREAM_DRAW);
-                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-                glEnableVertexAttribArray(0);
+                //GLuint vbo;
+                //glGenBuffers(1, &vbo);
+                //glBindBuffer(GL_ARRAY_BUFFER, vbo);
+                //glBufferData(GL_ARRAY_BUFFER, bvh_res.positions_size_, &bvh_res.positions_[0], GL_STREAM_DRAW);
+                //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+                //glEnableVertexAttribArray(0);
+                //glUniformMatrix4fv(glGetUniformLocation(program, "model_matrix"), 1, GL_FALSE, &mm[0]);
+                //glUniformMatrix4fv(glGetUniformLocation(program, "view_matrix"), 1, GL_FALSE, &vm[0]);
+                //glUniformMatrix4fv(glGetUniformLocation(program, "projection_matrix"), 1, GL_FALSE, &pm[0]);
+                //glUniformMatrix4fv(glGetUniformLocation(program, "mvp_matrix"), 1, GL_FALSE, &mvp[0]);
 
-                glUniformMatrix4fv(glGetUniformLocation(program, "model_matrix"), 1, GL_FALSE, &mm[0]);
-                glUniformMatrix4fv(glGetUniformLocation(program, "view_matrix"), 1, GL_FALSE, &vm[0]);
-                glUniformMatrix4fv(glGetUniformLocation(program, "projection_matrix"), 1, GL_FALSE, &pm[0]);
-                glUniformMatrix4fv(glGetUniformLocation(program, "mvp_matrix"), 1, GL_FALSE, &mvp[0]);
 
-                
+                vis_line_shader_->uniform("mvp_matrix", scm::math::mat4f(mvp_matrix));
+                context_->bind_program(vis_line_shader_);
+                _plugin->set_uniforms(vis_line_shader_);
 
                 lamure::context_t context_id = controller->deduce_context_id(lmr_ctx);
                 lamure::ren::cut& cut = cuts->get_cut(context_id, lmr_ctx, model_id);
                 std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
                 const lamure::ren::bvh* bvh = database->get_model(model_id)->get_bvh();
 
-
                 std::vector<scm::gl::boxf>const& bounding_box_vector = bvh->get_bounding_boxes();
                 scm::gl::frustum frustum_by_model = scm_camera_->get_frustum_by_model(scm::math::mat4f(model_matrix));
 
+                int* indices = _plugin->VecToArr(bvh_res.idx_vec);
+
+                scm::gl::buffer_ptr bvh_index_buffer = device_->create_buffer(scm::gl::BIND_INDEX_BUFFER, scm::gl::USAGE_STATIC_DRAW, bounding_box_vector.size() * bvh_res.num_idx_per_node * sizeof(int), indices);
+                context_->bind_index_buffer(bvh_index_buffer, scm::gl::PRIMITIVE_LINE_LIST, scm::gl::TYPE_UINT);
+                context_->apply();
 
                 bool draw = true;
                 for (auto const& node_slot_aggregate : renderable) {
                     uint32_t node_culling_result = scm_camera_->cull_against_frustum(frustum_by_model, bounding_box_vector[node_slot_aggregate.node_id_]);
-
                     if (node_culling_result != 1) {
-                        glDrawArrays(GL_LINES, node_slot_aggregate.node_id_ * 24, 24);
+                        std::cout << bounding_box_vector[node_slot_aggregate.node_id_].min_vertex() << std::endl;
+                        std::printf("min: %i, %i, %i\n", bvh_res.idx_vec[node_slot_aggregate.node_id_][0], bvh_res.idx_vec[node_slot_aggregate.node_id_][1], bvh_res.idx_vec[node_slot_aggregate.node_id_][2]);
+                        std::cout << bounding_box_vector[node_slot_aggregate.node_id_].max_vertex() << std::endl;
+                        std::printf("max: %i, %i, %i\n", bvh_res.idx_vec[node_slot_aggregate.node_id_][3], bvh_res.idx_vec[node_slot_aggregate.node_id_][4], bvh_res.idx_vec[node_slot_aggregate.node_id_][5]);
+
+                        context_->draw_elements(6, node_slot_aggregate.node_id_ * bvh_res.num_idx_per_node, 0);
                     }
                 }
             }
-            glDisableVertexAttribArray(0);
+            //glDisableVertexAttribArray(0);
             drawable->drawImplementation(renderInfo);
+
 
             // Restore modified GL state
             //glUseProgram(last_program);
@@ -1747,9 +1800,6 @@ protected:
             //glPolygonMode(GL_FRONT_AND_BACK, last_polygon_mode[0]);
             //glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
             //glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
-
-            
-
 
         }
         GLGrp* _gl_grp = nullptr;
@@ -1909,6 +1959,22 @@ protected:
                 context_->bind_vertex_array(
                     controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_));
             }
+            glEnableVertexAttribArray(0);
+            glEnableVertexAttribArray(1);
+            glEnableVertexAttribArray(2);
+            glEnableVertexAttribArray(3);
+            glEnableVertexAttribArray(4);
+            glEnableVertexAttribArray(5);
+            glEnableVertexAttribArray(6);
+            glDisableVertexAttribArray(0);
+            glDisableVertexAttribArray(1);
+            glDisableVertexAttribArray(2);
+            glDisableVertexAttribArray(3);
+            glDisableVertexAttribArray(4);
+            glDisableVertexAttribArray(5);
+            glDisableVertexAttribArray(6);
+
+            scm::gl::vertex_array_ptr pcl_va = controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_);
 
             context_->apply();
 
@@ -2184,12 +2250,12 @@ bool LamurePointCloudPlugin::init() {
 
         //coVRConfig::instance()->windows[0].context->getState()->print(std::cout);
         std::cout << (*device_);
-        device_->dump_memory_info(std::cout);
-        plugin->create_bvh_resources();
-        plugin->create_aux_resources();
-        //plugin->create_aux_resources_buffered();
+        scm::gl::render_device::device_capabilities capa = device_->capabilities();
+
         plugin->create_framebuffers();
         plugin->init_lamure_shader();
+        plugin->create_aux_resources();
+        plugin->create_bvh_resources();
         plugin->init_render_states();
         plugin->init_camera();
         /*Hier noch nicht die display-func aufrufen! Nur lamure-obj. erstellen und Initialisierung in OpenCOVER abschließen lassen.*/
@@ -2231,8 +2297,9 @@ void LamurePointCloudPlugin::preFrame() {
     if (cover->getPointerButton()->getState() == 1 && counter == 0) {
 
         //plugin->gl_grp->addTriangles(VRViewer::instance()->getViewerStats(), plugin);
-        plugin->gl_grp->addPoints(VRViewer::instance()->getViewerStats(), plugin);
+        //plugin->gl_grp->addPoints(VRViewer::instance()->getViewerStats(), plugin);
         plugin->gl_grp->addLines(VRViewer::instance()->getViewerStats(), plugin);
+        //plugin->create_aux_resources_buffered();
 
         printNodePath(plugin->gl_grp);
 
@@ -2294,6 +2361,9 @@ void LamurePointCloudPlugin::init_camera() {
 
     screen_quad_.reset(new scm::gl::quad_geometry(device_, scm::math::vec2f(-1.0f, -1.0f), scm::math::vec2f(1.0f, 1.0f)));
 
+
+    //coVRConfig::instance()->channels[0].camera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+
     //osg::Vec3f eye, center_osg, up;
     //osg_camera_->getViewMatrixAsLookAt(eye, center_osg, up);
     //scm_camera_ = new lamure::ren::camera(
@@ -2344,7 +2414,6 @@ void LamurePointCloudPlugin::init_camera() {
     //rtt_camera_->setViewMatrix(osg::Matrix::identity());
     //rtt_camera_->setClearMask(0); // only clear the depth buffer
     //rtt_camera_->setRenderer(new osgViewer::Renderer(rtt_camera_.get()));
-    //coVRConfig::instance()->channels[0].camera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
 
 }
 
@@ -2812,9 +2881,8 @@ void LamurePointCloudPlugin::lines_from_min_max(const scm::math::vec3f& min_vert
 
 void LamurePointCloudPlugin::create_bvh_resources() {
     //create bvh representation
-
-    resource bvh_line_resource;
-    bvh_line_resource.idx_per_node = 72;
+    int num_idx_per_node = 72;
+    bvh_line_resource_.num_idx_per_node = num_idx_per_node;
 
     lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
     lamure::model_t num_models = database->num_models();
@@ -2843,10 +2911,14 @@ void LamurePointCloudPlugin::create_bvh_resources() {
     if (settings_.provenance_ != 0) {
         local_cache_provenance = new char[lamure::ren::policy::get_instance()->size_of_provenance()];
     }
+
+
     for (int model_id = 0; model_id < num_models_; model_id++) {
 
         std::vector<std::vector<int>> idx_vec;
-        std::vector<int*> idx_arr;
+
+        std::vector<std::array<float, 3>> vert_min;
+        std::vector<std::array<float, 3>> vert_max;
 
         std::string bvh_filename = database->get_model(model_id)->get_bvh()->get_filename();
         std::string base_name = bvh_filename.substr(0, bvh_filename.find_last_of(".") + 1);
@@ -2872,140 +2944,124 @@ void LamurePointCloudPlugin::create_bvh_resources() {
 
             lamure::ren::dataset::serialized_surfel* surfels = (lamure::ren::dataset::serialized_surfel*)local_cache;
 
-            scm::math::vec3f pos_min = scm::math::vec3f::zero();
-            scm::math::vec3f pos_max = scm::math::vec3f::zero();
-            scm::math::vec3i idx_min = scm::math::vec3i::zero();
-            scm::math::vec3i idx_max = scm::math::vec3i::zero();
+            std::array<float, 3> pos_min = std::array<float, 3>{0.0f, 0.0f, 0.0f};
+            std::array<float, 3> pos_max = std::array<float, 3>{0.0f, 0.0f, 0.0f};
+            std::array<int, 3> idx_min = std::array<int, 3>{0, 0, 0};
+            std::array<int, 3> idx_max = std::array<int, 3>{0, 0, 0};
+
+ /*           for (int prim = 0; prim < prim_per_node; prim++) {
+
+                min_.x = std::min(min_.x, point.x);
+                min_.y = std::min(min_.y, point.y);
+                min_.z = std::min(min_.z, point.z);
+
+                max_.x = std::max(max_.x, point.x);
+                max_.y = std::max(max_.y, point.y);
+                max_.z = std::max(max_.z, point.z);
+
+            }*/
+
+            for (int node_id = 0; node_id < 5000; node_id++) {
+
+            }
 
             for (int prim = 0; prim < prim_per_node; prim++) {
-
                 if (prim == 0) {
-                    pos_min.x = surfels[prim].x;
-                    idx_min.x = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 0;
-                    pos_max.x = surfels[prim].x;
-                    idx_max.x = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 3;
-                    pos_min.y = surfels[prim].y;
-                    idx_min.y = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 1;
-                    pos_max.y = surfels[prim].y;
-                    idx_max.y = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 4;
-                    pos_min.z = surfels[prim].z;
-                    idx_min.z = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 2;
-                    pos_max.z = surfels[prim].z;
-                    idx_max.z = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 5;
+                    idx_min[0] = prim;
+                    pos_min[0] = surfels[prim].x;
+                    idx_max[0] = prim;
+                    pos_max[0] = surfels[prim].y;
+                    idx_min[1] = prim;
+                    pos_min[1] = surfels[prim].z;
+                    idx_max[1] = prim;
+                    pos_max[1] = surfels[prim].x;
+                    idx_min[2] = prim;
+                    pos_min[2] = surfels[prim].y;
+                    idx_max[2] = prim;
+                    pos_max[2] = surfels[prim].z;
                 }
                 else {
                     if (surfels[prim].x < pos_min[0]) {
-                        pos_min.x = surfels[prim].x;
-                        idx_min.x = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 0;
+                        idx_min[0] = prim;
+                        pos_min[0] = surfels[prim].x;
                     }
                     else if (surfels[prim].x > pos_max[0]) {
-                        pos_max.x = surfels[prim].x;
-                        idx_max.x = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 3;
+                        idx_max[0] = prim;
+                        pos_max[0] = surfels[prim].x;
                     }
 
-                    if (surfels[prim].y < pos_min[1]) {
-                        pos_min.y = surfels[prim].y;
-                        idx_min.y = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 1;
+                    if (surfels[prim].x < pos_min[1]) {
+                        idx_min[1] = prim;
+                        pos_min[1] = surfels[prim].y;
                     }
-                    else if (surfels[prim].y > pos_max[1]) {
-                        pos_max.y = surfels[prim].y;
-                        idx_max.y = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 4;
+                    else if (surfels[prim].x > pos_max[1]) {
+                        idx_max[1] = prim;
+                        pos_max[1] = surfels[prim].y;
                     }
 
-                    if (surfels[prim].z < pos_min[2]) {
-                        pos_min.z = surfels[prim].z;
-                        idx_min.z = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 2;
+                    if (surfels[prim].x < pos_min[2]) {
+                        idx_min[2] = prim;
+                        pos_min[2] = surfels[prim].z;
                     }
-                    else if (surfels[prim].z > pos_max[2]) {
-                        pos_max.z = surfels[prim].z;
-                        idx_max.z = prim * sizeof(lamure::ren::dataset::serialized_surfel) + 5;
+                    else if (surfels[prim].x > pos_max[2]) {
+                        idx_max[2] = prim;
+                        pos_max[2] = surfels[prim].z;
                     }
                 }
             }
 
-            vector<int> vect =
+            std::vector<int> vect =
             {
-                idx_min.x, idx_min.y, idx_min.z,
-                idx_max.x, idx_min.y, idx_min.z,
-                idx_max.x, idx_min.y, idx_min.z,
-                idx_max.x, idx_min.y, idx_max.z,
-                idx_max.x, idx_min.y, idx_max.z,
-                idx_min.x, idx_min.y, idx_max.z,
-                idx_min.x, idx_min.y, idx_max.z,
-                idx_min.x, idx_min.y, idx_min.z,
+                idx_min[0], idx_min[1], idx_min[2],
+                idx_max[0], idx_min[1], idx_min[2],
+                idx_max[0], idx_min[1], idx_min[2],
+                idx_max[0], idx_min[1], idx_max[2],
+                idx_max[0], idx_min[1], idx_max[2],
+                idx_min[0], idx_min[1], idx_max[2],
+                idx_min[0], idx_min[1], idx_max[2],
+                idx_min[0], idx_min[1], idx_min[2],
 
-                idx_min.x, idx_max.y, idx_min.z,
-                idx_max.x, idx_max.y, idx_min.z,
-                idx_max.x, idx_max.y, idx_min.z,
-                idx_max.x, idx_max.y, idx_max.z,
-                idx_max.x, idx_max.y, idx_max.z,
-                idx_min.x, idx_max.y, idx_max.z,
-                idx_min.x, idx_max.y, idx_max.z,
-                idx_min.x, idx_max.y, idx_min.z,
+                idx_min[0], idx_max[1], idx_min[2],
+                idx_max[0], idx_max[1], idx_min[2],
+                idx_max[0], idx_max[1], idx_min[2],
+                idx_max[0], idx_max[1], idx_max[2],
+                idx_max[0], idx_max[1], idx_max[2],
+                idx_min[0], idx_max[1], idx_max[2],
+                idx_min[0], idx_max[1], idx_max[2],
+                idx_min[0], idx_max[1], idx_min[2],
 
-                idx_min.x, idx_min.y, idx_min.z,
-                idx_min.x, idx_max.y, idx_min.z,
-                idx_min.x, idx_min.y, idx_max.z,
-                idx_min.x, idx_max.y, idx_max.z,
-                idx_max.x, idx_min.y, idx_max.z,
-                idx_max.x, idx_max.y, idx_max.z,
-                idx_max.x, idx_min.y, idx_min.z,
-                idx_max.x, idx_max.y, idx_min.z
+                idx_min[0], idx_min[1], idx_min[2],
+                idx_min[0], idx_max[1], idx_min[2],
+                idx_min[0], idx_min[1], idx_max[2],
+                idx_min[0], idx_max[1], idx_max[2],
+                idx_max[0], idx_min[1], idx_max[2],
+                idx_max[0], idx_max[1], idx_max[2],
+                idx_max[0], idx_min[1], idx_min[2],
+                idx_max[0], idx_max[1], idx_min[2]
             };
 
-            int arr[] =
-            {
-                idx_min.x, idx_min.y, idx_min.z,
-                idx_max.x, idx_min.y, idx_min.z,
-                idx_max.x, idx_min.y, idx_min.z,
-                idx_max.x, idx_min.y, idx_max.z,
-                idx_max.x, idx_min.y, idx_max.z,
-                idx_min.x, idx_min.y, idx_max.z,
-                idx_min.x, idx_min.y, idx_max.z,
-                idx_min.x, idx_min.y, idx_min.z,
-
-                idx_min.x, idx_max.y, idx_min.z,
-                idx_max.x, idx_max.y, idx_min.z,
-                idx_max.x, idx_max.y, idx_min.z,
-                idx_max.x, idx_max.y, idx_max.z,
-                idx_max.x, idx_max.y, idx_max.z,
-                idx_min.x, idx_max.y, idx_max.z,
-                idx_min.x, idx_max.y, idx_max.z,
-                idx_min.x, idx_max.y, idx_min.z,
-
-                idx_min.x, idx_min.y, idx_min.z,
-                idx_min.x, idx_max.y, idx_min.z,
-                idx_min.x, idx_min.y, idx_max.z,
-                idx_min.x, idx_max.y, idx_max.z,
-                idx_max.x, idx_min.y, idx_max.z,
-                idx_max.x, idx_max.y, idx_max.z,
-                idx_max.x, idx_min.y, idx_min.z,
-                idx_max.x, idx_max.y, idx_min.z
-            };
-
-
-            idx_arr.push_back(arr);
             idx_vec.push_back(vect);
+            vert_min.push_back(pos_min);
+            vert_max.push_back(pos_max);
+
+
+            std::cout << "node_id: " << node_id <<  std::endl;
+            std::cout << idx_min[0] << " " << idx_min[1] << " " << idx_min[2] << std::endl;
+            std::cout << pos_min[0] << " " << pos_min[1] << " " << pos_min[2] << " " << std::endl;
+            std::cout << bounding_boxes[node_id].min_vertex() << std::endl;
+            std::cout << idx_max[0] << " " << idx_max[1] << " " << idx_max[2] << std::endl;
+            std::cout << pos_max[0] << " " << pos_max[1] << " " << pos_max[2] << " " << std::endl;
+            std::cout << bounding_boxes[node_id].max_vertex() << std::endl;
+            std::cout << "" << std::endl;
+
         }
         access.close();
 
-        int totalsize = 0;
-        for (int i = 0; i < idx_vec.size(); i++) {
-            totalsize += idx_vec[i].size();
-        }
-        int* idx_serialized = new int[totalsize];
-
-        int index = 0;
-        for (int i = 0; i < idx_vec.size(); i++) {
-            std::copy(idx_vec[i].begin(), idx_vec[i].end(), &idx_serialized[index]);
-            index += idx_vec[i].size();
-        }
-
-        bvh_line_resource.idx_arr = idx_arr;
-        bvh_line_resource.idx_vec = idx_vec;
-        bvh_line_resource.idx_serialized = idx_serialized;
-        bvh_line_resource.num_primitives_ = 24 * bounding_boxes.size();
-        bvh_resources_[model_id] = bvh_line_resource;
+        bvh_line_resource_.vert_min = vert_min;
+        bvh_line_resource_.vert_max = vert_max;
+        bvh_line_resource_.idx_vec = idx_vec;
+        bvh_line_resource_.num_primitives_ = 24 * bounding_boxes.size();
+        bvh_resources_[model_id] = bvh_line_resource_;
 
         //GLuint elementbuffer;
         //glGenBuffers(1, &elementbuffer);
@@ -3066,23 +3122,29 @@ void LamurePointCloudPlugin::create_aux_resources() {
 
     //create bvh representation
     for (uint32_t model_id = 0; model_id < num_models_; ++model_id) {
+
         const auto& bvh_ = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh();
         const auto& bounding_boxes = bvh_->get_bounding_boxes();
         uint32_t prim_per_node = bvh_->get_primitives_per_node();
         uint32_t prim_size = bvh_->get_size_of_primitive();
 
-        //resource bvh_line_resource;
-        bvh_line_resource.buffer_.reset();
-        bvh_line_resource.array_.reset();
+        std::vector<scm::math::vec3f> bvh_lines_to_upload;
+        for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
+            const auto& node = bounding_boxes[node_id];
+            lines_from_min_max(node.min_vertex(), node.max_vertex(), bvh_lines_to_upload);
+        }
 
-        bvh_line_resource.positions_ = LamurePointCloudPlugin::instance()->getSerializedBvhCorners(bounding_boxes);
-        bvh_line_resource.positions_size_ = sizeof(float) * 3 * 24 * bounding_boxes.size();
+        std::vector<vector<float>> corners_ = getSerializedBvhCorners(bounding_boxes);
 
-        bvh_line_resource.buffer_ = device_->create_buffer(scm::gl::BIND_VERTEX_BUFFER, scm::gl::USAGE_STATIC_DRAW, sizeof(float) * 3 * 24 * bounding_boxes.size(), &(bvh_line_resource.positions_)[0]);
-        std::vector<scm::gl::buffer_ptr> array_buf = { bvh_line_resource.buffer_ };
-        bvh_line_resource.array_ = device_->create_vertex_array(scm::gl::vertex_format(0, 0, scm::gl::TYPE_VEC3F, sizeof(float) * 3), array_buf);
+        //bvh_line_resource.buffer_ = device_->create_buffer(scm::gl::BIND_VERTEX_BUFFER, scm::gl::USAGE_STATIC_DRAW, (sizeof(float) * 3) * bvh_lines_to_upload.size(), &bvh_lines_to_upload[0]);
+        bvh_line_resource_.buffer_ = device_->create_buffer(scm::gl::BIND_VERTEX_BUFFER, scm::gl::USAGE_STREAM_DRAW, (sizeof(float) * 3) * 24 * bounding_boxes.size(), VecToArr(corners_));
+        std::vector buf = { bvh_line_resource_.buffer_ };
+        bvh_line_resource_.array_ = device_->create_vertex_array(scm::gl::vertex_format(0, "in_position", scm::gl::TYPE_VEC3F, sizeof(float) * 3), buf, vis_line_shader_);
 
-        bvh_resources_[model_id] = bvh_line_resource;
+        bvh_line_resource_.num_primitives_ = bvh_lines_to_upload.size();
+        bvh_line_resource_.buffer_id_ = bvh_line_resource_.buffer_->object_id();
+        bvh_line_resource_.array_id_ = bvh_line_resource_.array_->object_id();
+        bvh_resources_[model_id] = bvh_line_resource_;
 
     }
 

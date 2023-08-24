@@ -185,9 +185,10 @@ private:
 
 public:
     void printNodePath(osg::ref_ptr<osg::Node> pointer);
-    float* getSerializedBvhCorners(const std::vector<scm::gl::boxf>);
-    float* getSerializedBvhMinMax(const std::vector<scm::gl::boxf>);
+    std::vector<vector<float>> getSerializedBvhCorners(const std::vector<scm::gl::boxf>);
+    std::vector<vector<float>> getSerializedBvhMinMax(const std::vector<scm::gl::boxf>);
     float* VecToArr(std::vector<std::vector<float>> vec);
+    int* VecToArr(std::vector<std::vector<int>> vec);
     osg::ref_ptr<struct GLGrp> gl_grp;
     osg::ref_ptr<osg::MatrixTransform> transform;
     ui::Menu* menu = nullptr;
@@ -235,6 +236,9 @@ protected:
 
 
     void setUpStateSets();
+
+
+
 };
 
 
