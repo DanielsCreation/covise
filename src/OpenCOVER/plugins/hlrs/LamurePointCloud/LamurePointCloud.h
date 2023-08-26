@@ -185,8 +185,8 @@ private:
 
 public:
     void printNodePath(osg::ref_ptr<osg::Node> pointer);
-    std::vector<vector<float>> getSerializedBvhCorners(const std::vector<scm::gl::boxf>);
     std::vector<vector<float>> getSerializedBvhMinMax(const std::vector<scm::gl::boxf>);
+    std::vector<float> getBoxCorners(scm::gl::boxf);
     float* VecToArr(std::vector<std::vector<float>> vec);
     int* VecToArr(std::vector<std::vector<int>> vec);
     osg::ref_ptr<struct GLGrp> gl_grp;
