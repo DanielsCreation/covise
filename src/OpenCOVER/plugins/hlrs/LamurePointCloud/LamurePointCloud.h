@@ -106,8 +106,7 @@ public:
     void sync_cameras();
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
-    void create_aux_resources_buffered();
-    void create_bvh_resources();
+    void create_pcl_resources();
     void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
     void draw_brush(scm::gl::program_ptr shader);
     void set_uniforms(scm::gl::program_ptr shader);

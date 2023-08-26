@@ -360,19 +360,31 @@ struct settings {
     bool imgui{ 0 };
     bool osg_rendering_only{ 0 };
     std::vector<float> bvh_color_{ 1.0f, 1.0f, 0.0f, 1.0f };
-    std::vector<float> frustum_color_{ 1.0f, 0.0f, 0.0f, 1.0f };
+    std::vector<float> frustum_color_{ 0.0f, 0.0f, 0.0f, 1.0f };
     bool show_bvh_DSA_{ 0 }; // direct state access
 };
 settings settings_;
+
+
+struct pcl_resource {
+    GLuint vbo_{ 0 };
+    GLuint ibo_{ 0 };
+    GLuint vao_{ 0 };
+    GLuint program_{ 0 };
+    std::array<unsigned short, 24> corners_idx_ = {
+        0, 1, 2, 3, 4, 5, 6, 7,
+        0, 2, 1, 3, 4, 6, 5, 7,
+        0, 4, 1, 5, 2, 6, 3, 7,
+    };
+};
+pcl_resource pcl_res_;
 
 struct box_resource {
     GLuint vbo_{ 0 };
     GLuint ibo_{ 0 };
     GLuint vao_{ 0 };
     GLuint program_{ 0 };
-
-    std::array<unsigned short, 24> corners_idx_ =
-    {
+    std::array<unsigned short, 24> corners_idx_ = {
         0, 1, 2, 3, 4, 5, 6, 7,
         0, 2, 1, 3, 4, 6, 5, 7,
         0, 4, 1, 5, 2, 6, 3, 7,
@@ -380,17 +392,16 @@ struct box_resource {
 };
 box_resource box_res_;
 
+
 struct resource {
     uint64_t num_primitives_{ 0 };
     scm::gl::buffer_ptr buffer_;
     scm::gl::vertex_array_ptr array_;
     std::vector<std::vector<float>> corners_;
 };
-
 // only one needed
 resource brush_resource_;
 resource pvs_resource_;
-
 // singels are declared locally
 std::map<uint32_t, resource> bvh_resources_;
 std::map<uint32_t, resource> frusta_resources_;
@@ -409,6 +420,7 @@ struct model_info {
     scm::math::vec3f models_center;
 };
 model_info model_info_;
+
 
 struct gui {
     bool selection_settings_{ true };
@@ -445,6 +457,7 @@ struct selection {
     int64_t brush_end_{ 0 };
 };
 selection selection_;
+
 
 struct input {
     float trackball_x_ = 0.f;
@@ -1398,25 +1411,6 @@ protected:
             glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_FALSE, &pm[0]);
             glDrawArrays(GL_TRIANGLES, 0, 9);
             glDisableVertexAttribArray(0);
-
-            // Restore modified GL state
-            //glUseProgram(last_program);
-            //glBindTexture(GL_TEXTURE_2D, last_texture);
-            //glBindSampler(0, last_sampler);
-            //glActiveTexture(last_active_texture);
-            //glBindVertexArray(last_vertex_array);
-            //glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
-            //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last_element_array_buffer);
-            //glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
-            //glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
-            //if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
-            //if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
-            //if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-            //if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
-            //glPolygonMode(GL_FRONT_AND_BACK, last_polygon_mode[0]);
-            //glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
-            //glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
-
             drawable->drawImplementation(renderInfo);
         }
 
@@ -1438,127 +1432,6 @@ protected:
             //setStateSet(plugin->_lineStateSet.get());
             setDrawCallback(new LinesUpdateCallback(gl_grp, viewerStats, _plugin));
         }
-
-
-        //for (uint32_t model_id = 0; model_id < num_models_; ++model_id) {
-        //    const auto& bounding_boxes = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
-        //    float* corners_ = LamurePointCloudPlugin::instance()->getSerializesBvhCorners(bounding_boxes);
-        //}
-        //coVRPluginList::instance()->preDraw(renderInfo);
-
-        //create bvh representation
-        //for (uint32_t model_id = 0; model_id < num_models_; ++model_id) {
-        //    const auto& bounding_boxes = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
-        //    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_LINES, bounding_boxes.size() * 24);
-        //    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array(bounding_boxes.size() * 8);
-        //    for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
-        //        scm::math::vec3f min_vertex = bounding_boxes[node_id].min_vertex();
-        //        scm::math::vec3f max_vertex = bounding_boxes[node_id].max_vertex();
-        //        (*vertices)[(node_id * 8) + 0] = osg::Vec3f(min_vertex.x, min_vertex.y, min_vertex.z);
-        //        (*vertices)[(node_id * 8) + 1] = osg::Vec3f(max_vertex.x, min_vertex.y, min_vertex.z);
-        //        (*vertices)[(node_id * 8) + 2] = osg::Vec3f(max_vertex.x, min_vertex.y, max_vertex.z);
-        //        (*vertices)[(node_id * 8) + 3] = osg::Vec3f(min_vertex.x, min_vertex.y, max_vertex.z);
-        //        (*vertices)[(node_id * 8) + 4] = osg::Vec3f(min_vertex.x, max_vertex.y, min_vertex.z);
-        //        (*vertices)[(node_id * 8) + 5] = osg::Vec3f(max_vertex.x, max_vertex.y, min_vertex.z);
-        //        (*vertices)[(node_id * 8) + 6] = osg::Vec3f(max_vertex.x, max_vertex.y, max_vertex.z);
-        //        (*vertices)[(node_id * 8) + 7] = osg::Vec3f(min_vertex.x, max_vertex.y, max_vertex.z);
-        //        (*indices)[(node_id * 12) + 0] = (node_id * 8) + 0;   (*indices)[(node_id * 12) + 1] = (node_id * 8) + 1;
-        //        (*indices)[(node_id * 12) + 2] = (node_id * 8) + 1;   (*indices)[(node_id * 12) + 3] = (node_id * 8) + 2;
-        //        (*indices)[(node_id * 12) + 4] = (node_id * 8) + 2;   (*indices)[(node_id * 12) + 5] = (node_id * 8) + 3;
-        //        (*indices)[(node_id * 12) + 6] = (node_id * 8) + 3;   (*indices)[(node_id * 12) + 7] = (node_id * 8) + 0;
-        //        (*indices)[(node_id * 12) + 8] = (node_id * 8) + 4;   (*indices)[(node_id * 12) + 9] = (node_id * 8) + 5;
-        //        (*indices)[(node_id * 12) + 10] = (node_id * 8) + 5;  (*indices)[(node_id * 12) + 11] = (node_id * 8) + 6;
-        //        (*indices)[(node_id * 12) + 12] = (node_id * 8) + 6;  (*indices)[(node_id * 12) + 13] = (node_id * 8) + 7;
-        //        (*indices)[(node_id * 12) + 14] = (node_id * 8) + 7;  (*indices)[(node_id * 12) + 15] = (node_id * 8) + 4;
-        //        (*indices)[(node_id * 12) + 16] = (node_id * 8) + 0;  (*indices)[(node_id * 12) + 17] = (node_id * 8) + 4;
-        //        (*indices)[(node_id * 12) + 18] = (node_id * 8) + 1;  (*indices)[(node_id * 12) + 19] = (node_id * 8) + 5;
-        //        (*indices)[(node_id * 12) + 20] = (node_id * 8) + 2;  (*indices)[(node_id * 12) + 21] = (node_id * 8) + 6;
-        //        (*indices)[(node_id * 12) + 22] = (node_id * 8) + 3;  (*indices)[(node_id * 12) + 23] = (node_id * 8) + 7;
-        //    }
-        //    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-        //    colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
-        //    setVertexArray(vertices.get());
-        //    setColorArray(colors.get());
-        //    setColorBinding(osg::Geometry::BIND_OVERALL);
-        //    getOrCreateStateSet()->setAttributeAndModes(new osg::LineWidth(1.0f), osg::StateAttribute::ON);
-        //    addPrimitiveSet(indices.get());
-        //}
-
-        //unsigned int program = glCreateProgram();
-            //unsigned int vs = CompileShader(GL_VERTEX_SHADER, vis_line_vs_source, 0);
-            //unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, vis_line_fs_source, 0);
-            //glAttachShader(program, vs);
-            //glAttachShader(program, fs);
-            //glLinkProgram(program);
-            //glValidateProgram(program);
-            //glDeleteProgram(vs);
-            //glDeleteProgram(fs);
-            //glUseProgram(program);
-
-            //GLuint ibo = bvh_res.gl_id;
-            //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-            //context_->bind_program(vis_line_shader_);
-            //vis_line_shader_->uniform("mvp_matrix", scm::math::mat4f(model_view_projection_matrix));
-            //context_->apply_program();
-            //scm::gl::buffer_ptr index_buffer = device_->create_buffer(scm::gl::BIND_INDEX_BUFFER, scm::gl::USAGE_STREAM_DRAW, sizeof(bvh_res.idx_serialized), bvh_res.idx_serialized);
-            //context_->bind_index_buffer(index_buffer, scm::gl::PRIMITIVE_LINE_LIST, scm::gl::TYPE_INT, 0);
-            //context_->apply();
-
-            //context_->draw_elements(1, bvh_res.idx_serialized[node_slot_aggregate.node_id_ * bvh_res.idx_per_node], 12);
-            //glDrawElements(GL_LINES, 24, GL_STREAM_DRAW, bvh_res.idx_arr[node_slot_aggregate.node_id_]);
-            //glDrawElements(GL_LINES, bvh_res.idx_per_node, GL_STREAM_DRAW, bvh_res.idx_arr[node_slot_aggregate.node_id_]);
-
-            //GLuint ibo;
-            //glGenBuffers(1, &ibo);
-            //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-            //glBufferData(GL_ELEMENT_ARRAY_BUFFER, bvh_res.idx_per_node * 3 * sizeof(int), bvh_res.idx_serialized, GL_STREAM_DRAW);
-            //float* mvp = scm::math::mat4f(model_view_projection_matrix).data_array;
-            //unsigned int program = glCreateProgram();
-            //unsigned int vs = CompileShader(GL_VERTEX_SHADER, vis_line_vs_source, 0);
-            //unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, vis_line_fs_source, 0);
-            //glAttachShader(program, vs);
-            //glAttachShader(program, fs);
-            //glLinkProgram(program);
-            //glValidateProgram(program);
-            //glDeleteProgram(vs);
-            //glDeleteProgram(fs);
-            //glUseProgram(program);
-            //glEnableVertexAttribArray(0);
-
-
-            // bind program, set state and set uniforms
-            //context_->bind_program(vis_line_shader_);
-            //_plugin->set_uniforms(vis_line_shader_);
-            //lamure::context_t context_id = controller->deduce_context_id(lmr_ctx);
-            //scm::math::mat4d projection_matrix = scm::math::mat4d(gl_projection_matrix_d);
-            //scm::math::mat4d view_matrix = gl_view_matrix_d;
-            //for (int32_t model_id = 0; model_id < num_models_; ++model_id) {
-            //    bool draw = true;
-            //    auto bvh_res = bvh_resources_[model_id];
-            //    lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
-            //    lamure::ren::cut& cut = cuts->get_cut(lmr_ctx, lmr_ctx, m_id);
-            //    std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
-            //    const lamure::ren::bvh* bvh = database->get_model(m_id)->get_bvh();
-            //    if (draw) {
-            //        //uniforms per model
-            //        scm::math::mat4d model_matrix = model_info_.model_transformations_[model_id];
-            //        scm::math::mat4d mvp = projection_matrix * view_matrix * model_matrix;
-            //        vis_line_shader_->uniform("mvp_matrix", scm::math::mat4f(mvp));
-            //        std::vector<scm::gl::boxf>const& bounding_box_vector = bvh->get_bounding_boxes();
-            //        scm::gl::frustum frustum_by_model = scm_camera_->get_frustum_by_model(scm::math::mat4f(model_matrix));
-            //        if (bvh_res.num_primitives_ > 0) {
-            //            context_->bind_vertex_array(bvh_res.array_);
-            //            context_->apply();
-            //            for (auto const& node_slot_aggregate : renderable) {
-            //                uint32_t node_culling_result = scm_camera_->cull_against_frustum(frustum_by_model, bounding_box_vector[node_slot_aggregate.node_id_]);
-            //                if (node_culling_result != 1) {
-            //                    context_->draw_arrays(scm::gl::PRIMITIVE_LINE_LIST, node_slot_aggregate.node_id_ * 24, 24);
-            //                }
-            //            }
-            //        }
-            //    }
-            //}
-
     };
     struct LinesUpdateCallback : public virtual osg::Drawable::DrawCallback
     {
@@ -1573,6 +1446,10 @@ protected:
         /** do customized draw code.*/
         virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
         {
+            if (_plugin->b11->state() == 0) {
+                return;
+            }
+
             // Backup GL state
             GLenum last_active_texture; glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture);
             //glActiveTexture(GL_TEXTURE0);
@@ -1649,7 +1526,6 @@ protected:
                 auto bvh_res_ = bvh_resources_[model_id];
                 auto frustum_res_ = frusta_resources_[model_id];
 
-                
                 //MVP-Matrix für shader berechnen
                 scm::math::mat4d model_matrix = model_info_.model_transformations_[model_id];
                 scm::math::mat4d view_matrix = gl_view_matrix_d;
@@ -1695,9 +1571,7 @@ protected:
                     glDrawElements(GL_LINES, 24, GL_UNSIGNED_SHORT, nullptr);
 
                 }
-
                 glUniform4f(glGetUniformLocation(box_res_.program_, "in_color"), settings_.bvh_color_[0], settings_.bvh_color_[1], settings_.bvh_color_[2], settings_.bvh_color_[3]);
-
 
                 bool draw = true;
                 for (auto const& node_slot_aggregate : renderable) {
@@ -1716,35 +1590,29 @@ protected:
                         glDrawElements(GL_LINES, 24, GL_UNSIGNED_SHORT, nullptr);
                     }
                 }
-                std::cout << _plugin->query_video_memory_in_mb() << std::endl;
-                lamure::ren::controller::get_instance()->get_context_memory(0, lamure::ren::bvh::primitive_type::POINTCLOUD, device_);
-                lamure::ren::controller::get_instance()->get_context_buffer(0, device_);
-                std::cout << lamure::ren::gpu_access::query_video_memory_in_mb(device_) << std::endl;
             }
 
             glDisableVertexAttribArray(0);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-            drawable->drawImplementation(renderInfo);
-
-
             // Restore modified GL state
-            //glUseProgram(last_program);
-            //glBindTexture(GL_TEXTURE_2D, last_texture);
-            //glBindSampler(0, last_sampler);
-            //glActiveTexture(last_active_texture);
-            //glBindVertexArray(last_vertex_array);
-            //glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
-            //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last_element_array_buffer);
-            //glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
-            //glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
-            //if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
-            //if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
-            //if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-            //if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
-            //glPolygonMode(GL_FRONT_AND_BACK, last_polygon_mode[0]);
-            //glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
-            //glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
+            glUseProgram(last_program);
+            glBindTexture(GL_TEXTURE_2D, last_texture);
+            glBindSampler(0, last_sampler);
+            glActiveTexture(last_active_texture);
+            glBindVertexArray(last_vertex_array);
+            glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last_element_array_buffer);
+            glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
+            glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
+            if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+            if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+            if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+            if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
+            glPolygonMode(GL_FRONT_AND_BACK, last_polygon_mode[0]);
+            glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
+            glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
+            drawable->drawImplementation(renderInfo);
         };
         GLGrp* _gl_grp = nullptr;
         osg::Stats* _viewerStats;
@@ -1770,7 +1638,6 @@ protected:
             _plugin(plugin)
         {
             std::cout << "protected struct PointsUpdateCallback()" << std::endl;
-            //osg::StateSet* stateset = gl_grp->getOrCreateStateSet();
         }
 
         /** do customized draw code.*/
@@ -1780,30 +1647,6 @@ protected:
 
             if (_plugin->rendering_) { return; }
             _plugin->rendering_ = true;
-
-            // Backup GL state
-            GLenum last_active_texture; glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture);
-            //glActiveTexture(GL_TEXTURE0);
-            GLint last_program; glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
-            GLint last_texture; glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
-            GLint last_sampler; glGetIntegerv(GL_SAMPLER_BINDING, &last_sampler);
-            GLint last_array_buffer; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
-            GLint last_element_array_buffer; glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &last_element_array_buffer);
-            GLint last_vertex_array; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
-            GLint last_polygon_mode[2]; glGetIntegerv(GL_POLYGON_MODE, last_polygon_mode);
-            GLint last_viewport[4]; glGetIntegerv(GL_VIEWPORT, last_viewport);
-            GLint last_scissor_box[4]; glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box);
-            GLenum last_blend_src_rgb; glGetIntegerv(GL_BLEND_SRC_RGB, (GLint*)&last_blend_src_rgb);
-            GLenum last_blend_dst_rgb; glGetIntegerv(GL_BLEND_DST_RGB, (GLint*)&last_blend_dst_rgb);
-            GLenum last_blend_src_alpha; glGetIntegerv(GL_BLEND_SRC_ALPHA, (GLint*)&last_blend_src_alpha);
-            GLenum last_blend_dst_alpha; glGetIntegerv(GL_BLEND_DST_ALPHA, (GLint*)&last_blend_dst_alpha);
-            GLenum last_blend_equation_rgb; glGetIntegerv(GL_BLEND_EQUATION_RGB, (GLint*)&last_blend_equation_rgb);
-            GLenum last_blend_equation_alpha; glGetIntegerv(GL_BLEND_EQUATION_ALPHA, (GLint*)&last_blend_equation_alpha);
-            GLboolean last_enable_blend = glIsEnabled(GL_BLEND);
-            GLboolean last_enable_cull_face = glIsEnabled(GL_CULL_FACE);
-            GLboolean last_enable_depth_test = glIsEnabled(GL_DEPTH_TEST);
-            GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
-
 
             GLdouble vm[16];
             glGetDoublev(GL_MODELVIEW_MATRIX, vm);
@@ -1894,18 +1737,16 @@ protected:
                 context_->bind_vertex_array(
                     controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_));
             }
-            glEnableVertexAttribArray(0);
-            glEnableVertexAttribArray(1);
-            glEnableVertexAttribArray(2);
-            glEnableVertexAttribArray(3);
-            glEnableVertexAttribArray(4);
-            glEnableVertexAttribArray(5);
-            glEnableVertexAttribArray(6);
 
+            //glEnableVertexAttribArray(0);
+            //glEnableVertexAttribArray(1);
+            //glEnableVertexAttribArray(2);
+            //glEnableVertexAttribArray(3);
+            //glEnableVertexAttribArray(4);
+            //glEnableVertexAttribArray(5);
+            //glEnableVertexAttribArray(6);
 
-            scm::gl::vertex_array_ptr pcl_va = controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_);
-
-            context_->apply();
+            //context_->apply();
 
             rendered_splats_ = 0;
             rendered_nodes_ = 0;
@@ -2004,34 +1845,16 @@ protected:
             }
             _plugin->rendering_ = false;
 
-            glDisableVertexAttribArray(0);
-            glDisableVertexAttribArray(1);
-            glDisableVertexAttribArray(2);
-            glDisableVertexAttribArray(3);
-            glDisableVertexAttribArray(4);
-            glDisableVertexAttribArray(5);
-            glDisableVertexAttribArray(6);
+            //glDisableVertexAttribArray(0);
+            //glDisableVertexAttribArray(1);
+            //glDisableVertexAttribArray(2);
+            //glDisableVertexAttribArray(3);
+            //glDisableVertexAttribArray(4);
+            //glDisableVertexAttribArray(5);
+            //glDisableVertexAttribArray(6);
 
             drawable->drawImplementation(renderInfo);
 
-
-            // Restore modified GL state
-            //glUseProgram(last_program);
-            //glBindTexture(GL_TEXTURE_2D, last_texture);
-            //glBindSampler(0, last_sampler);
-            //glActiveTexture(last_active_texture);
-            //glBindVertexArray(last_vertex_array);
-            //glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
-            //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last_element_array_buffer);
-            //glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
-            //glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
-            //if (last_enable_blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
-            //if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
-            //if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-            //if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
-            //glPolygonMode(GL_FRONT_AND_BACK, last_polygon_mode[0]);
-            //glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
-            //glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
         }
  
         GLGrp* _gl_grp = nullptr;
@@ -2058,7 +1881,7 @@ bool LamurePointCloudPlugin::init() {
     plugin->bg1 = new ui::ButtonGroup(plugin->group, "bg1");
     plugin->bg1->enableDeselect(true);
 
-    plugin->b11 = new ui::Button(plugin->group, "b11", bg1);
+    plugin->b11 = new ui::Button(plugin->group, "show boxes", bg1);
     plugin->b12 = new ui::Button(plugin->group, "b12", bg1);
     plugin->b13 = new ui::Button(plugin->group, "b13", bg1);
     plugin->b14 = new ui::Button(plugin->group, "b14", bg1);
@@ -2194,10 +2017,9 @@ bool LamurePointCloudPlugin::init() {
         plugin->init_lamure_shader();
         plugin->init_camera();
         plugin->create_aux_resources();
-        //plugin->create_bvh_resources();
+        plugin->create_pcl_resources();
         plugin->init_render_states();
         /*Hier noch nicht die display-func aufrufen! Nur lamure-obj. erstellen und Initialisierung in OpenCOVER abschließen lassen.*/
-
 
         // Restore modified GL state
         glUseProgram(last_program);
@@ -2231,12 +2053,11 @@ bool LamurePointCloudPlugin::init() {
 
 unsigned int counter = 0;
 void LamurePointCloudPlugin::preFrame() {
-
-    if (cover->getPointerButton()->getState() == 1 && counter == 0) {
-
+    if (/*cover->getPointerButton()->getState() == 1 && */counter == 0) {
         //plugin->gl_grp->addTriangles(VRViewer::instance()->getViewerStats(), plugin);
         plugin->gl_grp->addPoints(VRViewer::instance()->getViewerStats(), plugin);
         plugin->gl_grp->addLines(VRViewer::instance()->getViewerStats(), plugin);
+
 
         printNodePath(plugin->gl_grp);
 
@@ -2817,6 +2638,19 @@ void LamurePointCloudPlugin::lines_from_min_max(const scm::math::vec3f& min_vert
 }
 
 
+void LamurePointCloudPlugin::create_pcl_resources() {
+    unsigned int program = glCreateProgram();
+    unsigned int vs = CompileShader(GL_VERTEX_SHADER, vis_surfel_shader_vs_source, 0);
+    unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, vis_surfel_shader_fs_source, 0);
+    glAttachShader(program, vs);
+    glAttachShader(program, fs);
+    glLinkProgram(program);
+    glValidateProgram(program);
+    glDeleteProgram(vs);
+    glDeleteProgram(fs);
+
+    pcl_res_;
+}
 
 
 void LamurePointCloudPlugin::create_aux_resources() {
@@ -3123,127 +2957,6 @@ float LamurePointCloudPlugin::get_atlas_scale_factor() {
     double factor_v = (double)image_height / (tile_inner_height * std::pow(2, depth - 1));
 
     return std::max(factor_u, factor_v);
-}
-
-
-void LamurePointCloudPlugin::create_aux_resources_buffered() {
-    if (!settings_.create_aux_resources_) { return; }
-
-    osg::Geometry* aux_geo = new osg::Geometry();
-    plugin->geode->addDrawable(aux_geo);
-
-    for (uint32_t model_id = 0; model_id < num_models_; ++model_id) {
-        const auto& bounding_boxes = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
-        aux_geo->setUseDisplayList(false);
-        aux_geo->setUseVertexBufferObjects(true);
-        aux_geo->setUseVertexArrayObject(false);
-        osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_LINES, bounding_boxes.size() * 24);
-        osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array(bounding_boxes.size() * 8);
-
-        for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
-            scm::math::vec3f min_vertex = bounding_boxes[node_id].min_vertex();
-            scm::math::vec3f max_vertex = bounding_boxes[node_id].max_vertex();
-            (*vertices)[(node_id * 8) + 0] = osg::Vec3f(min_vertex.x, min_vertex.y, min_vertex.z);
-            (*vertices)[(node_id * 8) + 1] = osg::Vec3f(max_vertex.x, min_vertex.y, min_vertex.z);
-            (*vertices)[(node_id * 8) + 2] = osg::Vec3f(max_vertex.x, min_vertex.y, max_vertex.z);
-            (*vertices)[(node_id * 8) + 3] = osg::Vec3f(min_vertex.x, min_vertex.y, max_vertex.z);
-            (*vertices)[(node_id * 8) + 4] = osg::Vec3f(min_vertex.x, max_vertex.y, min_vertex.z);
-            (*vertices)[(node_id * 8) + 5] = osg::Vec3f(max_vertex.x, max_vertex.y, min_vertex.z);
-            (*vertices)[(node_id * 8) + 6] = osg::Vec3f(max_vertex.x, max_vertex.y, max_vertex.z);
-            (*vertices)[(node_id * 8) + 7] = osg::Vec3f(min_vertex.x, max_vertex.y, max_vertex.z);
-
-            (*indices)[(node_id * 24) + 0] = (node_id * 8) + 0;   (*indices)[(node_id * 24) + 1] = (node_id * 8) + 1;
-            (*indices)[(node_id * 24) + 2] = (node_id * 8) + 1;   (*indices)[(node_id * 24) + 3] = (node_id * 8) + 2;
-            (*indices)[(node_id * 24) + 4] = (node_id * 8) + 2;   (*indices)[(node_id * 24) + 5] = (node_id * 8) + 3;
-            (*indices)[(node_id * 24) + 6] = (node_id * 8) + 3;   (*indices)[(node_id * 24) + 7] = (node_id * 8) + 0;
-            (*indices)[(node_id * 24) + 8] = (node_id * 8) + 4;   (*indices)[(node_id * 24) + 9] = (node_id * 8) + 5;
-            (*indices)[(node_id * 24) + 10] = (node_id * 8) + 5;  (*indices)[(node_id * 24) + 11] = (node_id * 8) + 6;
-            (*indices)[(node_id * 24) + 12] = (node_id * 8) + 6;  (*indices)[(node_id * 24) + 13] = (node_id * 8) + 7;
-            (*indices)[(node_id * 24) + 14] = (node_id * 8) + 7;  (*indices)[(node_id * 24) + 15] = (node_id * 8) + 4;
-            (*indices)[(node_id * 24) + 16] = (node_id * 8) + 0;  (*indices)[(node_id * 24) + 17] = (node_id * 8) + 4;
-            (*indices)[(node_id * 24) + 18] = (node_id * 8) + 1;  (*indices)[(node_id * 24) + 19] = (node_id * 8) + 5;
-            (*indices)[(node_id * 24) + 20] = (node_id * 8) + 2;  (*indices)[(node_id * 24) + 21] = (node_id * 8) + 6;
-            (*indices)[(node_id * 24) + 22] = (node_id * 8) + 3;  (*indices)[(node_id * 24) + 23] = (node_id * 8) + 7;
-        }
-        osg::StateSet* stateset = new osg::StateSet();
-        aux_geo->setStateSet(stateset);
-        osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-        colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
-        aux_geo->setVertexArray(vertices.get());
-        aux_geo->setColorArray(colors.get());
-        aux_geo->setColorBinding(osg::Geometry::BIND_OVERALL);
-        stateset->setAttributeAndModes(new osg::LineWidth(1.0f), osg::StateAttribute::ON);
-        aux_geo->addPrimitiveSet(indices.get());
-    }
-
-
-    /*
-    for (int model_id = 0; model_id < num_models_; ++model_id) {
-        if (settings_.show_bvhs_) {
-            //create bvh representation
-            const auto& bounding_boxes = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
-
-            aux_geo->setUseDisplayList(false);
-            aux_geo->setUseVertexBufferObjects(true);
-            aux_geo->setUseVertexArrayObject(false);
-
-            osg::ref_ptr<osg::Vec3Array> lines = new osg::Vec3Array();
-            for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
-                const auto& node = bounding_boxes[node_id];
-                lines_from_min_max_buffered(node.min_vertex(), node.max_vertex(), lines);
-            }
-            aux_geo->setVertexArray(lines.get());
-
-            osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-            colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
-            aux_geo->setColorArray(colors.get());
-            aux_geo->setColorBinding(osg::Geometry::BIND_OVERALL);
-            aux_geo->getOrCreateStateSet()->setAttributeAndModes(new osg::LineWidth(1.0f), osg::StateAttribute::ON);
-            aux_geo->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, (int)(24 * bounding_boxes.size()), 0));
-        }
-        if (settings_.show_pvs_ && settings_.pvs_ != "") {
-            std::string pvs_grid_file_path = settings_.pvs_;
-            pvs_grid_file_path.resize(pvs_grid_file_path.length() - 3);
-            pvs_grid_file_path = pvs_grid_file_path + "grid";
-
-            lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
-            pvs->load_pvs_from_file(pvs_grid_file_path, settings_.pvs_, false);
-            pvs->activate(settings_.use_pvs_);
-            std::cout << "use pvs: " << (int)pvs->is_activated() << std::endl;
-            if (pvs->get_visibility_grid() != nullptr) {
-
-                aux_geo->setUseDisplayList(false);
-                aux_geo->setUseVertexBufferObjects(true);
-                aux_geo->setUseVertexArrayObject(false);
-
-                osg::ref_ptr<osg::Vec3Array> lines = new osg::Vec3Array();
-
-                for (size_t cell_id = 0; cell_id < pvs->get_visibility_grid()->get_cell_count(); ++cell_id) {
-                    const lamure::pvs::view_cell* cell = pvs->get_visibility_grid()->get_cell_at_index(cell_id);
-
-                    scm::math::vec3f min_vertex(cell->get_position_center() - (cell->get_size() * 0.5f));
-                    scm::math::vec3f max_vertex(cell->get_position_center() + (cell->get_size() * 0.5f));
-
-                    lines_from_min_max_buffered(min_vertex, max_vertex, lines);
-                }
-
-                aux_geo->setVertexArray(lines.get());
-
-                osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-                colors->push_back(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
-                aux_geo->setColorArray(colors.get());
-                aux_geo->setColorBinding(osg::Geometry::BIND_OVERALL);
-                aux_geo->getOrCreateStateSet()->setAttributeAndModes(new osg::LineWidth(1.0f), osg::StateAttribute::ON);
-                aux_geo->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, (int)(pvs->get_visibility_grid()->get_cell_count() * 24)));
-
-            }
-            else {
-                std::cout << "no pvs grid!" << std::endl;
-            }
-        }
-    }*/
-
-
 }
 
 
@@ -4881,3 +4594,243 @@ glDisableVertexAttribArray(0);*/
 //
 //    }
 //}
+
+
+/*
+void LamurePointCloudPlugin::create_aux_resources_buffered() {
+    if (!settings_.create_aux_resources_) { return; }
+
+    osg::Geometry* aux_geo = new osg::Geometry();
+    plugin->geode->addDrawable(aux_geo);
+
+    for (uint32_t model_id = 0; model_id < num_models_; ++model_id) {
+        const auto& bounding_boxes = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
+        aux_geo->setUseDisplayList(false);
+        aux_geo->setUseVertexBufferObjects(true);
+        aux_geo->setUseVertexArrayObject(false);
+        osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_LINES, bounding_boxes.size() * 24);
+        osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array(bounding_boxes.size() * 8);
+
+        for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
+            scm::math::vec3f min_vertex = bounding_boxes[node_id].min_vertex();
+            scm::math::vec3f max_vertex = bounding_boxes[node_id].max_vertex();
+            (*vertices)[(node_id * 8) + 0] = osg::Vec3f(min_vertex.x, min_vertex.y, min_vertex.z);
+            (*vertices)[(node_id * 8) + 1] = osg::Vec3f(max_vertex.x, min_vertex.y, min_vertex.z);
+            (*vertices)[(node_id * 8) + 2] = osg::Vec3f(max_vertex.x, min_vertex.y, max_vertex.z);
+            (*vertices)[(node_id * 8) + 3] = osg::Vec3f(min_vertex.x, min_vertex.y, max_vertex.z);
+            (*vertices)[(node_id * 8) + 4] = osg::Vec3f(min_vertex.x, max_vertex.y, min_vertex.z);
+            (*vertices)[(node_id * 8) + 5] = osg::Vec3f(max_vertex.x, max_vertex.y, min_vertex.z);
+            (*vertices)[(node_id * 8) + 6] = osg::Vec3f(max_vertex.x, max_vertex.y, max_vertex.z);
+            (*vertices)[(node_id * 8) + 7] = osg::Vec3f(min_vertex.x, max_vertex.y, max_vertex.z);
+
+            (*indices)[(node_id * 24) + 0] = (node_id * 8) + 0;   (*indices)[(node_id * 24) + 1] = (node_id * 8) + 1;
+            (*indices)[(node_id * 24) + 2] = (node_id * 8) + 1;   (*indices)[(node_id * 24) + 3] = (node_id * 8) + 2;
+            (*indices)[(node_id * 24) + 4] = (node_id * 8) + 2;   (*indices)[(node_id * 24) + 5] = (node_id * 8) + 3;
+            (*indices)[(node_id * 24) + 6] = (node_id * 8) + 3;   (*indices)[(node_id * 24) + 7] = (node_id * 8) + 0;
+            (*indices)[(node_id * 24) + 8] = (node_id * 8) + 4;   (*indices)[(node_id * 24) + 9] = (node_id * 8) + 5;
+            (*indices)[(node_id * 24) + 10] = (node_id * 8) + 5;  (*indices)[(node_id * 24) + 11] = (node_id * 8) + 6;
+            (*indices)[(node_id * 24) + 12] = (node_id * 8) + 6;  (*indices)[(node_id * 24) + 13] = (node_id * 8) + 7;
+            (*indices)[(node_id * 24) + 14] = (node_id * 8) + 7;  (*indices)[(node_id * 24) + 15] = (node_id * 8) + 4;
+            (*indices)[(node_id * 24) + 16] = (node_id * 8) + 0;  (*indices)[(node_id * 24) + 17] = (node_id * 8) + 4;
+            (*indices)[(node_id * 24) + 18] = (node_id * 8) + 1;  (*indices)[(node_id * 24) + 19] = (node_id * 8) + 5;
+            (*indices)[(node_id * 24) + 20] = (node_id * 8) + 2;  (*indices)[(node_id * 24) + 21] = (node_id * 8) + 6;
+            (*indices)[(node_id * 24) + 22] = (node_id * 8) + 3;  (*indices)[(node_id * 24) + 23] = (node_id * 8) + 7;
+        }
+        osg::StateSet* stateset = new osg::StateSet();
+        aux_geo->setStateSet(stateset);
+        osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+        colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
+        aux_geo->setVertexArray(vertices.get());
+        aux_geo->setColorArray(colors.get());
+        aux_geo->setColorBinding(osg::Geometry::BIND_OVERALL);
+        stateset->setAttributeAndModes(new osg::LineWidth(1.0f), osg::StateAttribute::ON);
+        aux_geo->addPrimitiveSet(indices.get());
+    }
+
+
+
+    for (int model_id = 0; model_id < num_models_; ++model_id) {
+        if (settings_.show_bvhs_) {
+            //create bvh representation
+            const auto& bounding_boxes = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
+
+            aux_geo->setUseDisplayList(false);
+            aux_geo->setUseVertexBufferObjects(true);
+            aux_geo->setUseVertexArrayObject(false);
+
+            osg::ref_ptr<osg::Vec3Array> lines = new osg::Vec3Array();
+            for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
+                const auto& node = bounding_boxes[node_id];
+                lines_from_min_max_buffered(node.min_vertex(), node.max_vertex(), lines);
+            }
+            aux_geo->setVertexArray(lines.get());
+
+            osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+            colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
+            aux_geo->setColorArray(colors.get());
+            aux_geo->setColorBinding(osg::Geometry::BIND_OVERALL);
+            aux_geo->getOrCreateStateSet()->setAttributeAndModes(new osg::LineWidth(1.0f), osg::StateAttribute::ON);
+            aux_geo->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, (int)(24 * bounding_boxes.size()), 0));
+        }
+        if (settings_.show_pvs_ && settings_.pvs_ != "") {
+            std::string pvs_grid_file_path = settings_.pvs_;
+            pvs_grid_file_path.resize(pvs_grid_file_path.length() - 3);
+            pvs_grid_file_path = pvs_grid_file_path + "grid";
+
+            lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
+            pvs->load_pvs_from_file(pvs_grid_file_path, settings_.pvs_, false);
+            pvs->activate(settings_.use_pvs_);
+            std::cout << "use pvs: " << (int)pvs->is_activated() << std::endl;
+            if (pvs->get_visibility_grid() != nullptr) {
+
+                aux_geo->setUseDisplayList(false);
+                aux_geo->setUseVertexBufferObjects(true);
+                aux_geo->setUseVertexArrayObject(false);
+
+                osg::ref_ptr<osg::Vec3Array> lines = new osg::Vec3Array();
+
+                for (size_t cell_id = 0; cell_id < pvs->get_visibility_grid()->get_cell_count(); ++cell_id) {
+                    const lamure::pvs::view_cell* cell = pvs->get_visibility_grid()->get_cell_at_index(cell_id);
+
+                    scm::math::vec3f min_vertex(cell->get_position_center() - (cell->get_size() * 0.5f));
+                    scm::math::vec3f max_vertex(cell->get_position_center() + (cell->get_size() * 0.5f));
+
+                    lines_from_min_max_buffered(min_vertex, max_vertex, lines);
+                }
+
+                aux_geo->setVertexArray(lines.get());
+
+                osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+                colors->push_back(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+                aux_geo->setColorArray(colors.get());
+                aux_geo->setColorBinding(osg::Geometry::BIND_OVERALL);
+                aux_geo->getOrCreateStateSet()->setAttributeAndModes(new osg::LineWidth(1.0f), osg::StateAttribute::ON);
+                aux_geo->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, (int)(pvs->get_visibility_grid()->get_cell_count() * 24)));
+
+            }
+            else {
+                std::cout << "no pvs grid!" << std::endl;
+            }
+        }
+    }
+
+
+}*/
+//for (uint32_t model_id = 0; model_id < num_models_; ++model_id) {
+//    const auto& bounding_boxes = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
+//    float* corners_ = LamurePointCloudPlugin::instance()->getSerializesBvhCorners(bounding_boxes);
+//}
+//coVRPluginList::instance()->preDraw(renderInfo);
+
+//create bvh representation
+//for (uint32_t model_id = 0; model_id < num_models_; ++model_id) {
+//    const auto& bounding_boxes = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes();
+//    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_LINES, bounding_boxes.size() * 24);
+//    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array(bounding_boxes.size() * 8);
+//    for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
+//        scm::math::vec3f min_vertex = bounding_boxes[node_id].min_vertex();
+//        scm::math::vec3f max_vertex = bounding_boxes[node_id].max_vertex();
+//        (*vertices)[(node_id * 8) + 0] = osg::Vec3f(min_vertex.x, min_vertex.y, min_vertex.z);
+//        (*vertices)[(node_id * 8) + 1] = osg::Vec3f(max_vertex.x, min_vertex.y, min_vertex.z);
+//        (*vertices)[(node_id * 8) + 2] = osg::Vec3f(max_vertex.x, min_vertex.y, max_vertex.z);
+//        (*vertices)[(node_id * 8) + 3] = osg::Vec3f(min_vertex.x, min_vertex.y, max_vertex.z);
+//        (*vertices)[(node_id * 8) + 4] = osg::Vec3f(min_vertex.x, max_vertex.y, min_vertex.z);
+//        (*vertices)[(node_id * 8) + 5] = osg::Vec3f(max_vertex.x, max_vertex.y, min_vertex.z);
+//        (*vertices)[(node_id * 8) + 6] = osg::Vec3f(max_vertex.x, max_vertex.y, max_vertex.z);
+//        (*vertices)[(node_id * 8) + 7] = osg::Vec3f(min_vertex.x, max_vertex.y, max_vertex.z);
+//        (*indices)[(node_id * 12) + 0] = (node_id * 8) + 0;   (*indices)[(node_id * 12) + 1] = (node_id * 8) + 1;
+//        (*indices)[(node_id * 12) + 2] = (node_id * 8) + 1;   (*indices)[(node_id * 12) + 3] = (node_id * 8) + 2;
+//        (*indices)[(node_id * 12) + 4] = (node_id * 8) + 2;   (*indices)[(node_id * 12) + 5] = (node_id * 8) + 3;
+//        (*indices)[(node_id * 12) + 6] = (node_id * 8) + 3;   (*indices)[(node_id * 12) + 7] = (node_id * 8) + 0;
+//        (*indices)[(node_id * 12) + 8] = (node_id * 8) + 4;   (*indices)[(node_id * 12) + 9] = (node_id * 8) + 5;
+//        (*indices)[(node_id * 12) + 10] = (node_id * 8) + 5;  (*indices)[(node_id * 12) + 11] = (node_id * 8) + 6;
+//        (*indices)[(node_id * 12) + 12] = (node_id * 8) + 6;  (*indices)[(node_id * 12) + 13] = (node_id * 8) + 7;
+//        (*indices)[(node_id * 12) + 14] = (node_id * 8) + 7;  (*indices)[(node_id * 12) + 15] = (node_id * 8) + 4;
+//        (*indices)[(node_id * 12) + 16] = (node_id * 8) + 0;  (*indices)[(node_id * 12) + 17] = (node_id * 8) + 4;
+//        (*indices)[(node_id * 12) + 18] = (node_id * 8) + 1;  (*indices)[(node_id * 12) + 19] = (node_id * 8) + 5;
+//        (*indices)[(node_id * 12) + 20] = (node_id * 8) + 2;  (*indices)[(node_id * 12) + 21] = (node_id * 8) + 6;
+//        (*indices)[(node_id * 12) + 22] = (node_id * 8) + 3;  (*indices)[(node_id * 12) + 23] = (node_id * 8) + 7;
+//    }
+//    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+//    colors->push_back(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
+//    setVertexArray(vertices.get());
+//    setColorArray(colors.get());
+//    setColorBinding(osg::Geometry::BIND_OVERALL);
+//    getOrCreateStateSet()->setAttributeAndModes(new osg::LineWidth(1.0f), osg::StateAttribute::ON);
+//    addPrimitiveSet(indices.get());
+//}
+
+//unsigned int program = glCreateProgram();
+    //unsigned int vs = CompileShader(GL_VERTEX_SHADER, vis_line_vs_source, 0);
+    //unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, vis_line_fs_source, 0);
+    //glAttachShader(program, vs);
+    //glAttachShader(program, fs);
+    //glLinkProgram(program);
+    //glValidateProgram(program);
+    //glDeleteProgram(vs);
+    //glDeleteProgram(fs);
+    //glUseProgram(program);
+
+    //GLuint ibo = bvh_res.gl_id;
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    //context_->bind_program(vis_line_shader_);
+    //vis_line_shader_->uniform("mvp_matrix", scm::math::mat4f(model_view_projection_matrix));
+    //context_->apply_program();
+    //scm::gl::buffer_ptr index_buffer = device_->create_buffer(scm::gl::BIND_INDEX_BUFFER, scm::gl::USAGE_STREAM_DRAW, sizeof(bvh_res.idx_serialized), bvh_res.idx_serialized);
+    //context_->bind_index_buffer(index_buffer, scm::gl::PRIMITIVE_LINE_LIST, scm::gl::TYPE_INT, 0);
+    //context_->apply();
+
+    //context_->draw_elements(1, bvh_res.idx_serialized[node_slot_aggregate.node_id_ * bvh_res.idx_per_node], 12);
+    //glDrawElements(GL_LINES, 24, GL_STREAM_DRAW, bvh_res.idx_arr[node_slot_aggregate.node_id_]);
+    //glDrawElements(GL_LINES, bvh_res.idx_per_node, GL_STREAM_DRAW, bvh_res.idx_arr[node_slot_aggregate.node_id_]);
+
+    //GLuint ibo;
+    //glGenBuffers(1, &ibo);
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, bvh_res.idx_per_node * 3 * sizeof(int), bvh_res.idx_serialized, GL_STREAM_DRAW);
+    //float* mvp = scm::math::mat4f(model_view_projection_matrix).data_array;
+    //unsigned int program = glCreateProgram();
+    //unsigned int vs = CompileShader(GL_VERTEX_SHADER, vis_line_vs_source, 0);
+    //unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, vis_line_fs_source, 0);
+    //glAttachShader(program, vs);
+    //glAttachShader(program, fs);
+    //glLinkProgram(program);
+    //glValidateProgram(program);
+    //glDeleteProgram(vs);
+    //glDeleteProgram(fs);
+    //glUseProgram(program);
+    //glEnableVertexAttribArray(0);
+
+
+    // bind program, set state and set uniforms
+    //context_->bind_program(vis_line_shader_);
+    //_plugin->set_uniforms(vis_line_shader_);
+    //lamure::context_t context_id = controller->deduce_context_id(lmr_ctx);
+    //scm::math::mat4d projection_matrix = scm::math::mat4d(gl_projection_matrix_d);
+    //scm::math::mat4d view_matrix = gl_view_matrix_d;
+    //for (int32_t model_id = 0; model_id < num_models_; ++model_id) {
+    //    bool draw = true;
+    //    auto bvh_res = bvh_resources_[model_id];
+    //    lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
+    //    lamure::ren::cut& cut = cuts->get_cut(lmr_ctx, lmr_ctx, m_id);
+    //    std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
+    //    const lamure::ren::bvh* bvh = database->get_model(m_id)->get_bvh();
+    //    if (draw) {
+    //        //uniforms per model
+    //        scm::math::mat4d model_matrix = model_info_.model_transformations_[model_id];
+    //        scm::math::mat4d mvp = projection_matrix * view_matrix * model_matrix;
+    //        vis_line_shader_->uniform("mvp_matrix", scm::math::mat4f(mvp));
+    //        std::vector<scm::gl::boxf>const& bounding_box_vector = bvh->get_bounding_boxes();
+    //        scm::gl::frustum frustum_by_model = scm_camera_->get_frustum_by_model(scm::math::mat4f(model_matrix));
+    //        if (bvh_res.num_primitives_ > 0) {
+    //            context_->bind_vertex_array(bvh_res.array_);
+    //            context_->apply();
+    //            for (auto const& node_slot_aggregate : renderable) {
+    //                uint32_t node_culling_result = scm_camera_->cull_against_frustum(frustum_by_model, bounding_box_vector[node_slot_aggregate.node_id_]);
+    //                if (node_culling_result != 1) {
+    //                    context_->draw_arrays(scm::gl::PRIMITIVE_LINE_LIST, node_slot_aggregate.node_id_ * 24, 24);
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
