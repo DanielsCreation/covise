@@ -139,7 +139,7 @@
       
       <Plugin>
         <LamurePointCloud>
-          <lmr value="C:/Users/Daniel/Desktop/Ablage/School_one.lmr" />
+          <lmr value="C:/Users/Daniel/Documents/Set1_prov/nkm.lmr" />
         </LamurePointCloud>
 
         <AKToolbar value="false" menu="false">

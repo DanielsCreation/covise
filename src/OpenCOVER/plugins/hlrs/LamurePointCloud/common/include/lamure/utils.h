@@ -34,9 +34,11 @@ std::vector<Base*> vector_to_ptr(std::vector<Derived>& input)
     return result;
 }
 
-COMMON_DLL boost::filesystem::path add_to_path(const boost::filesystem::path& path,
-                                  const std::string& addition);
+//COMMON_DLL boost::filesystem::path add_to_path(const boost::filesystem::path& path,
+//                                  const std::string& addition);
 
+boost::filesystem::path add_to_path(const boost::filesystem::path& path,
+    const std::string& addition);
 
 } // namespace lamure
 

@@ -115,7 +115,7 @@ public:
     void init_render_states();
     void init_camera();
     void lamure_display();
-    void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::gl::program_ptr shader);
+    void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::math::mat4d view_matrix, scm::math::mat4d projection_matrix, scm::gl::program_ptr shader);
     void sync_cameras(lmr_camera* lamure_camera, osg::Camera* osg_camera);
 
     // util
@@ -213,10 +213,12 @@ public:
 
 
 protected:
-    ui::ButtonGroup* bg2 = nullptr;
-    ui::ButtonGroup* fileButtonGroup = nullptr;
-    ui::Menu* loadMenu = nullptr;
     ui::Group* loadGroup = nullptr;
+    ui::Group* model_grp = nullptr;
+    ui::Group* viewGroup = nullptr;
+    ui::ButtonGroup* bg2 = nullptr;
+    ui::ButtonGroup* bg_models = nullptr;
+    ui::Menu* loadMenu = nullptr;
     ui::Button* rotPointsButton = nullptr;
     ui::Button* rotAxisButton = nullptr;
     ui::Button* moveButton = nullptr;
@@ -225,9 +227,12 @@ protected:
     ui::Button* deselectButton = nullptr;
     ui::Button* createNurbsSurface = nullptr;
     //ui::Button *deleteButton = nullptr;
-    ui::Group* viewGroup = nullptr;
     ui::Button* adaptLODButton = nullptr;
-    ui::Slider* pointSizeSlider = nullptr;
+
+    ui::Slider* maxRadiusSlider = nullptr;
+    ui::Slider* scaleRadiusSlider = nullptr;
+
+    ui::SelectionList* shader_list = nullptr;
 
     ui::Slider* lodFarDistanceSlider = nullptr;
     ui::Slider* lodNearDistanceSlider = nullptr;

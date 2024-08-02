@@ -13,9 +13,12 @@
 
 namespace lamure {
 
-COMMON_DLL const size_t get_total_memory();
-COMMON_DLL const size_t get_available_memory(const bool use_buffers_cache = true);
-COMMON_DLL const size_t get_process_used_memory();
+//COMMON_DLL const size_t get_total_memory();
+//COMMON_DLL const size_t get_available_memory(const bool use_buffers_cache = true);
+//COMMON_DLL const size_t get_process_used_memory();
+const size_t get_total_memory();
+const size_t get_available_memory(const bool use_buffers_cache = true);
+const size_t get_process_used_memory();
 
 } // namespace lamure
 

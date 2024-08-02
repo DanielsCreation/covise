@@ -34,4 +34,4 @@ macro(pcl_project_files)
 
     list(APPEND ${out_file_list} ${out_proj_files})
 
-endmacro(scm_project_files)
+endmacro(pcl_project_files)
