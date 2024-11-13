@@ -88,7 +88,7 @@ management_base(std::vector<std::string> const& model_filenames,
     std::cout << "model center : " << center << std::endl;
     std::cout << "model size : " << reset_diameter << std::endl;
 
-    active_camera_ = new lamure::ren::camera(0, reset_matrix, reset_diameter, false, false);
+    active_camera_ = new lamure::ren::camera(0, reset_matrix, reset_diameter);
 
     // Increase camera movement speed for debugging purpose.
     active_camera_->set_dolly_sens_(20.5f);

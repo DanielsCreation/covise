@@ -1939,7 +1939,7 @@ void VRViewer::frame(double simulationTime)
 
 void VRViewer::startThreading()
 {
-    //DebugBreak();
+    DebugBreak();
     if (_threadsRunning)
         return;
 

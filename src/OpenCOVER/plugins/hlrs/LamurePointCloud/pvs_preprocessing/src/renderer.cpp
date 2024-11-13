@@ -570,9 +570,6 @@ initialize_schism_device_and_shaders(int resX, int resY)
     }
 
 
-    scm::out() << *device_ << scm::log::end;
-
-
     using namespace scm;
     using namespace scm::gl;
     using namespace scm::math;

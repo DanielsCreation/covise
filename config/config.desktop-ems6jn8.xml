@@ -27,8 +27,8 @@
       <TwoSide value="on" />
       <TransparencyMode value="sorted_blended" />
       <Headlight value="on" />
-      <RenderOnMaster value="true" />
-      <Statistics value="true" />
+      <RenderOnMaster value="on" />
+      <Statistics value="off" />
       <DebugLevel value="2" />
       <ContinuousRendering value="off" />
       <trackedHMD value="off" />
@@ -43,7 +43,7 @@
       <NumPBOs value="0" />
       <Stereo value="off" />
       <Stencil value="off" />
-      <CheckForOpenGLErrors value="false" />
+      <CheckForOpenGLErrors value="off" />
       <StencilBits value="8" />
       <Stencil value="true" />
       <Notify value="INFO" />
@@ -52,9 +52,8 @@
       
       <!--GLVersion value="3.2" /> -->
       
-      <!-- 
-      <TabletUI host="localhost" /> 
-      -->
+      <TabletUI value="off" host="localhost" /> 
+      
       <PipeConfig>
         <Pipe name="0" useDISPLAY="false" />
       </PipeConfig>
@@ -94,7 +93,7 @@
       </Input>
       
 
-      <Menu>Visible
+      <Menu>
         <Visible value="false" />
         <Position x="900" y="0" z="700" />
         <Size value=".7" />
@@ -139,7 +138,7 @@
       
       <Plugin>
         <LamurePointCloud>
-          <lmr value="C:/Users/Daniel/Documents/Set1_prov/nkm.lmr" />
+          <lmr value="C:/src/covise/config/a_config.lmr" />
         </LamurePointCloud>
 
         <AKToolbar value="false" menu="false">

@@ -18,10 +18,10 @@
 #include <cover/PluginMenu.h>
 #include <cover/ui/ButtonGroup.h>
 #include <cover/ui/Button.h>
+#include <cover/ui/Label.h>
 #include <cover/ui/Menu.h>
 #include <cover/ui/Slider.h>
 #include <cover/ui/Action.h>
-#include <cover/ui/Menu.h>
 #include <cover/ui/Manager.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/SelectionList.h>
@@ -90,7 +90,7 @@ public:
     ~LamurePointCloudPlugin();
 
     static LamurePointCloudPlugin* instance();
-    bool init();
+    bool init2();
     void config();
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
@@ -107,6 +107,7 @@ public:
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
     void create_pcl_resources();
+    void create_aux_representation();
     void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
     void draw_brush(scm::gl::program_ptr shader);
     void set_uniforms(scm::gl::program_ptr shader);
@@ -137,10 +138,9 @@ public:
     void load_settings(const std::string &filename);
     bool rendering_ = false;
 
-    
-
     HWND hwnd_cover;
     HWND hwnd_opencover;
+    HWND hwnd_current;
 
     HGLRC HGLRC_cover;
     HGLRC HGLRC_opencover; 
@@ -164,7 +164,6 @@ private:
     void createGeodes(osg::Group*, const std::string&);
     bool adaptLOD = true; // LOD enable/disable
     
-
     osg::Point* pointstate;
     osg::StateSet* stateset;
     osg::BoundingBox box;
@@ -182,6 +181,7 @@ private:
 
 
 
+
 public:
     void printNodePath(osg::ref_ptr<osg::Node> pointer);
     std::vector<vector<float>> getSerializedBvhMinMax(const std::vector<scm::gl::boxf>);
@@ -193,13 +193,11 @@ public:
     ui::Menu* menu = nullptr;
     ui::Group* group = nullptr;
 
-    ui::ButtonGroup* bg1 = nullptr;
-
-    ui::Button* b11 = nullptr;
-    ui::Button* b12 = nullptr;
-    ui::Button* b13 = nullptr;
-    ui::Button* b14 = nullptr;
-    ui::Button* b15 = nullptr;
+    ui::Button* bounding_box_show_button = nullptr;
+    ui::Button* frustum_show_button = nullptr;
+    ui::Button* coord_show_button = nullptr;
+    ui::Button* sync_cam_button = nullptr;
+    ui::Button* notify_button = nullptr;
 
     osg::ref_ptr<osg::Geometry> _triangleGeometry;
     osg::ref_ptr<osg::StateSet> _triangleStateSet;
@@ -210,14 +208,46 @@ public:
     osg::ref_ptr<osg::Geometry> _pointGeometry;
     osg::ref_ptr<osg::StateSet> _pointStateSet;
 
+    // Slider-Deklarationen
+
+    ui::Slider* cameraPosXSlider = nullptr;
+    ui::Slider* cameraPosYSlider = nullptr;
+    ui::Slider* cameraPosZSlider = nullptr;
+
+    ui::Slider* modelPosXSlider = nullptr;
+    ui::Slider* modelPosYSlider = nullptr;
+    ui::Slider* modelPosZSlider = nullptr;
+
+    ui::Slider* rotationXSlider = nullptr;
+    ui::Slider* rotationYSlider = nullptr;
+    ui::Slider* rotationZSlider = nullptr;
+
+    // UI-Elemente für Kamera X-Position
+    ui::Label* cameraPosXLabel;
+    ui::Button* cameraPosXPlusButton;
+    ui::Button* cameraPosXMinusButton;
+
+    // UI-Elemente für Kamera Y-Position
+    ui::Label* cameraPosYLabel;
+    ui::Button* cameraPosYPlusButton;
+    ui::Button* cameraPosYMinusButton;
+
+    // UI-Elemente für Kamera Z-Position
+    ui::Label* cameraPosZLabel;
+    ui::Button* cameraPosZPlusButton;
+    ui::Button* cameraPosZMinusButton;
+
+    scm::math::vec3d cameraPosition;
+
+    scm::math::vec3d rotationAngles = scm::math::vec3d(0.0, 0.0, 0.0);
+
+    void updateModelRotation();
 
 
 protected:
     ui::Group* loadGroup = nullptr;
     ui::Group* model_grp = nullptr;
     ui::Group* viewGroup = nullptr;
-    ui::ButtonGroup* bg2 = nullptr;
-    ui::ButtonGroup* bg_models = nullptr;
     ui::Menu* loadMenu = nullptr;
     ui::Button* rotPointsButton = nullptr;
     ui::Button* rotAxisButton = nullptr;
@@ -240,9 +270,6 @@ protected:
 
 
     void setUpStateSets();
-
-
-
 };
 
 
@@ -285,11 +312,7 @@ static unsigned int CompileShader(unsigned int type, const std::string& source, 
         gl_api->glDeleteProgram(id);
         return 0;
     };
-
     return id;
 }
-
-
-
 
 #endif

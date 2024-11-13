@@ -379,7 +379,6 @@ coMenu *coVRPluginSupport::getMenu()
         m_vruiMenu->setTransformMatrix(&menuMatrix);
         m_vruiMenu->setScale(size * (getSceneSize() / 2500.0));
     }
-
     return m_vruiMenu;
 }
 

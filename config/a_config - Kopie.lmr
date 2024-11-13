@@ -1,0 +1,32 @@
+\Users\Daniel\Documents\Set1_prov\nkm.bvh
+# width : 64
+# height : 64
+# frame_div : 64
+# vram : 64
+# ram : 64
+# near : 64
+# far : 64
+# fov : 64
+# splatting : 0
+# amma_correction : 0
+speed : 300
+pvs_culling : 0
+use_pvs : 0
+lod_point_scale : 1.0
+# aux_point_size : 0
+# aux_point_distance : 1
+# aux_focal_length : 1
+# max_brush_size : 10
+lod_error : 10.0
+provenance : 1.0
+use_pvs : 0
+lod_point_scale : 0
+show_normals : 0
+show_accuracy : 0
+show_radius_deviation : 0
+show_output_sensitivity : 0
+show_sparse : 0
+show_views : 0
+show_bvhs : false
+show_pvs : true
+max_radius : 5.0

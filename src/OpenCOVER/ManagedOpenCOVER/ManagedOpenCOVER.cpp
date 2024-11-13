@@ -189,7 +189,6 @@ void coOpenCOVERWindow::init(IntPtr window, array<System::String ^> ^ args)
 
 
     m_hWnd = (HWND)window.ToPointer();
-
     HDC m_hDC;
     m_hDC = GetDC(m_hWnd);
     m_dScaleX = GetDeviceCaps(m_hDC, LOGPIXELSX) / 96.0;

@@ -849,6 +849,14 @@ bool OpenCOVER::init()
     }
     double loadEnd = cover->currentTime();
 
+    std::cout << "wglGetCurrentContext(): " << wglGetCurrentContext() << std::endl;
+    std::cout << "wglGetCurrentDC(): " << wglGetCurrentDC() << std::endl;
+    std::cout << "GetDC(FindWindow(NULL, 'COVER')): " << GetDC(FindWindow(NULL, "COVER")) << std::endl;
+
+    //wglCreateContext(GetDC(FindWindow(NULL, "COVER")));
+
+
+
     coVRPluginList::instance()->init2();
     double init2End = cover->currentTime();
 
