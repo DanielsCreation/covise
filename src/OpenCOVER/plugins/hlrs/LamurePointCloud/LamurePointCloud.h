@@ -55,6 +55,8 @@
 #include <lamure/lmr_camera.h>
 #include <lamure/ren/trackball.h>
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 namespace opencover {
 namespace ui {
@@ -102,7 +104,7 @@ public:
 
     // shared functions
     void init_lamure_shader();
-    void init_rtt_camera();
+    void init_pcl_camera();
     void sync_cameras();
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
@@ -111,9 +113,11 @@ public:
     void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
     void draw_brush(scm::gl::program_ptr shader);
     void set_uniforms(scm::gl::program_ptr shader);
+    void set_gl_uniforms(GLuint program);
     float get_atlas_scale_factor();
     void create_framebuffers();
     void init_render_states();
+    void init_text_rendering();
     void init_camera();
     void lamure_display();
     void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::math::mat4d view_matrix, scm::math::mat4d projection_matrix, scm::gl::program_ptr shader);
@@ -172,9 +176,16 @@ private:
     osg::Vec3Array* colors;
     osg::ElementBufferObject* primitiveBufferArray;
     PointSet* pointSet = nullptr;
+    osg::ref_ptr<osg::Camera> pcl_camera;
+    osg::ref_ptr<osg::Camera> hud_camera;
     osg::ref_ptr<osg::Group> LamureGroup;
     osg::ref_ptr<osg::Node> file;
     osg::ref_ptr<osg::Geode> geode;
+    osg::ref_ptr<osg::Geode> text_geode;
+    osg::ref_ptr<osg::Geode> triangle_geode;
+    osg::ref_ptr<osg::Geode> frustum_geode;
+    osg::ref_ptr<osg::Geode> point_geode;
+    osg::ref_ptr<osg::Geode> boundingbox_geode;
     osg::ref_ptr<LamureGeometry> geometry;
     osg::ref_ptr<LamureDrawable> draw1;
     osg::ref_ptr<osg::Switch> _switch;
@@ -188,16 +199,17 @@ public:
     std::vector<float> getBoxCorners(scm::gl::boxf);
     float* VecToArr(std::vector<std::vector<float>> vec);
     int* VecToArr(std::vector<std::vector<int>> vec);
-    osg::ref_ptr<struct GLGrp> gl_grp;
     osg::ref_ptr<osg::MatrixTransform> transform;
     ui::Menu* menu = nullptr;
     ui::Group* group = nullptr;
 
-    ui::Button* bounding_box_show_button = nullptr;
-    ui::Button* frustum_show_button = nullptr;
-    ui::Button* coord_show_button = nullptr;
-    ui::Button* sync_cam_button = nullptr;
+    ui::Button* pointcloud_button = nullptr;
+    ui::Button* boundingbox_button = nullptr;
+    ui::Button* frustum_button = nullptr;
+    ui::Button* coord_button = nullptr;
+    ui::Button* sync_button = nullptr;
     ui::Button* notify_button = nullptr;
+    ui::Button* text_button = nullptr;
 
     osg::ref_ptr<osg::Geometry> _triangleGeometry;
     osg::ref_ptr<osg::StateSet> _triangleStateSet;
@@ -242,7 +254,8 @@ public:
     scm::math::vec3d rotationAngles = scm::math::vec3d(0.0, 0.0, 0.0);
 
     void updateModelRotation();
-
+    scm::math::mat4f createSwapYZMatrix();
+    scm::math::mat4d createSwapYZ();
 
 protected:
     ui::Group* loadGroup = nullptr;
@@ -269,7 +282,7 @@ protected:
 
 
 
-    void setUpStateSets();
+    void set_up_state_sets();
 };
 
 

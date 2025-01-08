@@ -294,8 +294,8 @@ private:
 
     float m_floorHeight;
     WireframeMode m_wireframe;
-    bool m_textured = true; /* =true: textures are drawn as intended */
-    bool m_shaders = true; /* =true: shaders are applied */
+    bool m_textured = false; /* =true: textures are drawn as intended */
+    bool m_shaders = false; /* =true: shaders are applied */
     bool m_coordAxis = false; /* =true: coord Axis will be drawn */
     bool m_showMenu = true;
     bool m_showObjects = true;

@@ -33,6 +33,6 @@
 show_pvs : 0.0
 lod_point_scale : 1.0
 lod_error : 0.0
-provenance : 0.0
+provenance : 1.0
 scale_radius : 1.0
 max_radius : 0.5

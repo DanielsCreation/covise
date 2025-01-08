@@ -26,7 +26,7 @@
       <ScaleWithInteractors value="on"/>
       <TwoSide value="on" />
       <TransparencyMode value="sorted_blended" />
-      <Headlight value="on" />
+      <Headlight value="off" />
       <RenderOnMaster value="on" />
       <Statistics value="off" />
       <DebugLevel value="2" />
@@ -43,7 +43,7 @@
       <NumPBOs value="0" />
       <Stereo value="off" />
       <Stencil value="off" />
-      <CheckForOpenGLErrors value="off" />
+      <CheckForOpenGLErrors value="on" />
       <StencilBits value="8" />
       <Stencil value="true" />
       <Notify value="INFO" />
