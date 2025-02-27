@@ -96,8 +96,8 @@ gpu_access::gpu_access(scm::gl::render_device_ptr device, const slot_t num_slots
     if(has_layout_)
     {
 
-        std::cout << data_provenance.get_size_in_bytes() << std::endl;
-        std::cout << lamure::ren::policy::get_instance()->size_of_provenance() << std::endl;
+        //std::cout << data_provenance.get_size_in_bytes() << std::endl;
+        //std::cout << lamure::ren::policy::get_instance()->size_of_provenance() << std::endl;
 
         std::vector<scm::gl::vertex_format::element> vertex_format;
         vertex_format.push_back(scm::gl::vertex_format::element(0, 0, scm::gl::TYPE_VEC3F, size_of_surfel_));

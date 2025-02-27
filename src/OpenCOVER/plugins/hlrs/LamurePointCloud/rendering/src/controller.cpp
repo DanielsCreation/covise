@@ -6,8 +6,6 @@
 // http://www.uni-weimar.de/medien/vr
 
 #include <lamure/ren/controller.h>
-#include <LamureDevice.h>
-
 #include <chrono>
 
 namespace lamure

@@ -11,6 +11,8 @@
 #include <lamure/types.h>
 #include <lamure/utils.h>
 #include <unordered_map>
+#include <chrono>
+
 
 #include <lamure/ren/data_provenance.h>
 #include <lamure/ren/cut_update_pool.h>
@@ -83,7 +85,8 @@ class controller
     std::unordered_map<context_t, std::queue<bool>> reset_flags_history_;
 
     size_t ms_since_last_node_upload_;
-    std::chrono::time_point<std::chrono::system_clock> latest_timestamp_;
+    std::chrono::time_point<std::chrono::system_clock> latest_timestamp_ = std::chrono::system_clock::now();
+
 };
 }
 } // namespace lamure

@@ -97,22 +97,27 @@ public:
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
     void preFrame();
-    //bool update();
+    bool update();
     void postFrame();
     //void preDraw();
     size_t query_video_memory_in_mb();
 
     // shared functions
     void init_lamure_shader();
+    void read_lamure_shader();
     void init_pcl_camera();
+    void init_coord_resource();
     void sync_cameras();
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
     void create_pcl_resources();
+    void create_frustum_resources();
     void create_aux_representation();
     void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
     void draw_brush(scm::gl::program_ptr shader);
     void set_uniforms(scm::gl::program_ptr shader);
+    void add_pointcloud_uniforms(osg::ref_ptr<osg::StateSet> stateset);
+    void update_pointcloud_uniforms(osg::ref_ptr<osg::StateSet> stateset);
     void set_gl_uniforms(GLuint program);
     float get_atlas_scale_factor();
     void create_framebuffers();
@@ -171,7 +176,6 @@ private:
     osg::Point* pointstate;
     osg::StateSet* stateset;
     osg::BoundingBox box;
-    osg::MatrixTransform* planetTrans;
     osg::Vec3Array* points;
     osg::Vec3Array* colors;
     osg::ElementBufferObject* primitiveBufferArray;
@@ -182,19 +186,25 @@ private:
     osg::ref_ptr<osg::Node> file;
     osg::ref_ptr<osg::Geode> geode;
     osg::ref_ptr<osg::Geode> text_geode;
-    osg::ref_ptr<osg::Geode> triangle_geode;
+    osg::ref_ptr<osg::Geode> coord_geode;
     osg::ref_ptr<osg::Geode> frustum_geode;
-    osg::ref_ptr<osg::Geode> point_geode;
+    osg::ref_ptr<osg::Geode> pointcloud_geode;
     osg::ref_ptr<osg::Geode> boundingbox_geode;
     osg::ref_ptr<LamureGeometry> geometry;
     osg::ref_ptr<LamureDrawable> draw1;
     osg::ref_ptr<osg::Switch> _switch;
+    osg::ref_ptr<osg::StateSet> pointcloud_stateset;
+    osg::ref_ptr<osg::StateSet> boundingbox_stateset;
+    osg::ref_ptr<osg::StateSet> frustum_stateset;
+    osg::ref_ptr<osg::StateSet> coord_stateset;
+    osg::ref_ptr<osg::StateSet> text_stateset;
 
 
 
 
 public:
     void printNodePath(osg::ref_ptr<osg::Node> pointer);
+    osg::ref_ptr<osg::Program> createOsgProgram(const std::string& vertPath, const std::string& geomPath, const std::string& fragPath);
     std::vector<vector<float>> getSerializedBvhMinMax(const std::vector<scm::gl::boxf>);
     std::vector<float> getBoxCorners(scm::gl::boxf);
     float* VecToArr(std::vector<std::vector<float>> vec);
