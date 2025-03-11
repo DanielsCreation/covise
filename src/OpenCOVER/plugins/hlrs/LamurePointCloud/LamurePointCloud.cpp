@@ -610,6 +610,7 @@ vt_info vt_;
 struct render_info {
 	uint64_t rendered_splats_{ 0 };
 	uint64_t rendered_nodes_{ 0 };
+	uint64_t rendered_bounding_boxes_{ 0 };
 	float fps_{0.0f};
 };
 render_info render_info_;
@@ -1690,91 +1691,6 @@ scm::math::mat4d gl_mat(GLdouble mat[16]) {
 
 using namespace scm::gl;
 
-/*
-struct CoordDrawCallback : public virtual osg::Drawable::DrawCallback
-{
-	CoordDrawCallback(osg::ref_ptr<osg::StateSet> coords_stateset, LamurePointCloudPlugin* plugin)
-		: _stateset(coords_stateset),
-		_plugin(plugin),
-		_initialized(false)
-	{
-		std::cout << "CoordDrawCallback()" << std::endl;
-	}
-
-	void initializeResources() const
-	{
-		GLuint vbo;
-		glGenBuffers(1, &vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-		GLuint vao;
-		glGenVertexArrays(1, &vao);
-		glBindVertexArray(vao);
-		glBufferData(GL_ARRAY_BUFFER, coord_resource_.vertices_.size() * sizeof(float), coord_resource_.vertices_.data(), GL_STATIC_DRAW);
-
-		GLuint ibo;
-		glGenBuffers(1, &ibo);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, coord_resource_.idx_.size() * sizeof(unsigned short), coord_resource_.idx_.data(), GL_STATIC_DRAW);
-
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		coord_resource_.vao_ = vao;
-		coord_resource_.vbo_ = vbo;
-		coord_resource_.ibo_ = ibo;
-		coord_resource_.program_ = box_resource_.program_;
-
-	}
-
-	virtual void drawImplementation(osg::RenderInfo& renderInfo,
-		const osg::Drawable* drawable) const override
-	{
-
-		if (!_initialized)
-		{
-			initializeResources();
-		}
-
-
-		GLdouble gl_mvm[16];
-		GLdouble gl_pm[16];
-
-		glGetDoublev(GL_MODELVIEW_MATRIX, gl_mvm);
-		glGetDoublev(GL_PROJECTION_MATRIX, gl_pm);
-
-		scm::math::mat4d view_matrix = scm::math::mat4d(gl_mvm[0], gl_mvm[1], gl_mvm[2], gl_mvm[3], gl_mvm[4], gl_mvm[5], gl_mvm[6], gl_mvm[7], gl_mvm[8], gl_mvm[9], gl_mvm[10], gl_mvm[11], gl_mvm[12], gl_mvm[13], gl_mvm[14], gl_mvm[15]);
-		scm::math::mat4d projection_matrix = scm::math::mat4d(gl_pm[0], gl_pm[1], gl_pm[2], gl_pm[3], gl_pm[4], gl_pm[5], gl_pm[6], gl_pm[7], gl_pm[8], gl_pm[9], gl_pm[10], gl_pm[11], gl_pm[12], gl_pm[13], gl_pm[14], gl_pm[15]);
-		scm::math::mat4d mvp_matrix = projection_matrix * view_matrix;
-		
-		float* mvp = scm::math::mat4f(mvp_matrix).data_array;
-
-		glBindVertexArray(coord_resource_.vao_);
-		glBindBuffer(GL_ARRAY_BUFFER, coord_resource_.vbo_);
-		glBufferData(GL_ARRAY_BUFFER, coord_resource_.vertices_.size() * sizeof(float), coord_resource_.vertices_.data(), GL_STATIC_DRAW);
-		//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, coord_resource_.ibo_);
-		//glBufferData(GL_ELEMENT_ARRAY_BUFFER, coord_resource_.idx_.size() * sizeof(float), coord_resource_.idx_.data(), GL_STATIC_DRAW);
-		//glUseProgram(coord_resource_.program_);
-		//glUniformMatrix4fv(glGetUniformLocation(coord_resource_.program_, "mvp_matrix"), 1, GL_FALSE, &mvp[0]);
-		_stateset->getUniform("mvp_matrix")->set(matConv4F(scm::math::mat4f(mvp_matrix)));
-		//glUniform4f(glGetUniformLocation(coord_resource_.program_, "in_color"), 1,0,0,1);
-		//glEnableVertexAttribArray(0);
-		//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glDrawElements(GL_LINES, 6, GL_UNSIGNED_SHORT, nullptr);
-		glBindVertexArray(0);
-		//glDisableVertexAttribArray(0);
-
-	}
-
-	mutable bool _initialized;
-	osg::ref_ptr<osg::StateSet> _stateset;
-	LamurePointCloudPlugin* _plugin;
-};
-*/
 struct CoordGeometry : public osg::Geometry
 {
 	CoordGeometry(osg::ref_ptr<osg::StateSet> stateset, LamurePointCloudPlugin* plugin)
@@ -1807,150 +1723,6 @@ struct CoordGeometry : public osg::Geometry
 };
 
 
-
-struct FrustumDrawCallback : public virtual osg::Drawable::DrawCallback
-{
-	FrustumDrawCallback(osg::ref_ptr<osg::StateSet> frustum_stateset, LamurePointCloudPlugin* plugin)
-		: _stateset(frustum_stateset),
-		_plugin(plugin),
-		_initialized(false)
-	{
-		std::cout << "FrustumDrawCallback()" << std::endl;
-	}
-
-	void initializeResources() const
-	{
-		std::cout << "create_frustum_resources() " << std::endl;
-
-		vector<float> corners_;
-		std::vector<scm::math::vec3d> corner_values = scm_camera_->get_frustum_corners();
-		for (uint64_t i = 0; i < corner_values.size(); ++i) {
-			auto vv = scm::math::vec3f(corner_values[i]);
-			corners_.insert(corners_.end(), { vv.x, vv.y, vv.z });
-		}
-		frustum_resource_.vertices_.push_back(corners_);
-		std::vector<float> vertices_ = frustum_resource_.vertices_[0];
-
-		//GLuint vao_f;
-		//glGenVertexArrays(1, &vao_f);
-		//glBindVertexArray(vao_f);
-		//GLuint ibo_f;
-		//glGenBuffers(1, &ibo_f);
-		//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_f);
-		//glBufferData(GL_ELEMENT_ARRAY_BUFFER, frustum_resource_.idx_.size() * sizeof(unsigned short), frustum_resource_.idx_.data(), GL_STATIC_DRAW);
-		//GLuint vbo_f;
-		//glGenBuffers(1, &vbo_f);
-		//glBindBuffer(GL_ARRAY_BUFFER, vbo_f);
-		//glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertices_.size(), vertices_.data(), GL_STATIC_DRAW);
-		//glEnableVertexAttribArray(0);
-		//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-		//unsigned int program = glCreateProgram();
-		//unsigned int vs = CompileShader(GL_VERTEX_SHADER, vis_line_bb_vs_source, 0);
-		//unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, vis_line_bb_fs_source, 0);
-		//glAttachShader(program, vs);
-		//glAttachShader(program, fs);
-		//glLinkProgram(program);
-		//glValidateProgram(program);
-		//glDeleteShader(vs);
-		//glDeleteShader(fs);
-		//frustum_resource_.vao_ = vao_f;
-		//frustum_resource_.vbo_ = vbo_f;
-		//frustum_resource_.ibo_ = ibo_f;
-		//frustum_resource_.program_ = program;
-		//glBindVertexArray(0);
-		_initialized = true;
-	}
-
-	virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
-	{
-		if (_plugin->notify_button->state()) { std::cout << "[Notify toggle] FrustumDrawCallback::drawImplementation()" << std::endl; }
-
-		if (!_initialized)
-		{
-			initializeResources();
-		}
-		//BACKUP_GL_STATE();
-		//glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-		GLdouble gl_mvm[16];
-		GLdouble gl_pm[16];
-
-		glGetDoublev(GL_MODELVIEW_MATRIX, gl_mvm);
-		glGetDoublev(GL_PROJECTION_MATRIX, gl_pm);
-
-		scm::math::mat4d gl_view_matrix_d = scm::math::mat4d(gl_mvm[0], gl_mvm[1], gl_mvm[2], gl_mvm[3], gl_mvm[4], gl_mvm[5], gl_mvm[6], gl_mvm[7], gl_mvm[8], gl_mvm[9], gl_mvm[10], gl_mvm[11], gl_mvm[12], gl_mvm[13], gl_mvm[14], gl_mvm[15]);
-		scm::math::mat4d gl_projection_matrix_d = scm::math::mat4d(gl_pm[0], gl_pm[1], gl_pm[2], gl_pm[3], gl_pm[4], gl_pm[5], gl_pm[6], gl_pm[7], gl_pm[8], gl_pm[9], gl_pm[10], gl_pm[11], gl_pm[12], gl_pm[13], gl_pm[14], gl_pm[15]);
-		scm::math::mat4d view_matrix = gl_view_matrix_d;
-		scm::math::mat4d projection_matrix = gl_projection_matrix_d;
-		scm::math::vec3d cam_pos = scm_camera_->get_cam_pos();
-		scm::math::mat4d model_matrix = scm::math::make_translation(cam_pos);
-		scm::math::mat4d mvp_matrix = projection_matrix * view_matrix * model_matrix;
-		scm::math::vec3f model_center = scm::math::vec3f(model_info_.models_center);
-		scm::math::vec3f origin = scm::math::vec3f::zero();
-
-		std::vector<float> points = {
-			origin.x, origin.y, origin.z
-		};
-
-		float* vm = scm::math::mat4f(view_matrix).data_array;
-		float* pm = scm::math::mat4f(projection_matrix).data_array;
-		float* mvp = scm::math::mat4f(mvp_matrix).data_array;
-
-		if (_plugin->notify_button->state()) {
-			std::cout << "[Notify toggle] FrustumDrawCallback::drawImplementation() shader: " << std::endl;
-		}
-
-		//glBindVertexArray(frustum_resource_.vao_);
-		//glUseProgram(frustum_resource_.program_);
-		//glUniformMatrix4fv(glGetUniformLocation(frustum_resource_.program_, "mvp_matrix"), 1, GL_FALSE, &mvp[0]);
-		//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, frustum_resource_.ibo_);
-		//glBindBuffer(GL_ARRAY_BUFFER, frustum_resource_.vbo_);
-
-		//printBufferContents(GL_ELEMENT_ARRAY_BUFFER, frustum_resource_.ibo_, frustum_resource_.idx_.size() * sizeof(unsigned short));
-		//printBufferContents(GL_ARRAY_BUFFER, frustum_resource_.vbo_, sizeof(float) * frustum_resource_.vertices_[0].size());
-		//printVAOAttributes(frustum_resource_.vao_);
-
-		//if (!glIsBuffer(frustum_resource_.vbo_)) { std::cerr << "VBO ist ungültig!" << std::endl; }
-		//if (!glIsBuffer(frustum_resource_.ibo_)) { std::cerr << "IBO ist ungültig!" << std::endl; }
-		//if (!glIsVertexArray(frustum_resource_.vao_)) { std::cerr << "VAO ist ungültig!" << std::endl; }
-
-		//_stateset->getUniform("mvp_matrix")->set(matConv4F(scm::math::mat4f(mvp_matrix)));
-		//glDrawElements(GL_LINES, 16, GL_UNSIGNED_SHORT, nullptr);
-		//glBindVertexArray(0);
-
-
-		/*glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, plane_resource_.ibo_);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, plane_resource_.corners_idx_.size() * sizeof(unsigned short), plane_resource_.corners_idx_.data(), GL_STATIC_DRAW);
-		glDrawElements(GL_TRIANGLES, 8, GL_UNSIGNED_SHORT, nullptr);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);*/
-
-
-		//glBindBuffer(GL_ARRAY_BUFFER, sphere_resource_.vbo_);
-		//glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3, &points[0], GL_STATIC_DRAW);
-		//glEnableVertexAttribArray(0);
-		//glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
-		//glEnable(GL_PROGRAM_POINT_SIZE);
-		//glEnable(GL_POINT_SMOOTH);
-		//glPointSize(10.0f);
-
-		//glUniform4f(glGetUniformLocation(box_resource_.program_, "in_color"), 0.0f, 1.0f, 0.0f, 1.0f);
-		//glDrawArrays(GL_POINTS, 0, 1);
-		//glUniform4f(glGetUniformLocation(box_resource_.program_, "in_color"), 1.0f, 0.0f, 0.0f, 1.0f);
-		//glDrawArrays(GL_POINTS, 1, 1);
-		//glUniform4f(glGetUniformLocation(box_resource_.program_, "in_color"), 0.0f, 0.0f, 1.0f, 1.0f);
-		//glDrawArrays(GL_POINTS, 1, 1);
-		//glBindVertexArray(0);
-
-		//RESTORE_GL_STATE();
-		//glPopAttrib();
-
-	};
-	mutable bool _initialized;
-	osg::ref_ptr<osg::StateSet> _stateset;
-	LamurePointCloudPlugin* _plugin;
-};
-
-
 struct FrustumGeometry : public osg::Geometry
 {
 	FrustumGeometry(osg::ref_ptr<osg::StateSet> stateset, LamurePointCloudPlugin* plugin)
@@ -1965,10 +1737,9 @@ struct FrustumGeometry : public osg::Geometry
 
 		for (const auto& c : frustumCorners)
 		{
-			vertexArray->push_back(osg::Vec3(static_cast<float>(c.x),
-				static_cast<float>(c.y),
-				static_cast<float>(c.z)));
+			vertexArray->push_back(osg::Vec3(static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z)));
 		}
+
 		osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_LINES);
 		indices->push_back(0); indices->push_back(1);
 		indices->push_back(2); indices->push_back(3);
@@ -1980,6 +1751,7 @@ struct FrustumGeometry : public osg::Geometry
 		indices->push_back(5); indices->push_back(7);
 		this->setVertexArray(vertexArray);
 		this->addPrimitiveSet(indices);
+
 		//stateset->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 		//osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(2.0f);
 		//stateset->setAttribute(lineWidth);
@@ -2093,7 +1865,6 @@ struct BoundingBoxDrawCallback : public virtual osg::Drawable::DrawCallback
 			initializeResources();
 		}
 
-		
 		glBindVertexArray(box_resource_.vao_);
 		glBindBuffer(GL_ARRAY_BUFFER, box_resource_.vbo_);
 		//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, box_resource_.ibo_);
@@ -2116,6 +1887,8 @@ struct BoundingBoxDrawCallback : public virtual osg::Drawable::DrawCallback
 		if (_plugin->notify_button->state()) {
 			std::cout << "[Notify toggle] BoundingBoxDrawCallback::drawImplementation() shader: " << box_resource_.program_ << std::endl;
 		}
+
+		uint64_t rendered_bounding_boxes = 0;
 
 		for (uint16_t model_id = 0; model_id < num_models_; ++model_id) {
 
@@ -2145,13 +1918,16 @@ struct BoundingBoxDrawCallback : public virtual osg::Drawable::DrawCallback
 						std::vector<float> corners_ = bvh_res_[model_id].corners_[node_slot_aggregate.node_id_];
 						glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 24, &corners_[0], GL_STREAM_DRAW);
 						glDrawElements(GL_LINES, 24, GL_UNSIGNED_SHORT, nullptr);
+						rendered_bounding_boxes++;
 					}
 				}
 			}
 		}
-		glBindVertexArray(0);
+		render_info_.rendered_bounding_boxes_ = rendered_bounding_boxes;
 
+		glBindVertexArray(0);
 		glPopAttrib();
+
 	};
 	mutable bool _initialized;
 	osg::ref_ptr<osg::StateSet> _stateset;
@@ -2176,26 +1952,14 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 	PointsDrawCallback(osg::ref_ptr<osg::StateSet> pointcloud_stateset, LamurePointCloudPlugin* plugin)
 		: _stateset(pointcloud_stateset),
 		_plugin(plugin)
-	{
-		std::cout << "PointsDrawCallback()" << std::endl;
-	}
+	{ std::cout << "PointsDrawCallback()" << std::endl; }
 	virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
 	{
 		if (_plugin->notify_button->state()) { std::cout << "[Notify toggle] PointsDrawCallback::drawImplementation()" << std::endl; }
 		if (_plugin->rendering_) { return; }
 		_plugin->rendering_ = true;
 
-		//glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-		//GLint program_start;
-		//glGetIntegerv(GL_CURRENT_PROGRAM, &program_start);
-
-		//if (_plugin->notify_button->state()) { std::cout << "[Notify toggle] PointsDrawCallback::drawImplementation() shader: " << program_start << std::endl; }
-
-		//BACKUP_GL_STATE();
-
-		//GLint previousProgram;
-		//glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 		GLdouble vm[16];
 		glGetDoublev(GL_MODELVIEW_MATRIX, vm);
@@ -2366,13 +2130,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
 		_plugin->rendering_ = false;
 
-		//RESTORE_GL_STATE();
-
-		//GLint program_end; 
-		//glGetIntegerv(GL_CURRENT_PROGRAM, &program_end);
-		//std::cout << "program_end: " << program_end << std::endl;
-
-		//glPopAttrib();
+		glPopAttrib();
 	}
 
 	osg::ref_ptr<osg::StateSet> _stateset;
@@ -2456,8 +2214,7 @@ struct PointsGeometry : public osg::Geometry
 
 
 struct TextCullCallback : public osg::Drawable::CullCallback {
-	TextCullCallback(osgText::Text* values,
-		const render_info& render_info)
+	TextCullCallback(osgText::Text* values, render_info* render_info)
 		: _values(values),
 		_render_info(render_info)
 	{
@@ -2473,8 +2230,9 @@ struct TextCullCallback : public osg::Drawable::CullCallback {
 			value_ss << "\n"
 				<< std::fixed << std::setprecision(2)
 				<< 1.0f / cover->frameDuration() << "\n"
-				<< _render_info.rendered_nodes_ << "\n"
-				<< _render_info.rendered_splats_ << "\n\n\n"
+				<< _render_info->rendered_nodes_ << "\n"
+				<< _render_info->rendered_splats_ << "\n"
+				<< _render_info->rendered_bounding_boxes_ << "\n\n\n"
 				<< camPos.x << "\n"
 				<< camPos.y << "\n"
 				<< camPos.z << "\n";
@@ -2485,14 +2243,13 @@ struct TextCullCallback : public osg::Drawable::CullCallback {
 	}
 
 	osg::ref_ptr<osgText::Text> _values;
-	render_info _render_info;
+	render_info* _render_info;
 	mutable std::chrono::steady_clock::time_point _lastUpdateTime;
 	std::chrono::milliseconds _minInterval;
 };
 
 struct TextGeode : public osg::Geode {
 	TextGeode() {
-		// Gemeinsame Parameter
 		osg::Quat rotation(osg::DegreesToRadians(90.0f), osg::Vec3(1.0f, 0.0f, 0.0f));
 		osg::Vec4 color(1.0f, 1.0f, 1.0f, 1.0f);
 		std::string font = coVRFileManager::instance()->getFontFile(NULL);
@@ -2513,7 +2270,8 @@ struct TextGeode : public osg::Geode {
 		label_ss << "Rendering" << "\n"
 			<< "FPS:" << "\n" 
 			<< "Nodes:" << "\n" 
-			<< "Splats:" << "\n\n" 
+			<< "Splats:" << "\n" 
+			<< "Boxes:" << "\n\n"
 			<< "Frustum Position" << "\n"
 			<< "X:" << "\n" 
 			<< "Y:" <<  "\n" 
@@ -2530,6 +2288,7 @@ struct TextGeode : public osg::Geode {
 		value_ss << "\n"
 			<< "0.00:" << "\n"
 			<< "0.00" << "\n"
+			<< "0.00" << "\n"
 			<< "0.00:" << "\n\n\n"
 			<< "0.00" << "\n"
 			<< "0.00" << "\n"
@@ -2539,7 +2298,7 @@ struct TextGeode : public osg::Geode {
 		this->addDrawable(label.get());
 		this->addDrawable(value.get());
 
-		value->setCullCallback(new TextCullCallback(value.get(), render_info_));
+		value->setCullCallback(new TextCullCallback(value.get(), &render_info_));
 	}
 };
 
@@ -2609,14 +2368,14 @@ bool LamurePointCloudPlugin::init2() {
 
 	plugin->create_framebuffers();
 	plugin->init_lamure_shader();
-	//plugin->read_lamure_shader();
+	plugin->init_camera();
+	plugin->create_aux_resources();
 	//plugin->create_pcl_resources();
 	plugin->init_render_states();
-	//plugin->set_up_state_sets();
+	plugin->set_up_state_sets();
 
 	RESTORE_GL_STATE();
 
-	plugin->init_camera();
 
 	// Slider für Kamera X-Position
 	cameraPosXSlider = new ui::Slider(menu, "camera_translation_x");
@@ -2786,8 +2545,8 @@ bool LamurePointCloudPlugin::init2() {
 	vis_xyz->addShader(new osg::Shader(osg::Shader::GEOMETRY, vis_xyz_gs_source));
 	vis_xyz->addShader(new osg::Shader(osg::Shader::FRAGMENT, vis_xyz_fs_source));
 
-	pointcloud_stateset->setAttributeAndModes(vis_xyz, osg::StateAttribute::ON);
-	pointcloud_stateset->addUniform(new osg::Uniform(osg::Uniform::FLOAT_MAT4, "mvp_matrix"));
+	//pointcloud_stateset->setAttributeAndModes(vis_xyz, osg::StateAttribute::ON);
+	//pointcloud_stateset->addUniform(new osg::Uniform(osg::Uniform::FLOAT_MAT4, "mvp_matrix"));
 	//add_pointcloud_uniforms(pointcloud_stateset);
 
 	boundingbox_stateset->setAttributeAndModes(vis_line_bb, osg::StateAttribute::ON);
@@ -2807,7 +2566,7 @@ bool LamurePointCloudPlugin::init2() {
 
 	text_stateset->setRenderBinDetails(10, "RenderBin");
 
-	pointcloud_geode->setStateSet(pointcloud_stateset.get());
+	//pointcloud_geode->setStateSet(pointcloud_stateset.get());
 	boundingbox_geode->setStateSet(boundingbox_stateset.get());
 	frustum_geode->setStateSet(frustum_stateset.get());
 	coord_geode->setStateSet(coord_stateset.get());
