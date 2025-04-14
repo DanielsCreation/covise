@@ -58,6 +58,7 @@ SET(HEADERS
   LamurePointCloud.h
   LamureGeometry.h
   LamureDrawable.h
+  gl_util.h
 )
 
 SET(SOURCES 
@@ -65,6 +66,7 @@ SET(SOURCES
   LamurePointCloud.cpp
   LamureGeometry.cpp
   LamureDrawable.cpp
+  gl_util.cpp
 )
 
 set(SCHISM_INCLUDE_DIRS

@@ -47,7 +47,7 @@
 
 int main(int argc, char *argv[])
 {
-    covise::Socket::initialize();
+    //covise::Socket::initialize();
 
 #ifdef _WIN32
     // disable "debug dialog": it prevents the application from exiting,

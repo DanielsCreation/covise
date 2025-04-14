@@ -25,6 +25,7 @@
       <Restrict value="off" />
       <ScaleWithInteractors value="on"/>
       <TwoSide value="on" />
+      <EnvMapMode value="NONE" />
       <TransparencyMode value="sorted_blended" />
       <Headlight value="off" />
       <RenderOnMaster value="on" />
@@ -83,6 +84,7 @@
       
       <UI>
         <VRUI toolbar="false" />
+        <Qt toolbar="false" />
       </UI>
       
       <Input>  
@@ -138,7 +140,7 @@
       
       <Plugin>
         <LamurePointCloud>
-          <lmr value="C:/src/covise/config/a_config.lmr" />
+          <lmr value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Config/Config_000.lmr" />
         </LamurePointCloud>
 
         <AKToolbar value="false" menu="false">
@@ -153,6 +155,7 @@
           <ShortCut value="drive" name="drive" />
           <ShortCut value="fly" name="fly" />
         </AKToolbar>
+        
       </Plugin>
     </COVER>
     

@@ -54,6 +54,9 @@
 #include <lamure/ren/camera.h>
 #include <lamure/lmr_camera.h>
 #include <lamure/ren/trackball.h>
+#include <scm/gl_util/font/font_face.h>
+#include <scm/gl_util/font/text.h>
+#include <scm/gl_util/font/text_renderer.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -107,17 +110,20 @@ public:
     void read_lamure_shader();
     void init_pcl_camera();
     void init_coord_resource();
+    void init_schism_objects();
     void sync_cameras();
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
     void create_pcl_resources();
+    void create_box_resources();
+    void create_coord_resources();
     void create_frustum_resources();
     void create_aux_representation();
     void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
     void draw_brush(scm::gl::program_ptr shader);
-    void set_uniforms(scm::gl::program_ptr shader);
-    void add_pointcloud_uniforms(osg::ref_ptr<osg::StateSet> stateset);
-    void update_pointcloud_uniforms(osg::ref_ptr<osg::StateSet> stateset);
+    void set_lamure_uniforms(scm::gl::program_ptr shader);
+    void add_stateset_uniforms(osg::ref_ptr<osg::StateSet> stateset);
+    void set_stateset_uniforms(osg::ref_ptr<osg::StateSet> stateset);
     void set_gl_uniforms(GLuint program);
     float get_atlas_scale_factor();
     void create_framebuffers();
@@ -147,19 +153,23 @@ public:
     void load_settings(const std::string &filename);
     bool rendering_ = false;
 
-    HWND hwnd_cover;
-    HWND hwnd_opencover;
-    HWND hwnd_current;
+    HWND HWND_cover;
+    HWND HWND_opencover;
+    HWND HWND_draw;
+    HWND HWND_init;
 
     HGLRC HGLRC_cover;
-    HGLRC HGLRC_opencover; 
-    HGLRC HGLRC_current;
-    HGLRC HGLRC_last;
+    HGLRC HGLRC_opencover;
+    HGLRC HGLRC_draw;
+    HGLRC HGLRC_init;
 
-    HDC hdc_cover;
-    HDC hdc_opencover;
-    HDC hdc_current; 
-    HDC hdc_last;
+    HDC HDC_cover;
+    HDC HDC_opencover;
+    HDC HDC_draw;
+    HDC HDC_init;
+
+    scm::math::mat4d gl_modelview_matrix;
+    scm::math::mat4d gl_projection_matrix;
 
 
 private:
@@ -172,6 +182,7 @@ private:
     float pointSizeValue = 4;
     void createGeodes(osg::Group*, const std::string&);
     bool adaptLOD = true; // LOD enable/disable
+
     
     osg::Point* pointstate;
     osg::StateSet* stateset;
@@ -184,20 +195,41 @@ private:
     osg::ref_ptr<osg::Camera> hud_camera;
     osg::ref_ptr<osg::Group> LamureGroup;
     osg::ref_ptr<osg::Node> file;
+
     osg::ref_ptr<osg::Geode> geode;
+    osg::ref_ptr<osg::Geode> init_geode;
     osg::ref_ptr<osg::Geode> text_geode;
     osg::ref_ptr<osg::Geode> coord_geode;
+    osg::ref_ptr<osg::Geode> coord_geode_gl;
     osg::ref_ptr<osg::Geode> frustum_geode;
+    osg::ref_ptr<osg::Geode> frustum_geode_gl;
     osg::ref_ptr<osg::Geode> pointcloud_geode;
     osg::ref_ptr<osg::Geode> boundingbox_geode;
+    osg::ref_ptr<osg::Geode> boundingbox_geode_gl;
+
     osg::ref_ptr<LamureGeometry> geometry;
     osg::ref_ptr<LamureDrawable> draw1;
+
     osg::ref_ptr<osg::Switch> _switch;
+
+    osg::ref_ptr<osg::StateSet> init_stateset;
     osg::ref_ptr<osg::StateSet> pointcloud_stateset;
     osg::ref_ptr<osg::StateSet> boundingbox_stateset;
+    osg::ref_ptr<osg::StateSet> boundingbox_stateset_gl;
     osg::ref_ptr<osg::StateSet> frustum_stateset;
+    osg::ref_ptr<osg::StateSet> frustum_stateset_gl;
     osg::ref_ptr<osg::StateSet> coord_stateset;
+    osg::ref_ptr<osg::StateSet> coord_stateset_gl;
     osg::ref_ptr<osg::StateSet> text_stateset;
+
+    osg::ref_ptr<osg::Geometry> init_geometry;
+    osg::ref_ptr<osg::Geometry> pointcloud_geometry;
+    osg::ref_ptr<osg::Geometry> boundingbox_geometry;
+    osg::ref_ptr<osg::Geometry> boundingbox_geometry_gl;
+    osg::ref_ptr<osg::Geometry> frustum_geometry;
+    osg::ref_ptr<osg::Geometry> frustum_geometry_gl;
+    osg::ref_ptr<osg::Geometry> coord_geometry;
+    osg::ref_ptr<osg::Geometry> coord_geometry_gl;
 
 
 
@@ -215,8 +247,11 @@ public:
 
     ui::Button* pointcloud_button = nullptr;
     ui::Button* boundingbox_button = nullptr;
+    ui::Button* boundingbox_button_gl = nullptr;
     ui::Button* frustum_button = nullptr;
+    ui::Button* frustum_button_gl = nullptr;
     ui::Button* coord_button = nullptr;
+    ui::Button* coord_button_gl = nullptr;
     ui::Button* sync_button = nullptr;
     ui::Button* notify_button = nullptr;
     ui::Button* text_button = nullptr;
@@ -266,6 +301,10 @@ public:
     void updateModelRotation();
     scm::math::mat4f createSwapYZMatrix();
     scm::math::mat4d createSwapYZ();
+    scm::math::mat4d swapMiddleColumns(const scm::math::mat4d& m);
+    scm::math::mat4d swapMiddleRows(const scm::math::mat4d& m);
+    scm::math::mat4d swapMiddleColumns(scm::math::mat4d& m);
+    scm::math::mat4d swapMiddleRows(scm::math::mat4d& m);
 
 protected:
     ui::Group* loadGroup = nullptr;
@@ -291,8 +330,6 @@ protected:
     ui::Slider* lodNearDistanceSlider = nullptr;
 
 
-
-    void set_up_state_sets();
 };
 
 
@@ -337,5 +374,6 @@ static unsigned int CompileShader(unsigned int type, const std::string& source, 
     };
     return id;
 }
+
 
 #endif

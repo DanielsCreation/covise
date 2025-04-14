@@ -44,11 +44,13 @@ class camera
     };
 
     camera() : cam_state_(CAM_STATE_GUA){};
-    camera(const view_t view_id, float near_plane, scm::math::mat4f const& view, scm::math::mat4f const& proj);
-    //camera(const view_t view_id, float near_plane, float far_plane_value_, scm::math::mat4f const& view, scm::math::mat4f const& proj, scm::math::mat4f const& init_tb_mat, float distance, bool fast_travel = false, bool touch_screen_mode = false);
-    camera(const view_t view_id, scm::math::mat4f const& init_tb_mat, float distance);
-    camera(const view_t view_id, scm::math::vec3f models_center, float distance, float fov, float aspect_ratio, float near_plane, float far_plane);
-    camera(const view_t view_id, scm::math::vec3f models_center, float fov, float aspect_ratio, float near_plane, float far_plane);
+    camera(const view_t view_id, double near, scm::math::mat4d const& view, scm::math::mat4d const& proj);
+    //camera(const view_t view_id, float near, float far, scm::math::mat4f const& view, scm::math::mat4f const& proj, scm::math::mat4f const& init_tb_mat, float distance, bool fast_travel = false, bool touch_screen_mode = false);
+    camera(const view_t view_id, scm::math::mat4f const& init_tb_mat, double distance);
+    //camera(const view_t view_id, scm::math::vec3d models_center, double distance, double fov, double aspect_ratio, double near, double far);
+    //camera(const view_t view_id, scm::math::vec3d models_center, double fov, double aspect_ratio, double near, double far);
+    camera(const view_t view_id, double left, double right, double bottom, double top, double near, double far, scm::math::vec3d eye, scm::math::vec3d center, scm::math::vec3d up, double look_dist);
+    camera(const view_t view_id, double near, double far, scm::math::mat4d view_matrix_, scm::math::mat4d projection_matrix_);
     virtual ~camera();
 
     void event_callback(uint16_t code, float value);
@@ -63,29 +65,33 @@ class camera
     void update_camera(double x, double y, int window_width, int window_height, mouse_state const &mouse_state, bool keys[]);
     
     //void set_frustum_orientation(scm::math::vec3 newCameraPosition, scm::math::vec3 newTargetPosition, scm::math::vec3 newUpVector);
-    //void set_frustum_dimensions(float fov, float aspect_ratio, float near_plane_value, float far_plane_value);
+    //void set_frustum_dimensions(float fov, float aspect_ratio, float near, float far_plane_value);
     
     
     scm::gl::frustum const get_predicted_frustum(scm::math::mat4f const &in_cam_or_mat);
 
-    inline const float near_plane_value() const { return near_plane_value_; }
-    inline const float far_plane_value() const { return far_plane_value_; }
+    inline const double near_plane_value() const { return near_; }
+    inline const double far_plane_value() const { return far_; }
 
     void set_trackball_matrix(scm::math::mat4d const& tb_matrix) { trackball_.set_transform(tb_matrix); }
+
     void set_view_matrix(scm::math::mat4d const& in_view);
+    void set_view_matrix(scm::math::mat4d& in_view);
+    void set_projection_matrix(scm::math::mat4d const& in_proj);
+    void set_projection_matrix(scm::math::mat4d& in_proj);
+
+    void set_projection_matrix(float opening_angle, float aspect_ratio, float near_, float far_);
 
     void set_cam_pos(scm::math::vec3d const& cam_pos);
-
-    void set_projection_matrix(scm::math::mat4d const& in_proj);
-    void set_projection_matrix(float opening_angle, float aspect_ratio, float near_, float far_);
-    void set_hp_projection_matrix(scm::math::mat4d const& in_proj);
-    void set_mvp_matrix();
-    void camera::set_mvp_matrix(scm::math::mat4d mvp_matrix);
 
     const scm::math::mat4d& trackball_matrix() const { return trackball_.transform(); };
 
     scm::math::mat4f const get_view_matrix() const;
     scm::math::mat4f const get_projection_matrix() const;
+
+    scm::math::mat4f get_view_matrix();
+    scm::math::mat4f get_projection_matrix();
+
     //scm::math::mat4f const get_mvp_matrix() const;
 
     scm::math::mat4d const get_high_precision_view_matrix() const;
@@ -98,10 +104,12 @@ class camera
     //scm::math::mat4d get_hp_cam_matrix();
 
     //void const update_frustum();    
-    scm::gl::frustum const get_frustum_by_model(scm::math::mat4 const& model) const;
+    scm::gl::frustum const get_frustum_by_model(scm::math::mat4d const& model) const;
+    scm::gl::frustum const get_frustum_by_model(scm::math::mat4f const& model) const;
 
     scm::gl::frustum const get_frustum() const;
     std::vector<scm::math::vec3d> get_frustum_corners() const;
+    std::vector<scm::math::vec3d> camera::get_frustum_corners_by_model(scm::math::mat4d const& model) const;
 
     void    write_view_matrix(std::ofstream& matrix_stream);
     void    set_trackball_center_of_rotation(const scm::math::vec3f& cor);
@@ -124,21 +132,26 @@ class camera
   private:
     view_t view_id_;
 
-    scm::math::vec3f eye_;
-    scm::math::mat4f eye_matrix_;
-    
-    scm::math::mat4f model_matrix_;
-    scm::math::mat4f view_matrix_;
-    scm::math::mat4f projection_matrix_;
+    double left_;
+    double right_;
+    double bottom_;
+    double top_;
+    double near_;
+    double far_;
+    scm::math::vec3d center_;
+    scm::math::vec3d up_;
+    double look_dist_;
+    scm::math::vec3d eye_;
+    scm::math::mat4d eye_matrix_;
+    scm::math::mat4d model_matrix_;
+    scm::math::mat4d view_matrix_;
+    scm::math::mat4d projection_matrix_;
     //scm::math::mat4f mvp_matrix_;
 
     scm::gl::frustum frustum_;
 
-    float near_plane_value_;
-    float far_plane_value_;
-
-    float fov_;
-    float aspect_ratio_;
+    double fov_;
+    double aspect_ratio_;
 
     lamure::ren::trackball trackball_;
 

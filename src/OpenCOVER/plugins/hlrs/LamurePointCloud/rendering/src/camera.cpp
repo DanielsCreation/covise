@@ -12,16 +12,54 @@ namespace lamure
 namespace ren
 {
 std::mutex camera::transform_update_mutex_;
-
-camera::camera(const view_t view_id, float near_plane, scm::math::mat4f const &view, scm::math::mat4f const &proj)
-    : view_id_(view_id), view_matrix_(view), projection_matrix_(proj), near_plane_value_(near_plane), far_plane_value_(1000.0f), trackball_init_x_(0.0), trackball_init_y_(0.0), dolly_sens_(0.5f),
+/*
+camera::camera(const view_t view_id, double near, scm::math::mat4d const &view, scm::math::mat4d const &proj)
+    : view_id_(view_id), view_matrix_(view), projection_matrix_(proj), near_(near), far_(1000.0f), trackball_init_x_(0.0), trackball_init_y_(0.0), dolly_sens_(0.5f),
       is_in_touch_screen_mode_(0), sum_trans_x_(0), sum_trans_y_(0), sum_trans_z_(0), sum_rot_x_(0), sum_rot_y_(0), sum_rot_z_(0), cam_state_(CAM_STATE_GUA)
 {
-    frustum_ = scm::gl::frustum(proj * view);
+    frustum_ = scm::gl::frustum(scm::math::mat4f(projection_matrix_ * view_matrix_));
 }
 
-camera::camera(const view_t view_id, scm::math::mat4f const &init_tb_mat, float distance)
-    : view_id_(view_id), near_plane_value_(0), far_plane_value_(0), trackball_init_x_(0.0), trackball_init_y_(0.0), dolly_sens_(0.5f), is_in_touch_screen_mode_(0),
+camera::camera(const view_t view_id, scm::math::vec3d models_center, double distance, double fov, double aspect_ratio, double near, double far)
+    : view_id_(view_id), near_(near), far_(far), fov_(fov), aspect_ratio_(aspect_ratio),
+    trackball_init_x_(0.0), trackball_init_y_(0.0), dolly_sens_(0.5f), is_in_touch_screen_mode_(0),
+    sum_trans_x_(0), sum_trans_y_(0), sum_trans_z_(0), sum_rot_x_(0), sum_rot_y_(0), sum_rot_z_(0), 
+    cam_state_(CAM_STATE_LAMURE), controlType_(control_type(0))
+{
+    scm::math::mat4d init_tb_mat =
+        scm::math::make_look_at_matrix(
+            models_center + scm::math::vec3d(0., 0.1, -0.01),
+            models_center,
+            scm::math::vec3d(0.0, 0.0, 1.0));
+
+    scm::math::mat4d projection_matrix_;
+    scm::math::perspective_matrix(projection_matrix_, fov_, aspect_ratio_, near_, far_);
+    trackball_.set_transform(scm::math::mat4d(init_tb_mat));
+    trackball_.dolly(distance);
+    frustum_ = scm::gl::frustum(scm::math::mat4f(projection_matrix_ * trackball_.transform()));
+};
+
+
+camera::camera(const view_t view_id, scm::math::vec3d models_center, double fov, double aspect_ratio, double near, double far)
+    : view_id_(view_id), near_(near), far_(far), fov_(fov), aspect_ratio_(aspect_ratio),
+    cam_state_(CAM_STATE_GUA), controlType_(control_type(0))
+{
+    eye_ = scm::math::vec3d(0., (near_ - far_) / 2, 0.0);
+    eye_matrix_ = scm::math::make_translation(eye_);
+
+    view_matrix_ = scm::math::make_look_at_matrix(
+        eye_,
+        scm::math::vec3d::zero(),
+        scm::math::vec3d(0.0, 0.0, 1.0)
+    );
+    //model_matrix_ = scm::math::make_translation(models_center);
+
+    scm::math::perspective_matrix(projection_matrix_, fov_, aspect_ratio_, near_, far_);
+    frustum_ = scm::gl::frustum(scm::math::mat4f(projection_matrix_ * view_matrix_));
+};*/
+
+camera::camera(const view_t view_id, scm::math::mat4f const& init_tb_mat, double distance)
+    : view_id_(view_id), near_(0), far_(0), trackball_init_x_(0.0), trackball_init_y_(0.0), dolly_sens_(0.5f), is_in_touch_screen_mode_(0),
     sum_trans_x_(0), sum_trans_y_(0), sum_trans_z_(0), sum_rot_x_(0), sum_rot_y_(0), sum_rot_z_(0), cam_state_(CAM_STATE_LAMURE), controlType_(control_type(0))
 {
     // set_projection_matrix(30.0f, float(800)/float(600), 0.01f, 100.0f);
@@ -31,43 +69,31 @@ camera::camera(const view_t view_id, scm::math::mat4f const &init_tb_mat, float 
 
     trackball_.set_transform(scm::math::mat4d(init_tb_mat));
     trackball_.dolly(distance);
-
 }
 
-camera::camera(const view_t view_id, scm::math::vec3f models_center, float distance, float fov, float aspect_ratio, float near_plane, float far_plane)
-    : view_id_(view_id), near_plane_value_(near_plane), far_plane_value_(far_plane), fov_(fov), aspect_ratio_(aspect_ratio), 
-    trackball_init_x_(0.0), trackball_init_y_(0.0), dolly_sens_(0.5f), is_in_touch_screen_mode_(0),
-    sum_trans_x_(0), sum_trans_y_(0), sum_trans_z_(0), sum_rot_x_(0), sum_rot_y_(0), sum_rot_z_(0), 
-    cam_state_(CAM_STATE_LAMURE), controlType_(control_type(0))
-{
-    scm::math::mat4f init_tb_mat =
-        scm::math::make_look_at_matrix(
-            models_center + scm::math::vec3f(0.f, 0.1f, -0.01f),
-            models_center,
-            scm::math::vec3f(0.0f, 0.0f, 1.0f));
 
-    scm::math::perspective_matrix(projection_matrix_, fov_, aspect_ratio_, near_plane_value_, far_plane_value_);
-    trackball_.set_transform(scm::math::mat4d(init_tb_mat));
-    trackball_.dolly(distance);
-    frustum_ = scm::gl::frustum(projection_matrix_ * scm::math::mat4f(trackball_.transform()));
+camera::camera(const view_t view_id, double left, double right, double bottom, double top, double near, double far, 
+    scm::math::vec3d eye, scm::math::vec3d center, scm::math::vec3d up, double look_dist) 
+    : view_id_(view_id), left_(left), right_(right), bottom_(bottom), top_(top), near_(near), far_(far), 
+    eye_(eye), center_(center), up_(up), look_dist_(look_dist),
+    cam_state_(CAM_STATE_GUA), controlType_(control_type(0))
+{
+    double fovy = 2.0 * std::atan((top_ - bottom_) / (2.0 * near_));
+    double aspect = (right_ - left_) / (top_ - bottom_);
+    eye_matrix_ = scm::math::make_translation(eye_);
+    view_matrix_ = scm::math::make_look_at_matrix(eye_, center_, up_);
+    model_matrix_ = scm::math::mat4f::identity();
+    scm::math::perspective_matrix(projection_matrix_, fov_, aspect_ratio_, near_, far_);
+    frustum_ = scm::gl::frustum(scm::math::mat4f(projection_matrix_ * view_matrix_));
 };
 
 
-camera::camera(const view_t view_id, scm::math::vec3f models_center, float fov, float aspect_ratio, float near_plane, float far_plane)
-    : view_id_(view_id), near_plane_value_(near_plane), far_plane_value_(far_plane), fov_(fov), aspect_ratio_(aspect_ratio),
-    cam_state_(CAM_STATE_GUA), controlType_(control_type(0))
+camera::camera(const view_t view_id, double near, double far, scm::math::mat4d view_matrix, scm::math::mat4d projection_matrix) 
+    : view_id_(view_id), near_(near), far_(far), view_matrix_(view_matrix), projection_matrix_(projection_matrix), cam_state_(CAM_STATE_GUA), controlType_(control_type(0))
 {
-    eye_ = scm::math::vec3f(0.f, (near_plane_value_ - far_plane_value_) / 2, 0.0f);
+    eye_ = scm::math::vec3d(0.0, (near_ - far_) / 2, 0.0);
     eye_matrix_ = scm::math::make_translation(eye_);
-
-    view_matrix_ = scm::math::make_look_at_matrix(
-        eye_,
-        scm::math::vec3f::zero(),
-        scm::math::vec3f(0.0f, 0.0f, 1.0f)
-    );
-    //model_matrix_ = scm::math::make_translation(models_center);
-    scm::math::perspective_matrix(projection_matrix_, fov_, aspect_ratio_, near_plane_value_, far_plane_value_);
-    frustum_ = scm::gl::frustum(projection_matrix_ * view_matrix_);
+    frustum_ = scm::gl::frustum(scm::math::mat4f(projection_matrix_ * view_matrix_));
 };
 
 
@@ -151,16 +177,36 @@ void camera::event_callback(uint16_t code, float value)
 scm::gl::frustum::classification_result const camera::cull_against_frustum(scm::gl::frustum const &frustum, scm::gl::box const &b) const { return frustum.classify(b); }
 
 
-scm::gl::frustum const camera::get_frustum_by_model(scm::math::mat4 const &model) const
+scm::gl::frustum const camera::get_frustum_by_model(scm::math::mat4d const &model) const
 {
     switch(cam_state_)
     {
     case CAM_STATE_LAMURE:
-        return scm::gl::frustum(projection_matrix_ * scm::math::mat4f(trackball_.transform()) * model);
+        return scm::gl::frustum(scm::math::mat4f(projection_matrix_ * trackball_.transform() * model));
         break;
 
     case CAM_STATE_GUA:
-        return scm::gl::frustum(projection_matrix_ * view_matrix_ * model);
+        return scm::gl::frustum(scm::math::mat4f(projection_matrix_ * view_matrix_ * model));
+        break;
+
+    default:
+        break;
+    }
+    return scm::gl::frustum();
+}
+
+
+
+scm::gl::frustum const camera::get_frustum_by_model(scm::math::mat4f const& model) const
+{
+    switch (cam_state_)
+    {
+    case CAM_STATE_LAMURE:
+        return scm::gl::frustum(scm::math::mat4f(projection_matrix_ * trackball_.transform()) * model);
+        break;
+
+    case CAM_STATE_GUA:
+        return scm::gl::frustum(scm::math::mat4f(projection_matrix_ * view_matrix_) * model);
         break;
 
     default:
@@ -186,10 +232,11 @@ void camera::set_projection_matrix(float opening_angle, float aspect_ratio, floa
 }
 
 
-//void camera::set_projection_matrix_lmr(scm::math::mat4d const& in_proj) {
-//
-//    projection_matrix_ = in_proj;
-//}
+void camera::set_projection_matrix(scm::math::mat4d& in_proj) {
+
+    projection_matrix_ = in_proj;
+    frustum_.update(scm::math::mat4f(projection_matrix_ * view_matrix_));
+}
 
 
 void camera::set_view_matrix(scm::math::mat4d const &in_view) {
@@ -197,9 +244,28 @@ void camera::set_view_matrix(scm::math::mat4d const &in_view) {
     {
     case CAM_STATE_LAMURE:
         trackball_.set_transform(in_view);
+        frustum_.update(scm::math::mat4f(projection_matrix_ * view_matrix_));
         break;
     case CAM_STATE_GUA:
         view_matrix_ = in_view;
+        frustum_.update(scm::math::mat4f(projection_matrix_ * view_matrix_));
+        break;
+    default:
+        break;
+    }
+}
+
+
+void camera::set_view_matrix(scm::math::mat4d& in_view) {
+    switch (cam_state_)
+    {
+    case CAM_STATE_LAMURE:
+        trackball_.set_transform(in_view);
+        frustum_.update(scm::math::mat4f(projection_matrix_ * view_matrix_));
+        break;
+    case CAM_STATE_GUA:
+        view_matrix_ = in_view;
+        frustum_.update(scm::math::mat4f(projection_matrix_ * view_matrix_));
         break;
     default:
         break;
@@ -262,7 +328,40 @@ scm::math::mat4d const camera::get_high_precision_view_matrix() const {
 
 
 scm::math::mat4f const camera::get_projection_matrix() const { 
-    return projection_matrix_; 
+    return scm::math::mat4f(projection_matrix_);
+}
+
+
+scm::math::mat4f camera::get_projection_matrix() {
+    return scm::math::mat4f(projection_matrix_);
+}
+
+
+std::vector<scm::math::vec3d> camera::get_frustum_corners_by_model(scm::math::mat4d const& model) const {
+    std::vector<scm::math::vec4d> tmp(8);
+    std::vector<scm::math::vec3d> result(8);
+
+    scm::math::mat4d inverse_transform;
+
+    if (CAM_STATE_LAMURE == cam_state_) {
+        inverse_transform = scm::math::mat4f(scm::math::inverse(projection_matrix_ * trackball_.transform() * model));
+    }
+    else if (CAM_STATE_GUA == cam_state_) {
+        inverse_transform = scm::math::mat4d(scm::math::inverse(projection_matrix_ * view_matrix_ * model));
+    }
+    tmp[0] = inverse_transform * scm::math::vec4d(-1, -1, -1, 1);
+    tmp[1] = inverse_transform * scm::math::vec4d(-1, -1, 1, 1);
+    tmp[2] = inverse_transform * scm::math::vec4d(-1, 1, -1, 1);
+    tmp[3] = inverse_transform * scm::math::vec4d(-1, 1, 1, 1);
+    tmp[4] = inverse_transform * scm::math::vec4d(1, -1, -1, 1);
+    tmp[5] = inverse_transform * scm::math::vec4d(1, -1, 1, 1);
+    tmp[6] = inverse_transform * scm::math::vec4d(1, 1, -1, 1);
+    tmp[7] = inverse_transform * scm::math::vec4d(1, 1, 1, 1);
+
+    for (int i(0); i < 8; ++i) {
+        result[i] = tmp[i] / tmp[i][3];
+    }
+    return result;
 }
 
 
@@ -273,10 +372,10 @@ std::vector<scm::math::vec3d> camera::get_frustum_corners() const {
     scm::math::mat4d inverse_transform;
 
     if(CAM_STATE_LAMURE == cam_state_) {
-        inverse_transform = scm::math::inverse(projection_matrix_ * scm::math::mat4f(trackball_.transform()) * eye_matrix_);
+        inverse_transform = scm::math::mat4f(scm::math::inverse(projection_matrix_ * trackball_.transform()));
     }
     else if(CAM_STATE_GUA == cam_state_) {
-        inverse_transform = scm::math::mat4d(scm::math::inverse(projection_matrix_ * view_matrix_ * eye_matrix_));
+        inverse_transform = scm::math::mat4d(scm::math::inverse(projection_matrix_ * view_matrix_));
     }
     tmp[0] = inverse_transform * scm::math::vec4d(-1, -1, -1, 1);
     tmp[1] = inverse_transform * scm::math::vec4d(-1, -1, 1, 1);
@@ -332,7 +431,7 @@ void camera::update_camera(double x, double y, int window_width, int window_heig
 
 void camera::translate(const float& x, const float& y, const float& z) {
     if(cam_state_ == CAM_STATE_GUA) {
-        view_matrix_ = scm::math::make_translation(x, y, z) * view_matrix_;
+        view_matrix_ = scm::math::make_translation(x, y, z) * scm::math::mat4f(view_matrix_);
     }
     else if(cam_state_ == CAM_STATE_LAMURE) {
         scm::math::mat4d trackball_trans = trackball_.transform();
@@ -346,7 +445,7 @@ void camera::rotate(const float& x, const float& y, const float& z) {
         view_matrix_ = scm::math::make_rotation(x, scm::math::vec3f(1.0f, 0.0f, 0.0f)) * 
                       scm::math::make_rotation(y, scm::math::vec3f(0.0f, 1.0f, 0.0f)) * 
                       scm::math::make_rotation(z, scm::math::vec3f(0.0f, 0.0f, 1.0f)) * 
-                      view_matrix_;
+                      scm::math::mat4f(view_matrix_);
     }
     else if(cam_state_ == CAM_STATE_LAMURE) {
         scm::math::mat4d trackball_trans = trackball_.transform();
@@ -366,7 +465,24 @@ scm::math::mat4f const camera::get_view_matrix() const
         return scm::math::mat4f(trackball_.transform());
         break;
     case CAM_STATE_GUA:
-        return view_matrix_;
+        return scm::math::mat4f(view_matrix_);
+        break;
+    default:
+        break;
+    }
+    return scm::math::mat4f();
+}
+
+
+scm::math::mat4f camera::get_view_matrix()
+{
+    switch (cam_state_)
+    {
+    case CAM_STATE_LAMURE:
+        return scm::math::mat4f(trackball_.transform());
+        break;
+    case CAM_STATE_GUA:
+        return scm::math::mat4f(view_matrix_);
         break;
     default:
         break;
@@ -384,7 +500,7 @@ scm::math::vec3d camera::get_cam_pos() {
         break;
     }
     case CAM_STATE_GUA: {
-        scm::math::mat4f vm = scm::math::inverse(view_matrix_);
+        scm::math::mat4d vm = scm::math::inverse(view_matrix_);
         return scm::math::vec3d(vm[12], vm[13], vm[14]);
         break;
     }
@@ -400,16 +516,16 @@ void camera::set_cam_pos(scm::math::vec3d const& cam_pos) {
         tm[12] = static_cast<float>(cam_pos[0]);
         tm[13] = static_cast<float>(cam_pos[1]);
         tm[14] = static_cast<float>(cam_pos[2]);
-        frustum_.update(projection_matrix_ * tm);
+        frustum_.update(scm::math::mat4f(projection_matrix_) * tm);
         break;
     }
     case CAM_STATE_GUA: {
-        scm::math::mat4f vm = scm::math::inverse(view_matrix_);
+        scm::math::mat4d vm = scm::math::inverse(view_matrix_);
         vm[12] = static_cast<float>(cam_pos[0]);
         vm[13] = static_cast<float>(cam_pos[1]);
         vm[14] = static_cast<float>(cam_pos[2]);
         view_matrix_ = scm::math::inverse(vm);
-        frustum_.update(projection_matrix_ * view_matrix_);
+        frustum_.update(scm::math::mat4f(projection_matrix_ * view_matrix_));
         break;
     }
     default: {

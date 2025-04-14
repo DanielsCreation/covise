@@ -15,6 +15,7 @@
 #include <lamure/vt/pre/AtlasFile.h>
 #include <lamure/vt/ooc/TileRequest.h>
 #include <lamure/vt/Observer.h>
+#include <chrono>
 
 namespace vt{
     namespace ooc{

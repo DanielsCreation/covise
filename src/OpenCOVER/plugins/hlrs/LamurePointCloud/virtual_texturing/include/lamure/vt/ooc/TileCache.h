@@ -16,6 +16,7 @@
 #include <queue>
 #include <map>
 #include <condition_variable>
+#include <chrono>
 
 namespace vt {
     namespace ooc {

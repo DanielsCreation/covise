@@ -304,7 +304,7 @@ bool OpenCOVER::init()
     if (m_initialized)
         return true;
 
-    covise::Socket::initialize();
+    //covise::Socket::initialize();
     setlocale(LC_NUMERIC, "C");
 
     installSignalHandlers();
