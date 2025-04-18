@@ -2173,26 +2173,20 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
 		GLStateBackup stateBackup = captureGLBackup();
 		GLStateSnapshot stateBefore = captureGLState();
-		osg::State* state = renderInfo.getState();
-		//state->pushStateSet(_stateset.get());
 
+		GLint prevVAO = 0;
+		glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVAO);
+
+		osg::State* state = renderInfo.getState();
 		state->setCheckForGLErrors(osg::State::CheckForGLErrors::ONCE_PER_ATTRIBUTE);
 
 
-		if (!_initialized) {
-			if (_plugin->notify_button->state()) { std::cout << "[Notify] PointsDrawCallback::drawImplementation()" << std::endl; }
-
-		}
-
-		//glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glDisable(GL_CULL_FACE);
 		scm::math::mat4d gl_view_matrix_d = matConv4D(osg::Matrixd(renderInfo.getState()->getModelViewMatrix()));
 		scm::math::mat4d gl_projection_matrix_d = matConv4D(osg::Matrixd(renderInfo.getState()->getProjectionMatrix()));
 
 		scm::math::mat4 gl_view_matrix = matConv4F(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
 		scm::math::mat4 gl_projection_matrix = matConv4F(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
-
-		//screen_quad_.reset(new scm::gl::quad_geometry(device_, scm::math::vec2f(-1.0f, -1.0f), scm::math::vec2f(1.0f, 1.0f)));
 
 		lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
 		lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
@@ -2232,12 +2226,13 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 		}
 
 
-		GLint prevVAO = 0;
 		if (_plugin->dump_button->state()) {
-			glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVAO);
 			printVAOAttributes(prevVAO);
 		}
 
+		if (!_initialized) {
+			if (_plugin->notify_button->state()) { std::cout << "[Notify] PointsDrawCallback::drawImplementation()" << std::endl; }
+		}
 
 		if (_initialized) {
 			glBindVertexArray(pcl_resource_.vao_);
@@ -2274,11 +2269,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
 		//_plugin->set_stateset_uniforms(_stateset);
 
-		//DRAW_ALL_MODELS(selected_single_pass_shading_program);
-
-
-
-
 		if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
 			context_->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_, data_provenance_));
 		}
@@ -2286,14 +2276,8 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
 
 
-		//GLint vao_ = 0;
-		//glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao_);
-		//pcl_resource_.vao_ = vao_;
-
 		glUseProgram(pcl_resource_.program_);
 		_plugin->set_gl_uniforms(pcl_resource_.program_);
-
-
 
 		uint64_t rendered_splats_ = 0;
 		uint64_t rendered_nodes_ = 0;
@@ -2325,7 +2309,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 			float* ivm_ = scm::math::mat4f(scm::math::transpose(scm::math::inverse(model_view_matrix))).data_array;
 			float* mms_ = scm::math::mat4f(model_to_screen).data_array;
 
-
 			glUniformMatrix4fv(glGetUniformLocation(pcl_resource_.program_, "mvp_matrix"), 1, GL_FALSE, &mvp_[0]);
 			glUniformMatrix4fv(glGetUniformLocation(pcl_resource_.program_, "model_matrix"), 1, GL_FALSE, &mmm_[0]);
 			glUniformMatrix4fv(glGetUniformLocation(pcl_resource_.program_, "model_view_matrix"), 1, GL_FALSE, &mvm_[0]);
@@ -2337,7 +2320,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 				uint32_t node_culling_result = scm_camera_->cull_against_frustum(frustum_, bounding_box_vector[node_slot_aggregate.node_id_]);
 				if (node_culling_result != 1) {
 					if (draw) {
-						//renderInfo.getState()->drawArrays(GL_POINTS, static_cast<GLint>(node_slot_aggregate.slot_id_ * surfels_per_node), static_cast<GLsizei>(surfels_per_node));
 						glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
 						//context_->draw_arrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node); 
 						rendered_splats_ += surfels_per_node;
@@ -2378,17 +2360,10 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 			restoreGLBackup(stateBackup);
 		}
 
-		//glPopAttrib();
-		//restoreGLBackup(stateBackup);
-		//state->popStateSet();
-
-
 		if (_plugin->notify_button->state()) {
 			GLStateSnapshot stateAfter = captureGLState();
 			compareGLStateSnapshots(stateBefore, stateAfter, "[Notify] PointsDrawCallback::drawImplementation()");
 		}
-
-
 	}
 	osg::ref_ptr<osg::StateSet> _stateset;
 	LamurePointCloudPlugin* _plugin;
