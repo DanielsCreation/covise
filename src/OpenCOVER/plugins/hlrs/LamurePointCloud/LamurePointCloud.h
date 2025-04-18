@@ -244,6 +244,7 @@ public:
     osg::ref_ptr<osg::MatrixTransform> transform;
     ui::Menu* menu = nullptr;
     ui::Group* group = nullptr;
+    bool dump = false;
 
     ui::Button* pointcloud_button = nullptr;
     ui::Button* boundingbox_button = nullptr;
@@ -255,6 +256,7 @@ public:
     ui::Button* sync_button = nullptr;
     ui::Button* notify_button = nullptr;
     ui::Button* text_button = nullptr;
+    ui::Button* dump_button = nullptr;
 
     osg::ref_ptr<osg::Geometry> _triangleGeometry;
     osg::ref_ptr<osg::StateSet> _triangleStateSet;

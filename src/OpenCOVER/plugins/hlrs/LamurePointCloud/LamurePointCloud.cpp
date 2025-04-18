@@ -3,6 +3,7 @@
 //local
 #include "LamurePointCloud.h"
 #include "gl_util.h"
+#include "osg_util.h"
 #include <osg/StateSet>
 
 #include <lamure/imgui.h>
@@ -1670,6 +1671,8 @@ struct CoordDrawCallbackGL : public osg::Drawable::DrawCallback
 
 	virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const override
 	{
+		GLStateBackup stateBackup = captureGLBackup();
+		GLStateSnapshot stateBefore = captureGLState();
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		if (!_initialized)
 		{
@@ -1703,6 +1706,12 @@ struct CoordDrawCallbackGL : public osg::Drawable::DrawCallback
 		glBindVertexArray(0);
 
 		glPopAttrib();
+		restoreGLBackup(stateBackup);
+
+		if (_plugin->notify_button->state()) {
+			GLStateSnapshot stateAfter = captureGLState();
+			compareGLStateSnapshots(stateBefore, stateAfter, "[Notify] BoundingBoxDrawCallback::drawImplementation()");
+		}
 	}
 	osg::ref_ptr<osg::StateSet> _stateset;
 	LamurePointCloudPlugin* _plugin;
@@ -1734,7 +1743,10 @@ struct FrustumDrawCallbackGL : public osg::Drawable::DrawCallback
 
 	virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const override
 	{
+		GLStateBackup stateBackup = captureGLBackup();
+		GLStateSnapshot stateBefore = captureGLState();
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
+
 		if (!_initialized)
 		{
 			_plugin->create_frustum_resources();
@@ -1778,10 +1790,13 @@ struct FrustumDrawCallbackGL : public osg::Drawable::DrawCallback
 		//printBufferContents(GL_ARRAY_BUFFER, frustum_resource_.vbo_, sizeof(float) * frustum_resource_.vertices_[0].size());
 		//printVAOAttributes(frustum_resource_.vao_);
 
-		glUseProgram(0);
-		glBindVertexArray(0);
-
 		glPopAttrib();
+		restoreGLBackup(stateBackup);
+
+		if (_plugin->notify_button->state()) {
+			GLStateSnapshot stateAfter = captureGLState();
+			compareGLStateSnapshots(stateBefore, stateAfter, "[Notify] BoundingBoxDrawCallback::drawImplementation()");
+		}
 	}
 	osg::ref_ptr<osg::StateSet> _stateset;
 	LamurePointCloudPlugin* _plugin;
@@ -2009,6 +2024,8 @@ struct BoundingBoxDrawCallbackGL : public virtual osg::Drawable::DrawCallback
 
 	virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const {
 
+		osg::State* state = renderInfo.getState();
+		state->setCheckForGLErrors(osg::State::CheckForGLErrors::ONCE_PER_ATTRIBUTE);
 		GLStateBackup stateBackup = captureGLBackup();
 		GLStateSnapshot stateBefore = captureGLState();
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -2114,15 +2131,13 @@ struct BoundingBoxDrawCallbackGL : public virtual osg::Drawable::DrawCallback
 			}
 		}
 		render_info_.rendered_bounding_boxes_ = rendered_bounding_boxes;
-		glUseProgram(0);
-		glBindVertexArray(0);
-		glDisableVertexAttribArray(0);
 		glPopAttrib();
-
-		//GLStateSnapshot stateAfter = captureGLState();
-		//compareGLStateSnapshots(stateBefore, stateAfter);
 		restoreGLBackup(stateBackup);
-		
+
+		if (_plugin->notify_button->state()) {
+			GLStateSnapshot stateAfter = captureGLState();
+			compareGLStateSnapshots(stateBefore, stateAfter, "[Notify] BoundingBoxDrawCallback::drawImplementation()");
+		}
 	};
 	mutable bool _initialized;
 	osg::ref_ptr<osg::StateSet> _stateset;
@@ -2150,25 +2165,26 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 		_initialized(false)
 	{ if (_plugin->notify_button->state()) { std::cout << "[Notify] PointsDrawCallback()" << std::endl; } }
 
+
 	virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
 	{
 		if (_plugin->rendering_) { return; }
 		_plugin->rendering_ = true;
 
+		GLStateBackup stateBackup = captureGLBackup();
+		GLStateSnapshot stateBefore = captureGLState();
+		osg::State* state = renderInfo.getState();
+		//state->pushStateSet(_stateset.get());
+
+		state->setCheckForGLErrors(osg::State::CheckForGLErrors::ONCE_PER_ATTRIBUTE);
+
 
 		if (!_initialized) {
 			if (_plugin->notify_button->state()) { std::cout << "[Notify] PointsDrawCallback::drawImplementation()" << std::endl; }
-			//_plugin->HDC_draw = wglGetCurrentDC();
-			//_plugin->HGLRC_draw = GLStateBackup &backup();
-			//_plugin->init_schism_objects();
-			_plugin->create_pcl_resources();
-			_initialized = true;
+
 		}
 
-		GLStateBackup stateBackup = captureGLBackup();
-		GLStateSnapshot stateBefore = captureGLState();
-
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		//glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glDisable(GL_CULL_FACE);
 		scm::math::mat4d gl_view_matrix_d = matConv4D(osg::Matrixd(renderInfo.getState()->getModelViewMatrix()));
 		scm::math::mat4d gl_projection_matrix_d = matConv4D(osg::Matrixd(renderInfo.getState()->getProjectionMatrix()));
@@ -2176,15 +2192,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 		scm::math::mat4 gl_view_matrix = matConv4F(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
 		scm::math::mat4 gl_projection_matrix = matConv4F(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
 
-		//GLdouble vm[16];
-		//glGetDoublev(GL_MODELVIEW_MATRIX, vm);
-		//GLdouble pm[16];
-		//glGetDoublev(GL_PROJECTION_MATRIX, pm);
-		//scm::math::mat4d gl_view_matrix_d = scm::math::mat4d(vm[0], vm[1], vm[2], vm[3], vm[4], vm[5], vm[6], vm[7], vm[8], vm[9], vm[10], vm[11], vm[12], vm[13], vm[14], vm[15]);
-		//scm::math::mat4d gl_projection_matrix_d = scm::math::mat4d(pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10], pm[11], pm[12], pm[13], pm[14], pm[15]);
-		
-		//float* vmm = scm::math::mat4f(gl_view_matrix_d).data_array;
-		//float* pmm = scm::math::mat4f(gl_projection_matrix_d).data_array;
 		//screen_quad_.reset(new scm::gl::quad_geometry(device_, scm::math::vec2f(-1.0f, -1.0f), scm::math::vec2f(1.0f, 1.0f)));
 
 		lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
@@ -2224,35 +2231,69 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 			else { controller->dispatch(context_id, device_); }
 		}
 
-		context_->set_rasterizer_state(no_backface_culling_rasterizer_state_, 1.0f, 1.0f);
+
+		GLint prevVAO = 0;
+		if (_plugin->dump_button->state()) {
+			glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVAO);
+			printVAOAttributes(prevVAO);
+		}
+
+
+		if (_initialized) {
+			glBindVertexArray(pcl_resource_.vao_);
+		}
+
+
+		//context_->set_rasterizer_state(no_backface_culling_rasterizer_state_, 1.0f, 1.0f);
 		//auto selected_single_pass_shading_program = vis_xyz_shader_;
 		//if (settings_.enable_lighting_) {
 		//	selected_single_pass_shading_program = vis_xyz_lighting_shader_;
 		//}
 
-	
 		//context_->clear_color_buffer(fbo_, 0, scm::math::vec4f(settings_.background_color_.x, settings_.background_color_.y, settings_.background_color_.z, 1.0f));
 		//context_->clear_depth_stencil_buffer(fbo_);
 		//context_->set_frame_buffer(fbo_);
 		//context_->apply_frame_buffer();
 		
-
 		//context_->bind_program(selected_single_pass_shading_program);
 		//_plugin->set_lamure_uniforms(selected_single_pass_shading_program);
-		context_->set_blend_state(color_no_blending_state_);
-		context_->set_depth_stencil_state(depth_state_less_);
-		context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(traits->width, traits->height)));
-		context_->apply();
+		//context_->set_blend_state(color_no_blending_state_);
+		//context_->set_depth_stencil_state(depth_state_less_);
+		//context_->set_viewport(scm::gl::viewport(scm::math::vec2ui(0, 0), scm::math::vec2ui(traits->width, traits->height)));
+		//context_->apply();
 
-		glUseProgram(pcl_resource_.program_);
-		_plugin->set_gl_uniforms(pcl_resource_.program_);
+		//context_->apply_texture_units();
+		//context_->apply_image_units();
+		//context_->apply_frame_buffer();
+		context_->apply_vertex_input();
+		//context_->apply_state_objects();
+		//context_->apply_uniform_buffer_bindings();
+		//context_->apply_atomic_counter_bindings();
+		//context_->apply_storage_buffer_bindings();
+		//context_->apply_program();
+
 		//_plugin->set_stateset_uniforms(_stateset);
 
 		//DRAW_ALL_MODELS(selected_single_pass_shading_program);
+
+
+
+
 		if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
 			context_->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_, data_provenance_));
 		}
 		else { context_->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_)); }
+
+
+
+		//GLint vao_ = 0;
+		//glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao_);
+		//pcl_resource_.vao_ = vao_;
+
+		glUseProgram(pcl_resource_.program_);
+		_plugin->set_gl_uniforms(pcl_resource_.program_);
+
+
 
 		uint64_t rendered_splats_ = 0;
 		uint64_t rendered_nodes_ = 0;
@@ -2284,37 +2325,12 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 			float* ivm_ = scm::math::mat4f(scm::math::transpose(scm::math::inverse(model_view_matrix))).data_array;
 			float* mms_ = scm::math::mat4f(model_to_screen).data_array;
 
-			//_stateset->getUniform("mvp_matrix")->set(matConv4F(scm::math::mat4f(model_view_projection_matrix)));
-			//_stateset->getUniform("model_matrix")->set(matConv4F(scm::math::mat4f(model_matrix)));
-			//_stateset->getUniform("model_view_matrix")->set(matConv4F(scm::math::mat4f(model_view_matrix)));
-			//_stateset->getUniform("inv_mv_matrix")->set(matConv4F(scm::math::mat4f(scm::math::transpose(scm::math::inverse(model_view_matrix)))));
-			//_stateset->getUniform("model_to_screen_matrix")->set(matConv4F(scm::math::mat4f(model_to_screen)));
 
 			glUniformMatrix4fv(glGetUniformLocation(pcl_resource_.program_, "mvp_matrix"), 1, GL_FALSE, &mvp_[0]);
 			glUniformMatrix4fv(glGetUniformLocation(pcl_resource_.program_, "model_matrix"), 1, GL_FALSE, &mmm_[0]);
 			glUniformMatrix4fv(glGetUniformLocation(pcl_resource_.program_, "model_view_matrix"), 1, GL_FALSE, &mvm_[0]);
 			glUniformMatrix4fv(glGetUniformLocation(pcl_resource_.program_, "inv_mv_matrix"), 1, GL_FALSE, &ivm_[0]);
 			glUniformMatrix4fv(glGetUniformLocation(pcl_resource_.program_, "model_to_screen_matrix"), 1, GL_FALSE, &mms_[0]);
-
-			//selected_single_pass_shading_program->uniform("mvp_matrix", scm::math::mat4(model_view_projection_matrix));
-			//selected_single_pass_shading_program->uniform("model_matrix", scm::math::mat4(model_matrix));
-			//selected_single_pass_shading_program->uniform("model_view_matrix", scm::math::mat4(model_view_matrix));
-			//selected_single_pass_shading_program->uniform("inv_mv_matrix", scm::math::mat4f(scm::math::transpose(scm::math::inverse(model_view_matrix))));
-			//selected_single_pass_shading_program->uniform("model_to_screen_matrix", scm::math::mat4f(model_to_screen));
-
-			//vis_xyz_shader_->uniform("mvp_matrix", scm::math::mat4f(model_view_projection_matrix));
-			//vis_xyz_shader_->uniform("model_matrix", scm::math::mat4f(model_matrix));
-			//vis_xyz_shader_->uniform("model_view_matrix", scm::math::mat4f(model_view_matrix));
-			//vis_xyz_shader_->uniform("inv_mv_matrix", scm::math::mat4f(scm::math::transpose(scm::math::inverse(model_view_matrix))));
-			//vis_xyz_shader_->uniform("model_to_screen_matrix", scm::math::mat4f::identity());
-			//vis_xyz_shader_->uniform("model_radius_scale", 1.f);
-
-			//context_->apply_uniform_buffer_bindings();
-			//context_->bind_program(selected_single_pass_shading_program);
-			context_->set_blend_state(color_no_blending_state_);
-			context_->set_depth_stencil_state(depth_state_less_);
-			context_->apply_state_objects();
-			context_->apply_program();
 
 			bool draw = true;
 			for (auto const& node_slot_aggregate : renderable) {
@@ -2333,14 +2349,46 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 		render_info_.rendered_splats_ = rendered_splats_;
 		render_info_.rendered_nodes_ = rendered_nodes_;
 		_plugin->rendering_ = false;
-		//glUseProgram(0);
-		//glBindVertexArray(0);
-		//glDisableVertexAttribArray(0);
-		glPopAttrib();
 
-		//GLStateSnapshot stateAfter = captureGLState();
-		//compareGLStateSnapshots(stateBefore, stateAfter);
+		GLStateSnapshot stateAfter = captureGLState();
+		if ((!_initialized) && (stateBefore.vertexArrayBinding != stateAfter.vertexArrayBinding)) {
+			compareGLStateSnapshots(stateBefore, stateAfter, "[Notify] PointsDrawCallback::drawImplementation()");
+			pcl_resource_.vao_ = stateAfter.vertexArrayBinding;
+			_initialized = true;
+		}
+
+		if (_plugin->dump_button->state()) {
+			//_plugin->dump_button->setState(false);
+			//stringstream stream;
+			//renderInfo.getState()->print(stream);
+			//std::cout << stream.str() << std::endl;
+			//dumpStateSet(drawable->getStateSet());
+			//dumpStateSet(_stateset);
+			//dumpAllModes(drawable->getStateSet());
+			//dumpAllModes(_stateset);
+			//dumpStateSetWithInheritance(_stateset);
+			//osg_util::dumpAllStateAttributes(_stateset);
+			//glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVAO);
+			glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVAO);
+			printVAOAttributes(prevVAO);
+			_plugin->dump_button->setState(false);
+		}
+
+		if (_initialized) {
+			restoreGLBackup(stateBackup);
+		}
+
+		//glPopAttrib();
 		//restoreGLBackup(stateBackup);
+		//state->popStateSet();
+
+
+		if (_plugin->notify_button->state()) {
+			GLStateSnapshot stateAfter = captureGLState();
+			compareGLStateSnapshots(stateBefore, stateAfter, "[Notify] PointsDrawCallback::drawImplementation()");
+		}
+
+
 	}
 	osg::ref_ptr<osg::StateSet> _stateset;
 	LamurePointCloudPlugin* _plugin;
@@ -2525,6 +2573,7 @@ struct InitDrawCallback : public osg::Drawable::DrawCallback {
 			_plugin->HDC_draw = wglGetCurrentDC();
 			_plugin->HGLRC_draw = wglGetCurrentContext();
 			//scm_camera_->set_view_matrix(matConv4D(osg::Matrixd(renderInfo.getState()->getModelViewMatrix())));
+			_plugin->create_pcl_resources();
 			_initialized = true;
 		}
 
@@ -2597,6 +2646,7 @@ bool LamurePointCloudPlugin::init2() {
 	sync_button = new ui::Button(group, "sync");
 	notify_button = new ui::Button(group, "notify");
 	text_button = new ui::Button(group, "text");
+	dump_button = new ui::Button(group, "dump");
 
 	pointcloud_button->setShared(true);
 	boundingbox_button->setShared(true);
@@ -2608,6 +2658,7 @@ bool LamurePointCloudPlugin::init2() {
 	sync_button->setShared(true);
 	notify_button->setShared(true);
 	text_button->setShared(true);
+	dump_button->setShared(true);
 
 	plugin->LamureGroup = new osg::Group();
 	plugin->LamureGroup->setName("LamureGroup");
@@ -2822,8 +2873,7 @@ bool LamurePointCloudPlugin::init2() {
 		text_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0);
 		});
 
-	text_button->setCallback([this](bool state) {
-		text_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0);
+	dump_button->setCallback([this](bool state) {
 		});
 
 
