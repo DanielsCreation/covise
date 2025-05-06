@@ -29,7 +29,6 @@
 #include <cover/VRSceneGraph.h>
 #include "cover/OpenCOVER.h"
 #include <cover/VRWindow.h>
-#include <cover/VRViewer.h>
 #include <cover/coVRFileManager.h>
 
 #include <osg/Version>
@@ -62,17 +61,16 @@
 #include FT_FREETYPE_H
 
 namespace opencover {
-namespace ui {
-    class Element;
-    class Group;
-    class Slider;
-    class Menu;
-    class Button;
-}
+    namespace ui {
+        class Element;
+        class Group;
+        class Slider;
+        class Menu;
+        class Button;
+    }
 }
 
 using namespace opencover;
-
 class LamurePointCloudPlugin : public coVRPlugin, public ui::Owner
 {
     class ImageFileEntry
@@ -100,8 +98,6 @@ public:
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
     void preFrame();
-    bool update();
-    void postFrame();
     //void preDraw();
     size_t query_video_memory_in_mb();
 
@@ -114,11 +110,6 @@ public:
     void sync_cameras();
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
-    void create_pcl_resources();
-    void create_box_resources();
-    void create_coord_resources();
-    void create_frustum_resources();
-    void create_aux_representation();
     void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
     void draw_brush(scm::gl::program_ptr shader);
     void set_lamure_uniforms(scm::gl::program_ptr shader);
@@ -133,6 +124,25 @@ public:
     void lamure_display();
     void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::math::mat4d view_matrix, scm::math::mat4d projection_matrix, scm::gl::program_ptr shader);
     void sync_cameras(lmr_camera* lamure_camera, osg::Camera* osg_camera);
+    void debug_print_settings() const;
+
+    void init_pcl_resources();
+    void init_box_resources();
+    void init_coord_resources();
+    void init_frustum_resources();
+    void create_aux_representation();
+
+    GLuint compile_and_link_shaders(std::string vs_source, std::string fs_source);
+    GLuint compile_and_link_shaders(std::string vs_source, std::string gs_source, std::string fs_source);
+    unsigned int create_shader(const std::string& vertexShader, const std::string& fragmentShader, uint8_t ctx_id);
+    unsigned int compile_shader(unsigned int type, const std::string& source, uint8_t ctx_id);
+
+    void init_line_uniforms();
+    void init_pcl_uniforms();
+
+    void set_gl_uniforms();
+
+    void update_pcl_uniforms();
 
     // util
     bool parse_prefix(std::string& in_string, std::string const& prefix);
@@ -151,6 +161,7 @@ public:
     ui::Group* FileGroup;
     scm::math::mat4d load_matrix(const std::string& filename);
     void load_settings(const std::string &filename);
+    void load_settings(std::string const& filename, std::string const& data_directory, std::vector<std::string> const& manual_files);
     bool rendering_ = false;
 
     HWND HWND_cover;
@@ -176,60 +187,11 @@ private:
     static LamurePointCloudPlugin* plugin;
     void selectedMenuButton(ui::Element*);
     std::vector<ImageFileEntry> pointVec;
-    void clearData();
     std::string const strip_whitespace(std::string const& in_string);
     void readMenuConfigData(const char*, std::vector<ImageFileEntry>&, ui::Group*);
     float pointSizeValue = 4;
-    void createGeodes(osg::Group*, const std::string&);
-    bool adaptLOD = true; // LOD enable/disable
+    bool adaptLOD = true;
 
-    
-    osg::Point* pointstate;
-    osg::StateSet* stateset;
-    osg::BoundingBox box;
-    osg::Vec3Array* points;
-    osg::Vec3Array* colors;
-    osg::ElementBufferObject* primitiveBufferArray;
-    PointSet* pointSet = nullptr;
-    osg::ref_ptr<osg::Camera> pcl_camera;
-    osg::ref_ptr<osg::Camera> hud_camera;
-    osg::ref_ptr<osg::Group> LamureGroup;
-    osg::ref_ptr<osg::Node> file;
-
-    osg::ref_ptr<osg::Geode> geode;
-    osg::ref_ptr<osg::Geode> init_geode;
-    osg::ref_ptr<osg::Geode> text_geode;
-    osg::ref_ptr<osg::Geode> coord_geode;
-    osg::ref_ptr<osg::Geode> coord_geode_gl;
-    osg::ref_ptr<osg::Geode> frustum_geode;
-    osg::ref_ptr<osg::Geode> frustum_geode_gl;
-    osg::ref_ptr<osg::Geode> pointcloud_geode;
-    osg::ref_ptr<osg::Geode> boundingbox_geode;
-    osg::ref_ptr<osg::Geode> boundingbox_geode_gl;
-
-    osg::ref_ptr<LamureGeometry> geometry;
-    osg::ref_ptr<LamureDrawable> draw1;
-
-    osg::ref_ptr<osg::Switch> _switch;
-
-    osg::ref_ptr<osg::StateSet> init_stateset;
-    osg::ref_ptr<osg::StateSet> pointcloud_stateset;
-    osg::ref_ptr<osg::StateSet> boundingbox_stateset;
-    osg::ref_ptr<osg::StateSet> boundingbox_stateset_gl;
-    osg::ref_ptr<osg::StateSet> frustum_stateset;
-    osg::ref_ptr<osg::StateSet> frustum_stateset_gl;
-    osg::ref_ptr<osg::StateSet> coord_stateset;
-    osg::ref_ptr<osg::StateSet> coord_stateset_gl;
-    osg::ref_ptr<osg::StateSet> text_stateset;
-
-    osg::ref_ptr<osg::Geometry> init_geometry;
-    osg::ref_ptr<osg::Geometry> pointcloud_geometry;
-    osg::ref_ptr<osg::Geometry> boundingbox_geometry;
-    osg::ref_ptr<osg::Geometry> boundingbox_geometry_gl;
-    osg::ref_ptr<osg::Geometry> frustum_geometry;
-    osg::ref_ptr<osg::Geometry> frustum_geometry_gl;
-    osg::ref_ptr<osg::Geometry> coord_geometry;
-    osg::ref_ptr<osg::Geometry> coord_geometry_gl;
 
 
 
@@ -246,11 +208,12 @@ public:
     ui::Group* group = nullptr;
     bool dump = false;
 
+    std::vector<ui::Button*>    model_buttons_;
+    std::vector<bool>           model_visible_;
+
     ui::Button* pointcloud_button = nullptr;
     ui::Button* boundingbox_button = nullptr;
-    ui::Button* boundingbox_button_gl = nullptr;
     ui::Button* frustum_button = nullptr;
-    ui::Button* frustum_button_gl = nullptr;
     ui::Button* coord_button = nullptr;
     ui::Button* coord_button_gl = nullptr;
     ui::Button* sync_button = nullptr;
@@ -258,14 +221,34 @@ public:
     ui::Button* text_button = nullptr;
     ui::Button* dump_button = nullptr;
 
-    osg::ref_ptr<osg::Geometry> _triangleGeometry;
-    osg::ref_ptr<osg::StateSet> _triangleStateSet;
+    osg::ref_ptr<osg::Camera> pcl_camera;
+    osg::ref_ptr<osg::Camera> hud_camera;
+    osg::ref_ptr<osg::Group> LamureGroup;
+    osg::ref_ptr<osg::Node> file;
 
-    osg::ref_ptr<osg::Geometry> _lineGeometry;
-    osg::ref_ptr<osg::StateSet> _lineStateSet;
+    osg::ref_ptr<osg::Geode> init_geode;
+    osg::ref_ptr<osg::Geode> pointcloud_geode;
+    osg::ref_ptr<osg::Geode> boundingbox_geode;
+    osg::ref_ptr<osg::Geode> frustum_geode;
+    osg::ref_ptr<osg::Geode> frustum_geode_gl;
+    osg::ref_ptr<osg::Geode> coord_geode;
+    osg::ref_ptr<osg::Geode> coord_geode_gl;
+    osg::ref_ptr<osg::Geode> text_geode;
 
-    osg::ref_ptr<osg::Geometry> _pointGeometry;
-    osg::ref_ptr<osg::StateSet> _pointStateSet;
+    osg::ref_ptr<osg::StateSet> init_stateset;
+    osg::ref_ptr<osg::StateSet> pointcloud_stateset;
+    osg::ref_ptr<osg::StateSet> boundingbox_stateset;
+    osg::ref_ptr<osg::StateSet> frustum_stateset;
+    osg::ref_ptr<osg::StateSet> coord_stateset;
+    osg::ref_ptr<osg::StateSet> coord_stateset_gl;
+    osg::ref_ptr<osg::StateSet> text_stateset;
+
+    osg::ref_ptr<osg::Geometry> init_geometry;
+    osg::ref_ptr<osg::Geometry> pointcloud_geometry;
+    osg::ref_ptr<osg::Geometry> boundingbox_geometry;
+    osg::ref_ptr<osg::Geometry> frustum_geometry;
+    osg::ref_ptr<osg::Geometry> coord_geometry;
+    osg::ref_ptr<osg::Geometry> coord_geometry_gl;
 
     // Slider-Deklarationen
 
@@ -331,51 +314,6 @@ protected:
     ui::Slider* lodFarDistanceSlider = nullptr;
     ui::Slider* lodNearDistanceSlider = nullptr;
 
-
 };
-
-
-static unsigned int CreateShader(const std::string& vertexShader, const std::string& fragmentShader, uint8_t ctx_id)
-{
-    osg::GLExtensions* gl_api = new osg::GLExtensions(ctx_id);
-    unsigned int program = gl_api->glCreateProgram();
-    unsigned int vs = CompileShader(GL_VERTEX_SHADER, vertexShader, ctx_id);
-    unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, fragmentShader, ctx_id);
-
-    gl_api->glAttachShader(program, vs);
-    gl_api->glAttachShader(program, fs);
-    gl_api->glLinkProgram(program);
-    gl_api->glValidateProgram(program);
-
-    gl_api->glDeleteProgram(vs);
-    gl_api->glDeleteProgram(fs);
-    return 1;
-}
-
-static unsigned int CompileShader(unsigned int type, const std::string& source, uint8_t ctx_id)
-{
-    osg::GLExtensions* gl_api = new osg::GLExtensions(ctx_id);
-    unsigned int id = gl_api->glCreateShader(type);
-    const char* src = source.c_str();
-    gl_api->glShaderSource(id, 1, &src, nullptr);
-    gl_api->glCompileShader(id);
-
-    int result;
-    gl_api->glGetShaderiv(id, GL_COMPILE_STATUS, &result);
-    if (result == false)
-    {
-        int length;
-        gl_api->glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
-        char* message = (char*)alloca(length * sizeof(char));
-        gl_api->glGetShaderInfoLog(id, length, &length, message);
-        std::cout << "Failed to compile " <<
-            (type == GL_VERTEX_SHADER ? "vertex" : "fragment") << " shader!" << std::endl;
-        std::cout << message << std::endl;
-        gl_api->glDeleteProgram(id);
-        return 0;
-    };
-    return id;
-}
-
 
 #endif

@@ -155,8 +155,11 @@
           <ShortCut value="drive" name="drive" />
           <ShortCut value="fly" name="fly" />
         </AKToolbar>
-        
       </Plugin>
+      
+    
+    <DefaultScaleFactor value="4" />
+      
     </COVER>
     
     <System>

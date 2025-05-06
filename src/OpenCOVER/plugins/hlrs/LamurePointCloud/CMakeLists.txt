@@ -59,6 +59,7 @@ SET(HEADERS
   LamureGeometry.h
   LamureDrawable.h
   gl_state.h
+  osg_util.h
 )
 
 SET(SOURCES 
@@ -67,6 +68,7 @@ SET(SOURCES
   LamureGeometry.cpp
   LamureDrawable.cpp
   gl_state.cpp
+  osg_util.cpp
 )
 
 set(SCHISM_INCLUDE_DIRS

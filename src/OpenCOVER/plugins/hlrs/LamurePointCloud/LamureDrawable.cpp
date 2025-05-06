@@ -44,7 +44,7 @@ void LamureDrawable::config() {
 }
 
 void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const {
-    uint8_t ctx_id = renderInfo.getContextID();
+    /*uint8_t ctx_id = renderInfo.getContextID();
     osg::GLExtensions* gl_api = new osg::GLExtensions(ctx_id);
     std::cout << "getUseDisplayList(): " << getUseDisplayList() << std::endl;
     std::cout << "getUseVertexArrayObject(): " << getUseVertexArrayObject() << std::endl;
@@ -101,7 +101,7 @@ void LamureDrawable::drawImplementation(osg::RenderInfo& renderInfo) const {
     
 
 
-    /*
+    
     float data_vertices[9] =
     {
         -300.0f, 0.0f, -300.0f,
