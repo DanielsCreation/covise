@@ -46,6 +46,7 @@
 #include <osg/BufferTemplate>
 #include <osg/State>
 
+#include "measurement.h"
 #include "LamureDrawable.h"
 #include "LamureGeometry.h"
 #include <lamure/types.h>
@@ -58,6 +59,7 @@
 #include <scm/gl_util/font/text_renderer.h>
 
 #include <ft2build.h>
+#include <LamurePointCloudInteractor.h>
 #include FT_FREETYPE_H
 
 namespace opencover {
@@ -103,9 +105,6 @@ public:
 
     // shared functions
     void init_lamure_shader();
-    void read_lamure_shader();
-    void init_pcl_camera();
-    void init_coord_resource();
     void init_schism_objects();
     void sync_cameras();
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
@@ -125,6 +124,7 @@ public:
     void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::math::mat4d view_matrix, scm::math::mat4d projection_matrix, scm::gl::program_ptr shader);
     void sync_cameras(lmr_camera* lamure_camera, osg::Camera* osg_camera);
     void debug_print_settings() const;
+    void setViewerPos(float x, float y, float z);
 
     void init_pcl_resources();
     void init_box_resources();
@@ -137,12 +137,14 @@ public:
     unsigned int create_shader(const std::string& vertexShader, const std::string& fragmentShader, uint8_t ctx_id);
     unsigned int compile_shader(unsigned int type, const std::string& source, uint8_t ctx_id);
 
-    void init_line_uniforms();
-    void init_pcl_uniforms();
+    void init_uniforms();
+    void set_surfel_uniforms();
+    void set_point_uniforms();
 
-    void set_gl_uniforms();
+    void startMeasurement();
+    void stopMeasurement();
 
-    void update_pcl_uniforms();
+    LamurePointCloudInteractor* interactor;
 
     // util
     bool parse_prefix(std::string& in_string, std::string const& prefix);
@@ -155,7 +157,6 @@ public:
     void apply_vt_cut_update();
     //float get_atlas_scale_factor();
     void lines_from_min_max(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, std::vector<scm::math::vec3f>& lines);
-    void lines_from_min_max_buffered(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, osg::ref_ptr<osg::Vec3Array>& lines);
     
     // objects and pointers
     ui::Group* FileGroup;
@@ -191,22 +192,28 @@ private:
     void readMenuConfigData(const char*, std::vector<ImageFileEntry>&, ui::Group*);
     float pointSizeValue = 4;
     bool adaptLOD = true;
-
-
-
+    std::vector<osg::Vec3> _path;
+    float                  _speed = 1.0f;
+    Measurement* _measurement = nullptr;
+    bool measurement_running = 0;
+    osgViewer::ViewerBase::FrameScheme rendering_scheme;
+    std::function<void(bool)> _measureCB;
 
 
 public:
     void printNodePath(osg::ref_ptr<osg::Node> pointer);
-    osg::ref_ptr<osg::Program> createOsgProgram(const std::string& vertPath, const std::string& geomPath, const std::string& fragPath);
     std::vector<vector<float>> getSerializedBvhMinMax(const std::vector<scm::gl::boxf>);
     std::vector<float> getBoxCorners(scm::gl::boxf);
     float* VecToArr(std::vector<std::vector<float>> vec);
     int* VecToArr(std::vector<std::vector<int>> vec);
     osg::ref_ptr<osg::MatrixTransform> transform;
-    ui::Menu* menu = nullptr;
+
+    ui::Menu* lamure_menu = nullptr;
     ui::Group* group = nullptr;
-    bool dump = false;
+    ui::Group* model_group = nullptr;
+    ui::Group* selection_group = nullptr;
+    ui::Group* adaption_group = nullptr;
+    ui::Group* action_group = nullptr;
 
     std::vector<ui::Button*>    model_buttons_;
     std::vector<bool>           model_visible_;
@@ -215,11 +222,15 @@ public:
     ui::Button* boundingbox_button = nullptr;
     ui::Button* frustum_button = nullptr;
     ui::Button* coord_button = nullptr;
-    ui::Button* coord_button_gl = nullptr;
     ui::Button* sync_button = nullptr;
     ui::Button* notify_button = nullptr;
     ui::Button* text_button = nullptr;
     ui::Button* dump_button = nullptr;
+
+    ui::Button* _surfelButton = nullptr;
+    ui::Button* _measureButton = nullptr;
+
+    bool dump = false;
 
     osg::ref_ptr<osg::Camera> pcl_camera;
     osg::ref_ptr<osg::Camera> hud_camera;
@@ -230,9 +241,7 @@ public:
     osg::ref_ptr<osg::Geode> pointcloud_geode;
     osg::ref_ptr<osg::Geode> boundingbox_geode;
     osg::ref_ptr<osg::Geode> frustum_geode;
-    osg::ref_ptr<osg::Geode> frustum_geode_gl;
     osg::ref_ptr<osg::Geode> coord_geode;
-    osg::ref_ptr<osg::Geode> coord_geode_gl;
     osg::ref_ptr<osg::Geode> text_geode;
 
     osg::ref_ptr<osg::StateSet> init_stateset;
@@ -240,7 +249,6 @@ public:
     osg::ref_ptr<osg::StateSet> boundingbox_stateset;
     osg::ref_ptr<osg::StateSet> frustum_stateset;
     osg::ref_ptr<osg::StateSet> coord_stateset;
-    osg::ref_ptr<osg::StateSet> coord_stateset_gl;
     osg::ref_ptr<osg::StateSet> text_stateset;
 
     osg::ref_ptr<osg::Geometry> init_geometry;
@@ -248,7 +256,6 @@ public:
     osg::ref_ptr<osg::Geometry> boundingbox_geometry;
     osg::ref_ptr<osg::Geometry> frustum_geometry;
     osg::ref_ptr<osg::Geometry> coord_geometry;
-    osg::ref_ptr<osg::Geometry> coord_geometry_gl;
 
     // Slider-Deklarationen
 
@@ -293,7 +300,6 @@ public:
 
 protected:
     ui::Group* loadGroup = nullptr;
-    ui::Group* model_grp = nullptr;
     ui::Group* viewGroup = nullptr;
     ui::Menu* loadMenu = nullptr;
     ui::Button* rotPointsButton = nullptr;
@@ -308,11 +314,20 @@ protected:
 
     ui::Slider* maxRadiusSlider = nullptr;
     ui::Slider* scaleRadiusSlider = nullptr;
+    ui::Slider* lodErrorSlider = nullptr;
 
     ui::SelectionList* shader_list = nullptr;
 
     ui::Slider* lodFarDistanceSlider = nullptr;
     ui::Slider* lodNearDistanceSlider = nullptr;
+
+    ui::Slider* lodErrorSlider_;
+    ui::Slider* uploadBudgetSlider_;
+    ui::Slider* videoMemoryBudgetSlider_;
+    ui::Slider* mainMemoryBudgetSlider_;
+    ui::Slider* maxUpdatesSlider_;
+
+    ui::SelectionList* modelList_;
 
 };
 

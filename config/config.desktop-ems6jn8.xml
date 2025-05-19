@@ -13,21 +13,21 @@
       <CollisionDist value="1500" />
       <Background r="0.5" g="0.5" b="1.0" /> 
       <MultiThreaded value="false" />
-      <ShowGeodeName enable="off" value="off"/>
+      <ShowGeodeName enable="on" value="on"/>
       <LODScale value="1" />
       <RotationSpeed value="10" />
       <REGISTER_RAW_SCENEGRAPH value="off" />
-      <ScaleAll value="on" />
-      <CoordAxis value="off" />
+      <ScaleAll value="off" />
+      <CoordAxis value="on" />
       <Freeze value="off" />
       <FPS value="on" />
       <ConstantInteractorSize value="off"/>
       <Restrict value="off" />
-      <ScaleWithInteractors value="on"/>
+      <ScaleWithInteractors value="off"/>
       <TwoSide value="on" />
       <EnvMapMode value="NONE" />
       <TransparencyMode value="sorted_blended" />
-      <Headlight value="off" />
+      <Headlight value="on" />
       <RenderOnMaster value="on" />
       <Statistics value="off" />
       <DebugLevel value="2" />
@@ -46,10 +46,19 @@
       <Stencil value="off" />
       <CheckForOpenGLErrors value="on" />
       <StencilBits value="8" />
-      <Stencil value="true" />
       <Notify value="INFO" />
-      
-      
+
+
+      <Near value="10" />
+      <Far value="10000000" />
+      <SceneSize value="2000" />
+      <ViewerPosition x="0.0" y="-2000.0" z="30.0"/>
+      <showRotationPoint value="on"/>
+      <DefaultScaleFactor value="10" />
+      <SmallSceneAxis value="on">
+        <!-- 2) lege hier die gewünschte Schriftgröße fest -->
+        <FontSize value="50"/>
+      </SmallSceneAxis>
       
       <!--GLVersion value="3.2" /> -->
       
@@ -140,7 +149,7 @@
       
       <Plugin>
         <LamurePointCloud>
-          <lmr value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Config/Config_000.lmr" />
+          <lmr value="C:/src/covise/src/OpenCOVER/plugins/hlrs/LamurePointCloud/Config.lmr" />
         </LamurePointCloud>
 
         <AKToolbar value="false" menu="false">
@@ -156,9 +165,6 @@
           <ShortCut value="fly" name="fly" />
         </AKToolbar>
       </Plugin>
-      
-    
-    <DefaultScaleFactor value="4" />
       
     </COVER>
     

@@ -464,10 +464,10 @@ void VRSceneGraph::initSceneGraph()
 void VRSceneGraph::initAxis()
 {
     // geode for coordinate system axis
-    m_worldAxis = loadAxisGeode(4);
-    m_handAxis = loadAxisGeode(2);
-    m_viewerAxis = loadAxisGeode(4);
-    m_objectAxis = loadAxisGeode(0.01f);
+    m_worldAxis = loadAxisGeode(1.0f);
+    m_handAxis = loadAxisGeode(0.1f);
+    m_viewerAxis = loadAxisGeode(0.1f);
+    m_objectAxis = loadAxisGeode(0.1f);
     m_viewerAxisTransform = new osg::MatrixTransform();
     m_viewerAxisTransform->setName("ViewerAxisTransform");
     m_scene->addChild(m_viewerAxisTransform.get());
