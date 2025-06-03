@@ -15,15 +15,15 @@
       <MultiThreaded value="false" />
       <ShowGeodeName enable="on" value="on"/>
       <LODScale value="1" />
-      <RotationSpeed value="10" />
+      <RotationSpeed value="1" />
       <REGISTER_RAW_SCENEGRAPH value="off" />
-      <ScaleAll value="off" />
+      <ScaleAll value="on" />
       <CoordAxis value="on" />
       <Freeze value="off" />
       <FPS value="on" />
       <ConstantInteractorSize value="off"/>
       <Restrict value="off" />
-      <ScaleWithInteractors value="off"/>
+      <ScaleWithInteractors value="on"/>
       <TwoSide value="on" />
       <EnvMapMode value="NONE" />
       <TransparencyMode value="sorted_blended" />
@@ -48,15 +48,15 @@
       <StencilBits value="8" />
       <Notify value="INFO" />
 
-
+      <Turntable value="off"/>
       <Near value="10" />
-      <Far value="10000000" />
+      <Far value="100000" />
       <SceneSize value="2000" />
       <ViewerPosition x="0.0" y="-2000.0" z="30.0"/>
       <showRotationPoint value="on"/>
-      <DefaultScaleFactor value="10" />
+      <rotationPointSize value="0.2f"/>
+      <DefaultScaleFactor value="200" />
       <SmallSceneAxis value="on">
-        <!-- 2) lege hier die gewünschte Schriftgröße fest -->
         <FontSize value="50"/>
       </SmallSceneAxis>
       

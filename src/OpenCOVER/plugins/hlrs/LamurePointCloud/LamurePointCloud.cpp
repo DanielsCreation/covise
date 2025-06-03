@@ -136,8 +136,8 @@ LamurePointCloudPlugin::LamurePointCloudPlugin() : ui::Owner("LamurePointCloud",
 	plugin = this;
 }
 
-std::string vis_surfel_shader_vs_source;
-std::string vis_surfel_shader_fs_source;
+std::string vis_point_shader_vs_source;
+std::string vis_point_shader_fs_source;
 std::string vis_line_bb_vs_source;
 std::string vis_line_bb_fs_source;
 std::string vis_quad_vs_source;
@@ -283,7 +283,7 @@ lamure::ren::camera* scm_camera_;
 osg::ref_ptr<osg::Camera>   osg_camera_;
 osg::ref_ptr<osg::Camera>   rtt_camera_;
 
-scm::gl::program_ptr vis_surfel_shader_;
+scm::gl::program_ptr vis_point_shader_;
 scm::gl::program_ptr vis_line_bb_shader_; 
 scm::gl::program_ptr vis_text_shader_;
 scm::gl::program_ptr vis_box_shader_;
@@ -328,6 +328,7 @@ scm::gl::texture_2d_ptr bg_texture_;
 
 scm::time::accum_timer<scm::time::high_res_timer> frame_time_;
 
+
 struct settings {
 	int32_t frame_div_{ 1 };
 	int32_t vram_{ 1024 };
@@ -338,14 +339,16 @@ struct settings {
 	bool splatting_{ 0 };  // multipass is not working yet (bc of storage buffers/rtt mode?)
 	bool gamma_correction_{ 0 };
 	bool surfel_shader_{ 1 };
+	bool face_eye_{ 0 };
 	int32_t gui_{ 1 };
 	int32_t travel_{ 2 };
 	float travel_speed_{ 20.5f };
 	int32_t max_brush_size_{ 4096 };
 	bool lod_update_{ 1 };
+	float lod_error_{ 1.0f };
 	bool use_pvs_{ 0 };
 	bool pvs_culling_{ 0 };
-	float point_size_factor_{ 10.0f };
+	float point_size_factor_{ 1.0f };
 	float aux_point_size_{ 1.0f };
 	float aux_point_distance_{ 0.5f };
 	float aux_point_scale_{ 1.0f };
@@ -362,7 +365,6 @@ struct settings {
 	bool show_bvhs_{ 0 };
 	bool show_pvs_{ 0 };
 	int32_t channel_{ 0 };
-	float lod_error_{ 1.0f };
 	bool enable_lighting_{ 0 };
 	bool use_material_color_{ 1 };
 	scm::math::vec3f material_diffuse_{ 0.6f, 0.6f, 0.6f };
@@ -391,6 +393,148 @@ struct settings {
 	std::vector<float> frustum_color_{ 0.0f, 0.0f, 0.0f, 1.0f };
 };
 settings settings_;
+
+
+void LamurePointCloudPlugin::load_settings(std::string const& filename) {
+	using namespace std::filesystem;
+	std::cout << "load_settings()" << std::endl;
+	// Hilfs-Lambda zum Trimmen
+	auto strip_ws = [](std::string s) {
+		auto not_ws = [](char c) { return !std::isspace(c); };
+		s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_ws));
+		s.erase(std::find_if(s.rbegin(), s.rend(), not_ws).base(), s.end());
+		return s;
+		};
+	// 1) Datei einlesen
+	std::ifstream file(filename);
+	if (!file.is_open()) { std::cerr << "could not open lmr file: " << filename << std::endl; std::exit(EXIT_FAILURE); }
+	std::vector<std::string> lines; for (std::string line; std::getline(file, line); ) lines.push_back(line);
+	file.close();
+	// 2) Alte Einträge löschen
+	settings_.models_.clear(); settings_.transforms_.clear(); settings_.aux_.clear();
+	// 3) erste Key:Value-Pässe
+	std::string data_dir; std::vector<std::string> manual_files;
+	for (auto const& raw : lines) {
+		auto l = strip_ws(raw);
+		if (l.empty() || l[0] == '#') continue;
+		auto colon = l.find(':');
+		if (colon == std::string::npos)
+			manual_files.push_back(l);
+		else {
+			auto key = strip_ws(l.substr(0, colon)),
+				value = strip_ws(l.substr(colon + 1));
+			if (key == "data_directory") data_dir = value;
+		}
+	}
+	// 4) externe Modelle sammeln
+	std::vector<std::string> external_models;
+	if (!data_dir.empty())
+		for (auto const& e : recursive_directory_iterator(data_dir))
+			if (e.is_regular_file() && e.path().extension() == ".bvh")
+				external_models.push_back(e.path().string());
+	external_models.insert(external_models.end(), manual_files.begin(), manual_files.end());
+	bool use_external = !external_models.empty();
+	// 5) falls vorhanden, direkt hinzufügen
+	lamure::model_t model_id = 0;
+	if (use_external)
+		for (auto const& m : external_models)
+			settings_.models_.push_back(m),
+			settings_.transforms_[model_id] = scm::math::mat4d::identity(),
+			settings_.aux_[model_id++] = "";
+	// 6) restliche Zeilen verarbeiten, alle Settings in einer Zeile
+	for (auto const& raw : lines) {
+		auto l = strip_ws(raw);
+		if (l.empty() || l[0] == '#') continue;
+		auto colon = l.find(':');
+		if (colon == std::string::npos) {
+			if (use_external) continue;
+			std::istringstream ss(l); std::string model; ss >> model;
+			settings_.models_.push_back(model), settings_.transforms_[model_id] = scm::math::mat4d::identity(), settings_.aux_[model_id++] = "";
+		}
+		else {
+			auto key = strip_ws(l.substr(0, colon)),
+				value = strip_ws(l.substr(colon + 1));
+			if (key == "data_directory") continue;
+			if (!key.empty() && key[0] == '@') {
+				auto ws = l.find_first_of(' ');
+				uint32_t addr = std::atoi(strip_ws(l.substr(1, ws - 1)).c_str());
+				key = strip_ws(l.substr(ws + 1, colon - (ws + 1)));
+				if (key == "tf")  settings_.transforms_[addr] = load_matrix(value);
+				else if (key == "aux") settings_.aux_[addr] = value;
+				else { std::cerr << "unrecognized @-key: " << key << std::endl; std::exit(EXIT_FAILURE); }
+			}
+			else if (key == "surfel_shader")        settings_.surfel_shader_ = std::atoi(value.c_str());
+			else if (key == "frame_div")            settings_.frame_div_ = std::max(std::atoi(value.c_str()), 1);
+			else if (key == "vram")                 settings_.vram_ = std::max(std::atoi(value.c_str()), 8);
+			else if (key == "ram")                  settings_.ram_ = std::max(std::atoi(value.c_str()), 8);
+			else if (key == "upload")               settings_.upload_ = std::max(std::atoi(value.c_str()), 8);
+			else if (key == "splatting")            settings_.splatting_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "face_eye")             settings_.face_eye_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "gamma_correction")     settings_.gamma_correction_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "pvs_culling")          settings_.pvs_culling_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "use_pvs")              settings_.use_pvs_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "point_size_factor")    settings_.point_size_factor_ = std::clamp(std::atof(value.c_str()), 1.0, 10.0);
+			else if (key == "aux_point_size")       settings_.aux_point_size_ = std::clamp(std::atof(value.c_str()), 0.00001, 1.0);
+			else if (key == "aux_point_distance")   settings_.aux_point_distance_ = std::clamp(std::atof(value.c_str()), 0.00001, 1.0);
+			else if (key == "aux_focal_length")     settings_.aux_focal_length_ = std::clamp(std::atof(value.c_str()), 0.001, 10.0);
+			else if (key == "max_brush_size")       settings_.max_brush_size_ = std::clamp(std::atoi(value.c_str()), 64, 1024 * 1024);
+			else if (key == "lod_error")            settings_.lod_error_ = std::clamp(std::atof(value.c_str()), 1.0, 10.0);
+			else if (key == "provenance")           settings_.provenance_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "create_aux_resources") settings_.create_aux_resources_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_normals")         settings_.show_normals_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_accuracy")        settings_.show_accuracy_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_radius_deviation")settings_.show_radius_deviation_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_output_sensitivity") settings_.show_output_sensitivity_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_sparse")          settings_.show_sparse_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_views")           settings_.show_views_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_photos")          settings_.show_photos_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_octrees")         settings_.show_octrees_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_bvhs")            settings_.show_bvhs_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "show_pvs")             settings_.show_pvs_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "channel")              settings_.channel_ = std::max(std::atoi(value.c_str()), 0);
+			else if (key == "enable_lighting")      settings_.enable_lighting_ = std::clamp(std::atoi(value.c_str()), 0, 1) != 0;
+			else if (key == "use_material_color")   settings_.use_material_color_ = std::clamp(std::atoi(value.c_str()), 0, 1) != 0;
+			else if (key == "material_diffuse_r")   settings_.material_diffuse_.x = std::max<float>(std::atof(value.c_str()), 0.0f);
+			else if (key == "material_diffuse_g")   settings_.material_diffuse_.y = std::max<float>(std::atof(value.c_str()), 0.0f);
+			else if (key == "material_diffuse_b")   settings_.material_diffuse_.z = std::max<float>(std::atof(value.c_str()), 0.0f);
+			else if (key == "material_specular_r")  settings_.material_specular_.x = std::max<float>(std::atof(value.c_str()), 0.0f);
+			else if (key == "material_specular_g")  settings_.material_specular_.y = std::max<float>(std::atof(value.c_str()), 0.0f);
+			else if (key == "material_specular_b")  settings_.material_specular_.z = std::max<float>(std::atof(value.c_str()), 0.0f);
+			else if (key == "material_specular_exponent") settings_.material_specular_.w = std::clamp(std::atof(value.c_str()), 0.0, 10000.0);
+			else if (key == "ambient_light_color_r")settings_.ambient_light_color_.r = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+			else if (key == "ambient_light_color_g")settings_.ambient_light_color_.g = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+			else if (key == "ambient_light_color_b")settings_.ambient_light_color_.b = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+			else if (key == "point_light_color_r")  settings_.point_light_color_.r = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+			else if (key == "point_light_color_g")  settings_.point_light_color_.g = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+			else if (key == "point_light_color_b")  settings_.point_light_color_.b = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+			else if (key == "point_light_intensity")settings_.point_light_color_.w = std::clamp<float>(std::atof(value.c_str()), 0.0f, 10000.0);
+			else if (key == "background_color_r")   settings_.background_color_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+			else if (key == "background_color_g")   settings_.background_color_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+			else if (key == "background_color_b")   settings_.background_color_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+			else if (key == "heatmap")              settings_.heatmap_ = std::max(std::atoi(value.c_str()), 0) != 0;
+			else if (key == "heatmap_min")          settings_.heatmap_min_ = std::max<float>(std::atof(value.c_str()), 0.0f);
+			else if (key == "heatmap_max")          settings_.heatmap_max_ = std::max<float>(std::atof(value.c_str()), 0.0f);
+			else if (key == "heatmap_min_r")        settings_.heatmap_color_min_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+			else if (key == "heatmap_min_g")        settings_.heatmap_color_min_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+			else if (key == "heatmap_min_b")        settings_.heatmap_color_min_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+			else if (key == "heatmap_max_r")        settings_.heatmap_color_max_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+			else if (key == "heatmap_max_g")        settings_.heatmap_color_max_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+			else if (key == "heatmap_max_b")        settings_.heatmap_color_max_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+			else if (key == "atlas_file")           settings_.atlas_file_ = value;
+			else if (key == "json")                 settings_.json_ = value;
+			else if (key == "pvs")                  settings_.pvs_ = value;
+			else if (key == "selection")            settings_.selection_ = value;
+			else if (key == "background_image")     settings_.background_image_ = value;
+			else if (key == "max_radius")           settings_.max_radius_ = std::max(std::atof(value.c_str()), 0.1);
+			else if (key == "scale_radius")         settings_.scale_radius_ = std::max(std::atof(value.c_str()), 0.1);
+			else { std::cerr << "unrecognized key: " << key << std::endl; std::exit(EXIT_FAILURE); }
+		}
+	}
+	for (auto const& m : settings_.models_) {
+		std::cout << "Loaded model: " << m << std::endl;
+	}
+}
+
 
 
 struct Character {
@@ -472,6 +616,15 @@ struct selection {
 selection selection_;
 
 
+struct trackball {
+	float dist_ = 0.0;
+	float size_ = 0.0;
+	osg::Vec3 initial_pos_;
+	osg::Vec3 pos_;
+};
+trackball trackball_;
+
+
 struct input {
 	float trackball_x_ = 0.f;
 	float trackball_y_ = 0.f;
@@ -521,56 +674,66 @@ struct render_info {
 };
 render_info render_info_;
 
-struct point_shader {
-	GLuint program_ = 0;
-
-	GLint mvp_matrix_location = -1;
-	GLint model_matrix_location = -1;
-	GLint model_view_matrix_location = -1;
-	GLint inverse_mv_matrix_location = -1;
-	GLint model_to_screen_matrix_location = -1;
-
-	// Point-Cloud-Parameter
-	GLint model_radius_scale_location = -1;
-	GLint max_radius_location = -1;
-	GLint window_size_location = -1;
-	GLint near_plane_location = -1;
-	GLint far_plane_location = -1;
-	GLint point_size_factor_location = -1;
-
-	// Anzeige-Flags
-	GLint show_normals_location = -1;
-	GLint show_accuracy_location = -1;
-	GLint show_output_sensitivity_location = -1;
-	GLint channel_location = -1;
-	GLint heatmap_enabled_location = -1;
-
-	// Heatmap-Bereiche
-	GLint heatmap_min_location = -1;
-	GLint heatmap_max_location = -1;
-	GLint heatmap_min_color_location = -1;
-	GLint heatmap_max_color_location = -1;
-
-	// Beleuchtung
-	GLint use_material_color_location = -1;
-	GLint material_diffuse_location = -1;
-	GLint material_specular_location = -1;
-	GLint ambient_light_color_location = -1;
-	GLint point_light_color_location = -1;
-
-};
-point_shader point_shader_;
-
-
 struct surfel_shader {
 	GLuint program_ = 0;
 
 	// Core-Matrizen
 	GLint mvp_matrix_location = -1;
+	GLint view_matrix_location = -1;
+	GLint projection_matrix_location = -1;
 	GLint model_matrix_location = -1;
 	GLint model_view_matrix_location = -1;
 	GLint inverse_mv_matrix_location = -1;
 	GLint model_to_screen_matrix_location = -1;
+	GLint viewport_location = -1;
+	GLint eye_location = -1;
+	GLint face_eye_location = -1;
+
+	// Point-Cloud-Parameter
+	GLint model_radius_scale_location = -1;
+	GLint max_radius_location = -1;
+	GLint window_size_location = -1;
+	GLint near_plane_location = -1;
+	GLint far_plane_location = -1;
+	GLint point_size_factor_location = -1;
+
+	// Anzeige-Flags
+	GLint show_normals_location = -1;
+	GLint show_accuracy_location = -1;
+	GLint show_output_sensitivity_location = -1;
+	GLint channel_location = -1;
+	GLint heatmap_enabled_location = -1;
+
+	// Heatmap-Bereiche
+	GLint heatmap_min_location = -1;
+	GLint heatmap_max_location = -1;
+	GLint heatmap_min_color_location = -1;
+	GLint heatmap_max_color_location = -1;
+
+	// Beleuchtung
+	GLint use_material_color_location = -1;
+	GLint material_diffuse_location = -1;
+	GLint material_specular_location = -1;
+	GLint ambient_light_color_location = -1;
+	GLint point_light_color_location = -1;
+
+};
+surfel_shader surfel_shader_;
+
+
+struct point_shader {
+	GLuint program_ = 0;
+
+	// Core-Matrizen
+	GLint mvp_matrix_location = -1;
+	GLint view_matrix_location = -1;
+	GLint projection_matrix_location = -1;
+	GLint model_matrix_location = -1;
+	GLint model_view_matrix_location = -1;
+	GLint inverse_mv_matrix_location = -1;
+	GLint model_to_screen_matrix_location = -1;
+	GLint viewport_location = -1;
+	GLint height_divided_by_top_minus_bottom_location = -1;
 
 	// Point-Cloud-Parameter
 	GLint model_radius_scale_location = -1;
@@ -600,7 +763,7 @@ struct surfel_shader {
 	GLint ambient_light_color_location = -1;
 	GLint point_light_color_location = -1;
 };
-surfel_shader surfel_shader_;
+point_shader point_shader_;
 
 
 struct line_shader {
@@ -947,11 +1110,31 @@ struct TextCullCallback : public osg::Drawable::CullCallback {
 		if (now - _lastUpdateTime >= _minInterval) {
 			scm::math::vec3d camPos = scm_camera_->get_cam_pos();
 
-			scm::math::mat4d osg_model = matConv4D(cover->getInvBaseMat());
-			scm::math::mat4d osg_view = _plugin->swapMiddleRows(matConv4D(cover->getViewerMat()));
+			//osg::NodePathList npl = _plugin->LamureGroup->getParentalNodePaths();
+			//const osg::NodePath& path = npl.front();
+			//osg::Matrix world_matrix;
+			//for (osg::Node* n : path) {
+			//	osg::Matrix localMat;
+			//	if (auto mt = dynamic_cast<osg::MatrixTransform*>(n)) {
+			//		localMat = mt->getMatrix();
+			//	}
+			//	world_matrix = localMat * world_matrix;
+			//}
+
+			osg::Matrix baseMatrix = VRSceneGraph::instance()->getScaleTransform()->getMatrix();
+			osg::Matrix transformMatrix = VRSceneGraph::instance()->getTransform()->getMatrix();
+			baseMatrix.postMult(transformMatrix);
+
+			scm::math::mat4d osg_base = matConv4D(baseMatrix);
+			scm::math::mat4d osg_view = matConv4D(osg_camera_->getViewMatrix());
 			scm::math::mat4d osg_projection = matConv4D(osg_camera_->getProjectionMatrix());
-			scm::math::mat4d osg_xform = matConv4D(cover->getObjectsXform()->getMatrix());
-			scm::math::mat4d osg_scale = matConv4D(cover->getObjectsScale()->getMatrix());
+
+			std::stringstream osg_base_ss;
+			osg_base_ss << osg_view * osg_base;
+			std::stringstream osg_projection_ss;
+			osg_projection_ss << osg_projection;
+			std::stringstream osg_mvp_ss;
+			osg_mvp_ss << osg_projection * osg_view * osg_base;
 
 			std::stringstream gl_modelview_ss;
 			gl_modelview_ss << _plugin->gl_modelview_matrix;
@@ -959,13 +1142,6 @@ struct TextCullCallback : public osg::Drawable::CullCallback {
 			gl_projection_ss << _plugin->gl_projection_matrix;
 			std::stringstream gl_mvp_ss;
 			gl_mvp_ss << _plugin->gl_projection_matrix * _plugin->gl_modelview_matrix;
-
-			std::stringstream osg_modelview_ss;
-			osg_modelview_ss << osg_view * osg_model;
-			std::stringstream osg_projection_ss;
-			osg_projection_ss << osg_projection;
-			std::stringstream osg_mvp_ss;
-			osg_mvp_ss << osg_projection * osg_view * osg_model;
 
 			std::stringstream scm_modelview_ss;
 			scm_modelview_ss << scm_camera_->get_view_matrix();
@@ -984,12 +1160,12 @@ struct TextCullCallback : public osg::Drawable::CullCallback {
 				<< camPos.x << "\n"
 				<< camPos.y << "\n"
 				<< camPos.z << "\n\n\n\n"
+				<< osg_base_ss.str() << "\n\n\n"
+				<< osg_projection_ss.str() << "\n\n\n"
+				<< osg_mvp_ss.str() << "\n\n\n"
 				<< gl_modelview_ss.str() << "\n\n\n"
 				<< gl_projection_ss.str() << "\n\n\n"
 				<< gl_mvp_ss.str() << "\n\n\n"
-				<< osg_modelview_ss.str() << "\n\n\n"
-				<< osg_projection_ss.str() << "\n\n\n"
-				<< osg_mvp_ss.str() << "\n\n\n"
 				<< scm_modelview_ss.str() << "\n\n\n"
 				<< scm_projection_ss.str() << "\n\n\n"
 				<< scm_mvp_ss.str() << "\n";
@@ -1035,12 +1211,12 @@ struct TextGeode : public osg::Geode {
 			<< "X:" << "\n"
 			<< "Y:" << "\n"
 			<< "Z:" << "\n\n\n"
+			<< "OSG BASE:" << "\n\n\n\n\n\n"
+			<< "OSG Projection:" << "\n\n\n\n\n\n"
+			<< "OSG MVP:" << "\n\n\n\n\n\n"
 			<< "GL ModelView:" << "\n\n\n\n\n\n"
 			<< "GL Projection:" << "\n\n\n\n\n\n"
 			<< "GL MVP:" << "\n\n\n\n\n\n"
-			<< "OSG ModelView:" << "\n\n\n\n\n\n"
-			<< "OSG Projection:" << "\n\n\n\n\n\n"
-			<< "OSG MVP:" << "\n\n\n\n\n\n"
 			<< "SCM ModelView:" << "\n\n\n\n\n\n"
 			<< "SCM Projection:" << "\n\n\n\n\n\n"
 			<< "SCM MVP:" << "\n";
@@ -1206,6 +1382,7 @@ struct BoundingBoxDrawCallback : public virtual osg::Drawable::DrawCallback
 		//state->setCheckForGLErrors(osg::State::CheckForGLErrors::ONCE_PER_ATTRIBUTE);
 		scm::math::mat4 view_matrix_ = matConv4F(state->getModelViewMatrix());
 		scm::math::mat4 projection_matrix_ = matConv4F(state->getProjectionMatrix());
+		scm::math::mat4 osg_scale = matConv4F(cover->getObjectsScale()->getMatrix());
 
 		lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
 		lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
@@ -1217,10 +1394,10 @@ struct BoundingBoxDrawCallback : public virtual osg::Drawable::DrawCallback
 		lamure::context_t context_id = controller->deduce_context_id(lmr_ctx);
 		for (lamure::model_t model_id = 0; model_id < num_models_; ++model_id) {
 			lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
-			cuts->send_transform(context_id, m_id, scm::math::mat4f(model_info_.model_transformations_[m_id]));
+			cuts->send_transform(context_id, m_id, osg_scale * scm::math::mat4(model_info_.model_transformations_[m_id]));
 			cuts->send_threshold(context_id, m_id, settings_.lod_error_);
 			cuts->send_rendered(context_id, m_id);
-			database->get_model(m_id)->set_transform(scm::math::mat4f(model_info_.model_transformations_[m_id]));
+			database->get_model(m_id)->set_transform(osg_scale * scm::math::mat4(model_info_.model_transformations_[m_id]));
 		}
 
 		lamure::view_t view_id = controller->deduce_view_id(context_id, scm_camera_->view_id());
@@ -1305,8 +1482,12 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 		GLState before = GLState::capture();
 		glDisable(GL_CULL_FACE);
 
+		osg::State* state = renderInfo.getState();
+		//state->setCheckForGLErrors(osg::State::CheckForGLErrors::ONCE_PER_ATTRIBUTE);
+
 		scm::math::mat4 view_matrix_ = matConv4F(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
 		scm::math::mat4 projection_matrix_ = matConv4F(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
+		scm::math::mat4 osg_scale = matConv4F(cover->getObjectsScale()->getMatrix());
 
 		lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
 		lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
@@ -1322,10 +1503,10 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
 		for (lamure::model_t model_id = 0; model_id < num_models_; ++model_id) {
 			lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
-			cuts->send_transform(context_id, m_id, scm::math::mat4f(model_info_.model_transformations_[m_id]));
+			cuts->send_transform(context_id, m_id, scm::math::mat4(model_info_.model_transformations_[m_id]));
 			cuts->send_threshold(context_id, m_id, settings_.lod_error_);
 			cuts->send_rendered(context_id, m_id);
-			database->get_model(m_id)->set_transform(scm::math::mat4f(model_info_.model_transformations_[m_id]));
+			database->get_model(m_id)->set_transform(scm::math::mat4(model_info_.model_transformations_[m_id]));
 		}
 		cuts->send_camera(context_id, view_id, *scm_camera_);
 		std::vector<scm::math::vec3d> corner_values = scm_camera_->get_frustum_corners();
@@ -1374,22 +1555,58 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 			const scm::math::mat4d viewport_translate = scm::math::make_translation(1.0, 1.0, 1.0);
 			const scm::math::mat4 model_to_screen_matrix_ = scm::math::mat4(viewport_scale * viewport_translate);
 
+			scm::math::vec3 eye_ = scm::math::vec3f(scm_camera_->get_cam_pos());
+			scm::math::vec2 viewport_ = scm::math::vec2f(traits->width, traits->height);
+			scm::math::mat4 osg_xform = matConv4F(cover->getObjectsXform()->getMatrix());
+			scm::math::mat4 osg_scale = matConv4F(cover->getObjectsScale()->getMatrix());
 			scm::math::mat4 model_matrix_ = scm::math::mat4(model_info_.model_transformations_[model_id]);
 			scm::math::mat4 model_view_matrix_ = view_matrix_ * model_matrix_;
 			scm::math::mat4 mvp_matrix_ = projection_matrix_ * model_view_matrix_;
-			scm::math::mat4 inverse_model_view_matrix_ = scm::math::transpose(scm::math::inverse(model_view_matrix_));
+			scm::math::mat4 inverse_model_view_matrix_ = scm::math::inverse(model_view_matrix_);
 			scm::gl::frustum frustum_ = scm_camera_->get_frustum_by_model(model_matrix_);
 
+			if (_plugin->dump_button->state()) {
+				scm::math::mat4d osg_xform = matConv4D(cover->getObjectsXform()->getMatrix());
+				scm::math::mat4d osg_scale = matConv4D(cover->getObjectsScale()->getMatrix());
+				scm::math::mat4d osg_viewer_mat = matConv4D(cover->getViewerMat());
+				scm::math::mat4d osg_view_mat = matConv4D(osg_camera_->getViewMatrix());
+				scm::math::mat4d osg_projection_mat = matConv4D(osg_camera_->getProjectionMatrix());
+
+				std::cout << "osg_xform: " << std::endl << osg_xform << std::endl;
+				std::cout << "osg_scale: " << std::endl << osg_scale << std::endl;
+				std::cout << "osg_viewer_mat: " << std::endl << osg_viewer_mat << std::endl;
+				std::cout << "osg_view_mat: " << std::endl << osg_view_mat << std::endl;
+				std::cout << "osg_projection_mat: " << std::endl << osg_projection_mat << std::endl;
+				std::cout << "gl_view_matrix_: " << std::endl << view_matrix_ << std::endl;
+				std::cout << "gl_projection_matrix_: " << std::endl << projection_matrix_ << std::endl;
+				std::cout << "model_view_matrix_: " << std::endl << model_view_matrix_ << std::endl;
+				std::cout << "inverse_model_view_matrix_: " << std::endl << inverse_model_view_matrix_ << std::endl;
+
+				_plugin->dump_button->setState(false);
+			}
+
+
 			if (settings_.surfel_shader_) {
-				glUniformMatrix4fv(surfel_shader_.model_matrix_location, 1, GL_FALSE, model_matrix_.data_array);
-				glUniformMatrix4fv(surfel_shader_.model_view_matrix_location, 1, GL_FALSE, model_view_matrix_.data_array);
 				glUniformMatrix4fv(surfel_shader_.mvp_matrix_location, 1, GL_FALSE, mvp_matrix_.data_array);
+				glUniformMatrix4fv(surfel_shader_.model_matrix_location, 1, GL_FALSE, model_matrix_.data_array);
+				glUniformMatrix4fv(surfel_shader_.view_matrix_location, 1, GL_FALSE, view_matrix_.data_array);
+				glUniformMatrix4fv(surfel_shader_.projection_matrix_location, 1, GL_FALSE, projection_matrix_.data_array);
+				glUniformMatrix4fv(surfel_shader_.model_view_matrix_location, 1, GL_FALSE, model_view_matrix_.data_array);
 				glUniformMatrix4fv(surfel_shader_.inverse_mv_matrix_location, 1, GL_FALSE, inverse_model_view_matrix_.data_array);
 				glUniformMatrix4fv(surfel_shader_.model_to_screen_matrix_location, 1, GL_FALSE, model_to_screen_matrix_.data_array);
+				glUniform3f(surfel_shader_.eye_location, eye_[0], eye_[1], eye_[2]);
+				glUniform1f(surfel_shader_.face_eye_location, settings_.face_eye_);
 			}
 			else {
 				glUniformMatrix4fv(point_shader_.mvp_matrix_location, 1, GL_FALSE, mvp_matrix_.data_array);
+				glUniformMatrix4fv(point_shader_.model_matrix_location, 1, GL_FALSE, model_matrix_.data_array);
+				glUniformMatrix4fv(point_shader_.view_matrix_location, 1, GL_FALSE, view_matrix_.data_array);
+				glUniformMatrix4fv(point_shader_.projection_matrix_location, 1, GL_FALSE, projection_matrix_.data_array);
 				glUniformMatrix4fv(point_shader_.model_to_screen_matrix_location, 1, GL_FALSE, model_to_screen_matrix_.data_array);
+				glUniform2f(point_shader_.viewport_location, viewport_.x, viewport_.y);
+				glUniform1f(point_shader_.model_radius_scale_location, settings_.scale_radius_);
+				glUniform1f(point_shader_.max_radius_location, settings_.max_radius_);
+				glUniform1f(point_shader_.point_size_factor_location, settings_.point_size_factor_* cover->getScale());
 			}
 
 			bool draw = true;
@@ -1478,6 +1695,7 @@ struct InitDrawCallback : public osg::Drawable::DrawCallback {
 
 		if (_plugin->sync_button->state() == 1) {
 			scm_camera_->set_view_matrix(_plugin->gl_modelview_matrix);
+			scm_camera_->set_projection_matrix(_plugin->gl_projection_matrix);
 		}
 
 		if (!_initialized) {
@@ -1491,9 +1709,11 @@ struct InitDrawCallback : public osg::Drawable::DrawCallback {
 			_plugin->create_framebuffers();
 			_plugin->init_render_states();
 			_plugin->init_lamure_shader();
-
+			std::cout << "[Notify] surfel_shader_" << std::endl;
 			surfel_shader_.program_ = _plugin->compile_and_link_shaders(vis_xyz_vs_source, vis_xyz_gs_source, vis_xyz_fs_source);
-			point_shader_.program_ = _plugin->compile_and_link_shaders(vis_surfel_shader_vs_source, vis_surfel_shader_fs_source);
+			std::cout << "[Notify] point_shader_" << std::endl;
+			point_shader_.program_ = _plugin->compile_and_link_shaders(vis_point_shader_vs_source, vis_point_shader_fs_source);
+			std::cout << "[Notify] line_shader_" << std::endl;
 			line_shader_.program_ = _plugin->compile_and_link_shaders(vis_line_bb_vs_source, vis_line_bb_fs_source);
 
 			_plugin->init_uniforms();
@@ -1623,23 +1843,23 @@ bool LamurePointCloudPlugin::init2() {
 
 	maxRadiusSlider = new ui::Slider(adaption_group, "max_radius");
 	maxRadiusSlider->setText("max. radius");
-	maxRadiusSlider->setBounds(0.0, 0.5);
+	maxRadiusSlider->setBounds(0.0, settings_.max_radius_ * 5.0f);
 	maxRadiusSlider->setValue(settings_.max_radius_);
 	maxRadiusSlider->setShared(true);
-	maxRadiusSlider->setCallback([this](double value, bool released) { settings_.max_radius_ = value; });
+	maxRadiusSlider->setCallback([this](double value, bool released) { settings_.max_radius_ = static_cast<float>(value); });
 
 	scaleRadiusSlider = new ui::Slider(adaption_group, "scale_radius");
 	scaleRadiusSlider->setText("scale radius");
-	scaleRadiusSlider->setBounds(0.25, 3.0);
+	scaleRadiusSlider->setBounds(0.25, settings_.scale_radius_ * 5.0f);
 	scaleRadiusSlider->setValue(settings_.scale_radius_);
 	scaleRadiusSlider->setScale(ui::Slider::Logarithmic);
 	scaleRadiusSlider->setShared(true);
-	scaleRadiusSlider->setCallback([this](double value, bool released) { settings_.scale_radius_ = value; });
+	scaleRadiusSlider->setCallback([this](double value, bool released) { settings_.scale_radius_ = static_cast<float>(value); });
 
 	lodErrorSlider_ = new ui::Slider(adaption_group, "lod_error");
 	lodErrorSlider_->setText("LOD Error");
 	lodErrorSlider_->setBounds(LAMURE_MIN_THRESHOLD, LAMURE_MAX_THRESHOLD);
-	lodErrorSlider_->setValue(LAMURE_DEFAULT_THRESHOLD);
+	lodErrorSlider_->setValue(settings_.lod_error_);
 	lodErrorSlider_->setShared(true);
 	lodErrorSlider_->setCallback([this](double value, bool released) { settings_.lod_error_ = static_cast<float>(value); });
 
@@ -1751,12 +1971,19 @@ bool LamurePointCloudPlugin::init2() {
 	//LamureGroup->dirtyBound();
 	//cover->getObjectsRoot()->dirtyBound();
 
-	if (covise::coCoviseConfig::isOn("COVER.showRotationPoint", false))
+	if (covise::coCoviseConfig::isOn("COVER.showRotationPoint", false)) {
 		coVRNavigationManager::instance()->setRotationPointVisible(true);
+		trackball_.initial_pos_ = coVRNavigationManager::instance()->getRotationPoint();
+		trackball_.pos_ = coVRNavigationManager::instance()->getRotationPoint();
+		trackball_.size_ = covise::coCoviseConfig::getFloat("COVER.rotationPointSize", 1.0f);
+		trackball_.dist_ = (trackball_.initial_pos_ - osg_camera_->getViewMatrix().getTrans()).length();
+	}
 
 	interactor = new LamurePointCloudInteractor();
 	osg::ref_ptr<IntersectionHandler> handler = interactor;
 	coIntersection::instance()->addHandler(handler);
+
+	coVRNavigationManager::instance()->setNavMode("Point");
 
 	if (plugin->notify_button->state()) {
 		std::cout << "[Notify] === SceneGraph ===" << std::endl;
@@ -1769,6 +1996,34 @@ bool LamurePointCloudPlugin::init2() {
 int counter = 0;
 
 void LamurePointCloudPlugin::preFrame() {
+
+	float deltaTime = cover->frameDuration(); 
+	float moveAmount = 1000 * deltaTime;
+
+	osg::Matrix oldMat = VRSceneGraph::instance()->getTransform()->getMatrix();
+
+	if (GetAsyncKeyState(VK_NUMPAD4) & 0x8000)
+	{
+		oldMat.postMult(osg::Matrix::translate(moveAmount, 0.0, 0.0));
+	}
+	//    VK_NUMPAD6 → translate X‐  
+	if (GetAsyncKeyState(VK_NUMPAD6) & 0x8000)
+	{
+		oldMat.postMult(osg::Matrix::translate(-moveAmount, 0.0, 0.0));
+	}
+	//    VK_NUMPAD8 → translate Y+ (oder Z‐, je nach Achsen‐Konvention)
+	if (GetAsyncKeyState(VK_NUMPAD8) & 0x8000)
+	{
+		oldMat.postMult(osg::Matrix::translate(0.0, -moveAmount, 0.0));
+	}
+	//    VK_NUMPAD5 → translate Y‐ (oder Z+, wenn Y‐Achse nach oben)
+	if (GetAsyncKeyState(VK_NUMPAD5) & 0x8000)
+	{
+		oldMat.postMult(osg::Matrix::translate(0.0, moveAmount, 0.0));
+	}
+
+	VRSceneGraph::instance()->getTransform()->setMatrix(oldMat);
+
 	if ((cover->getMouseButton()->getState() == 1) && (counter == 0)) {
 		//std::cout << matConv4F(cover->getXformMat()) << std::endl;
 		//coVRTui* tui = coVRTui::instance();
@@ -1803,14 +2058,8 @@ void LamurePointCloudPlugin::preFrame() {
 	}
 
 	if ((cover->getMouseButton()->getState() == 1) && (counter != 0)) {
-		//std::cout << coVRNavigationManager::instance()->isViewerPosRotationEnabled() << std::endl;
+
 	}
-	//if (plugin->notify_button->state() == 0) {
-	//	osg_camera_->getGraphicsContext()->getState()->setCheckForGLErrors(osg::State::NEVER_CHECK_GL_ERRORS);
-	//}
-	//else {
-	//	osg_camera_->getGraphicsContext()->getState()->setCheckForGLErrors(osg::State::ONCE_PER_ATTRIBUTE);
-	//}
 }
 
 
@@ -1818,6 +2067,7 @@ void LamurePointCloudPlugin::setViewerPos(float x, float y, float z)
 {
 	osg::Matrix dcs_mat;
 	osg::Matrix doTrans;
+
 
 	osg::Vec3 viewerPos = cover->getViewerMat().getTrans();
 	dcs_mat.postMult(osg::Matrix::translate(-viewerPos[0], -viewerPos[1], -viewerPos[2]));
@@ -2123,6 +2373,8 @@ void LamurePointCloudPlugin::init_uniforms() {
 	glUseProgram(surfel_shader_.program_);
 	surfel_shader_.mvp_matrix_location = glGetUniformLocation(surfel_shader_.program_, "mvp_matrix");
 	surfel_shader_.model_matrix_location = glGetUniformLocation(surfel_shader_.program_, "model_matrix");
+	surfel_shader_.view_matrix_location = glGetUniformLocation(surfel_shader_.program_, "view_matrix");
+	surfel_shader_.projection_matrix_location = glGetUniformLocation(surfel_shader_.program_, "projection_matrix");
 	surfel_shader_.model_view_matrix_location = glGetUniformLocation(surfel_shader_.program_, "model_view_matrix");
 	surfel_shader_.inverse_mv_matrix_location = glGetUniformLocation(surfel_shader_.program_, "inv_mv_matrix");
 	surfel_shader_.model_to_screen_matrix_location = glGetUniformLocation(surfel_shader_.program_, "model_to_screen_matrix");
@@ -2146,6 +2398,8 @@ void LamurePointCloudPlugin::init_uniforms() {
 	surfel_shader_.material_specular_location = glGetUniformLocation(surfel_shader_.program_, "material_specular");
 	surfel_shader_.ambient_light_color_location = glGetUniformLocation(surfel_shader_.program_, "ambient_light_color");
 	surfel_shader_.point_light_color_location = glGetUniformLocation(surfel_shader_.program_, "point_light_color");
+	surfel_shader_.eye_location = glGetUniformLocation(surfel_shader_.program_, "eye");
+	surfel_shader_.face_eye_location = glGetUniformLocation(surfel_shader_.program_, "face_eye");
 
 	glUseProgram(line_shader_.program_);
 	line_shader_.mvp_matrix_location = glGetUniformLocation(line_shader_.program_, "mvp_matrix");
@@ -2153,10 +2407,19 @@ void LamurePointCloudPlugin::init_uniforms() {
 
 	glUseProgram(point_shader_.program_);
 	point_shader_.mvp_matrix_location = glGetUniformLocation(point_shader_.program_, "mvp_matrix");
+	point_shader_.model_matrix_location = glGetUniformLocation(point_shader_.program_, "model_matrix");
+	point_shader_.view_matrix_location = glGetUniformLocation(point_shader_.program_, "view_matrix");
+	point_shader_.projection_matrix_location = glGetUniformLocation(point_shader_.program_, "projection_matrix");
+	point_shader_.model_view_matrix_location = glGetUniformLocation(point_shader_.program_, "model_view_matrix");
+	point_shader_.inverse_mv_matrix_location = glGetUniformLocation(point_shader_.program_, "inv_mv_matrix");
 	point_shader_.model_to_screen_matrix_location = glGetUniformLocation(point_shader_.program_, "model_to_screen_matrix");
+	point_shader_.viewport_location = glGetUniformLocation(point_shader_.program_, "viewport");
 	point_shader_.model_radius_scale_location = glGetUniformLocation(point_shader_.program_, "model_radius_scale");
 	point_shader_.max_radius_location = glGetUniformLocation(point_shader_.program_, "max_radius");
 	point_shader_.point_size_factor_location = glGetUniformLocation(point_shader_.program_, "point_size_factor");
+	point_shader_.near_plane_location = glGetUniformLocation(point_shader_.program_, "near_plane");
+	point_shader_.far_plane_location = glGetUniformLocation(point_shader_.program_, "far_plane");
+	point_shader_.height_divided_by_top_minus_bottom_location = glGetUniformLocation(point_shader_.program_, "height_divided_by_top_minus_bottom");
 
 	glUseProgram(0);
 }
@@ -2165,10 +2428,11 @@ void LamurePointCloudPlugin::init_uniforms() {
 void LamurePointCloudPlugin::set_surfel_uniforms() {
 	glUniform1f(surfel_shader_.model_radius_scale_location, settings_.scale_radius_);
 	glUniform1f(surfel_shader_.max_radius_location, settings_.max_radius_);
+	glUniform1f(surfel_shader_.face_eye_location, settings_.face_eye_);
 	glUniform2f(surfel_shader_.window_size_location, traits->width, traits->height);
 	glUniform1f(surfel_shader_.near_plane_location, static_cast<float>(coco->nearClip()));
 	glUniform1f(surfel_shader_.far_plane_location, static_cast<float>(coco->farClip()));
-	glUniform1f(surfel_shader_.point_size_factor_location, settings_.point_size_factor_);
+	glUniform1f(surfel_shader_.point_size_factor_location, settings_.point_size_factor_ * cover->getScale());
 	glUniform1i(surfel_shader_.show_normals_location, settings_.show_normals_);
 	glUniform1i(surfel_shader_.show_accuracy_location, static_cast<int>(settings_.show_accuracy_));
 	glUniform1i(surfel_shader_.show_output_sensitivity_location, static_cast<int>(settings_.show_output_sensitivity_));
@@ -2190,7 +2454,10 @@ void LamurePointCloudPlugin::set_surfel_uniforms() {
 void LamurePointCloudPlugin::set_point_uniforms() {
 	glUniform1f(point_shader_.model_radius_scale_location, settings_.scale_radius_);
 	glUniform1f(point_shader_.max_radius_location, settings_.max_radius_);
-	glUniform1f(point_shader_.point_size_factor_location, settings_.point_size_factor_);
+	glUniform1f(point_shader_.point_size_factor_location, settings_.point_size_factor_ * cover->getScale());
+	glUniform1f(point_shader_.near_plane_location, coco->nearClip());
+	glUniform1f(point_shader_.far_plane_location, coco->farClip());
+	glUniform1f(point_shader_.height_divided_by_top_minus_bottom_location, height_divided_by_top_minus_bottom_);
 }
 
 
@@ -2312,8 +2579,8 @@ void LamurePointCloudPlugin::init_lamure_shader()
 	if (plugin->notify_button->state() == 1) { std::cout << "[Notify] init_lamure_shader()" << std::endl; }
 	try
 	{
-		if (!read_shader(shader_root_path + "/vis/vis_surfel_shader.glslv", vis_surfel_shader_vs_source)
-			|| !read_shader(shader_root_path + "/vis/vis_surfel_shader.glslf", vis_surfel_shader_fs_source)
+		if (!read_shader(shader_root_path + "/vis/vis_point_shader.glslv", vis_point_shader_vs_source)
+			|| !read_shader(shader_root_path + "/vis/vis_point_shader.glslf", vis_point_shader_fs_source)
 			|| !read_shader(shader_root_path + "/vis/vis_line_bb.glslv", vis_line_bb_vs_source)
 			|| !read_shader(shader_root_path + "/vis/vis_line_bb.glslf", vis_line_bb_fs_source)
 			|| !read_shader(shader_root_path + "/vis/vis_quad.glslv", vis_quad_vs_source)
@@ -2357,11 +2624,11 @@ void LamurePointCloudPlugin::init_lamure_shader()
 			std::cout << "error reading shader files" << std::endl; exit(1);
 		}
 
-		vis_surfel_shader_ = device_->create_program(
-			boost::assign::list_of
-			(device_->create_shader(scm::gl::STAGE_VERTEX_SHADER, vis_surfel_shader_vs_source))
-			(device_->create_shader(scm::gl::STAGE_FRAGMENT_SHADER, vis_surfel_shader_fs_source)));
-		if (!vis_surfel_shader_) { std::cout << "error creating shader vis_surfel_shader_ program" << std::endl; exit(1); }
+		//vis_point_shader_ = device_->create_program(
+		//	boost::assign::list_of
+		//	(device_->create_shader(scm::gl::STAGE_VERTEX_SHADER, vis_point_shader_vs_source))
+		//	(device_->create_shader(scm::gl::STAGE_FRAGMENT_SHADER, vis_point_shader_fs_source)));
+		//if (!vis_point_shader_) { std::cout << "error creating shader vis_point_shader_ program" << std::endl; exit(1); }
 
 		vis_quad_shader_ = device_->create_program(
 			boost::assign::list_of
@@ -2650,146 +2917,6 @@ size_t LamurePointCloudPlugin::query_video_memory_in_mb() {
 	int size_in_kb;
 	glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &size_in_kb);
 	return size_t(size_in_kb) / 1024;
-}
-
-
-void LamurePointCloudPlugin::load_settings(std::string const& filename) {
-	using namespace std::filesystem;
-	std::cout << "load_settings()" << std::endl;
-	// Hilfs-Lambda zum Trimmen
-	auto strip_ws = [](std::string s) {
-		auto not_ws = [](char c) { return !std::isspace(c); };
-		s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_ws));
-		s.erase(std::find_if(s.rbegin(), s.rend(), not_ws).base(), s.end());
-		return s;
-		};
-	// 1) Datei einlesen
-	std::ifstream file(filename);
-	if (!file.is_open()) { std::cerr << "could not open lmr file: " << filename << std::endl; std::exit(EXIT_FAILURE); }
-	std::vector<std::string> lines; for (std::string line; std::getline(file, line); ) lines.push_back(line);
-	file.close();
-	// 2) Alte Einträge löschen
-	settings_.models_.clear(); settings_.transforms_.clear(); settings_.aux_.clear();
-	// 3) erste Key:Value-Pässe
-	std::string data_dir; std::vector<std::string> manual_files;
-	for (auto const& raw : lines) {
-		auto l = strip_ws(raw);
-		if (l.empty() || l[0] == '#') continue;
-		auto colon = l.find(':');
-		if (colon == std::string::npos)
-			manual_files.push_back(l);
-		else {
-			auto key = strip_ws(l.substr(0, colon)),
-				value = strip_ws(l.substr(colon + 1));
-			if (key == "data_directory") data_dir = value;
-		}
-	}
-	// 4) externe Modelle sammeln
-	std::vector<std::string> external_models;
-	if (!data_dir.empty())
-		for (auto const& e : recursive_directory_iterator(data_dir))
-			if (e.is_regular_file() && e.path().extension() == ".bvh")
-				external_models.push_back(e.path().string());
-	external_models.insert(external_models.end(), manual_files.begin(), manual_files.end());
-	bool use_external = !external_models.empty();
-	// 5) falls vorhanden, direkt hinzufügen
-	lamure::model_t model_id = 0;
-	if (use_external)
-		for (auto const& m : external_models)
-			settings_.models_.push_back(m),
-			settings_.transforms_[model_id] = scm::math::mat4d::identity(),
-			settings_.aux_[model_id++] = "";
-	// 6) restliche Zeilen verarbeiten, alle Settings in einer Zeile
-	for (auto const& raw : lines) {
-		auto l = strip_ws(raw);
-		if (l.empty() || l[0] == '#') continue;
-		auto colon = l.find(':');
-		if (colon == std::string::npos) {
-			if (use_external) continue;
-			std::istringstream ss(l); std::string model; ss >> model;
-			settings_.models_.push_back(model), settings_.transforms_[model_id] = scm::math::mat4d::identity(), settings_.aux_[model_id++] = "";
-		}
-		else {
-			auto key = strip_ws(l.substr(0, colon)),
-				value = strip_ws(l.substr(colon + 1));
-			if (key == "data_directory") continue;
-			if (!key.empty() && key[0] == '@') {
-				auto ws = l.find_first_of(' ');
-				uint32_t addr = std::atoi(strip_ws(l.substr(1, ws - 1)).c_str());
-				key = strip_ws(l.substr(ws + 1, colon - (ws + 1)));
-				if (key == "tf")  settings_.transforms_[addr] = load_matrix(value);
-				else if (key == "aux") settings_.aux_[addr] = value;
-				else { std::cerr << "unrecognized @-key: " << key << std::endl; std::exit(EXIT_FAILURE); }
-			}
-			else if (key == "surfel_shader")        settings_.surfel_shader_ = std::atoi(value.c_str());
-			else if (key == "frame_div")            settings_.frame_div_ = std::max(std::atoi(value.c_str()), 1);
-			else if (key == "vram")                 settings_.vram_ = std::max(std::atoi(value.c_str()), 8);
-			else if (key == "ram")                  settings_.ram_ = std::max(std::atoi(value.c_str()), 8);
-			else if (key == "upload")               settings_.upload_ = std::max(std::atoi(value.c_str()), 8);
-			else if (key == "splatting")            settings_.splatting_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "gamma_correction")     settings_.gamma_correction_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "pvs_culling")          settings_.pvs_culling_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "use_pvs")              settings_.use_pvs_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "point_size_factor")    settings_.point_size_factor_ = std::clamp(std::atof(value.c_str()), 1.0, 10.0);
-			else if (key == "aux_point_size")       settings_.aux_point_size_ = std::clamp(std::atof(value.c_str()), 0.00001, 1.0);
-			else if (key == "aux_point_distance")   settings_.aux_point_distance_ = std::clamp(std::atof(value.c_str()), 0.00001, 1.0);
-			else if (key == "aux_focal_length")     settings_.aux_focal_length_ = std::clamp(std::atof(value.c_str()), 0.001, 10.0);
-			else if (key == "max_brush_size")       settings_.max_brush_size_ = std::clamp(std::atoi(value.c_str()), 64, 1024 * 1024);
-			else if (key == "lod_error")            settings_.lod_error_ = std::clamp(std::atof(value.c_str()), 1.0, 10.0);
-			else if (key == "provenance")           settings_.provenance_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "create_aux_resources") settings_.create_aux_resources_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_normals")         settings_.show_normals_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_accuracy")        settings_.show_accuracy_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_radius_deviation")settings_.show_radius_deviation_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_output_sensitivity") settings_.show_output_sensitivity_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_sparse")          settings_.show_sparse_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_views")           settings_.show_views_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_photos")          settings_.show_photos_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_octrees")         settings_.show_octrees_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_bvhs")            settings_.show_bvhs_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_pvs")             settings_.show_pvs_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "channel")              settings_.channel_ = std::max(std::atoi(value.c_str()), 0);
-			else if (key == "enable_lighting")      settings_.enable_lighting_ = std::clamp(std::atoi(value.c_str()), 0, 1) != 0;
-			else if (key == "use_material_color")   settings_.use_material_color_ = std::clamp(std::atoi(value.c_str()), 0, 1) != 0;
-			else if (key == "material_diffuse_r")   settings_.material_diffuse_.x = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_diffuse_g")   settings_.material_diffuse_.y = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_diffuse_b")   settings_.material_diffuse_.z = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_specular_r")  settings_.material_specular_.x = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_specular_g")  settings_.material_specular_.y = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_specular_b")  settings_.material_specular_.z = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_specular_exponent") settings_.material_specular_.w = std::clamp(std::atof(value.c_str()), 0.0, 10000.0);
-			else if (key == "ambient_light_color_r")settings_.ambient_light_color_.r = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "ambient_light_color_g")settings_.ambient_light_color_.g = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "ambient_light_color_b")settings_.ambient_light_color_.b = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "point_light_color_r")  settings_.point_light_color_.r = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "point_light_color_g")  settings_.point_light_color_.g = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "point_light_color_b")  settings_.point_light_color_.b = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "point_light_intensity")settings_.point_light_color_.w = std::clamp<float>(std::atof(value.c_str()), 0.0f, 10000.0);
-			else if (key == "background_color_r")   settings_.background_color_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "background_color_g")   settings_.background_color_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "background_color_b")   settings_.background_color_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap")              settings_.heatmap_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "heatmap_min")          settings_.heatmap_min_ = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "heatmap_max")          settings_.heatmap_max_ = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "heatmap_min_r")        settings_.heatmap_color_min_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_min_g")        settings_.heatmap_color_min_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_min_b")        settings_.heatmap_color_min_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_max_r")        settings_.heatmap_color_max_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_max_g")        settings_.heatmap_color_max_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_max_b")        settings_.heatmap_color_max_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "atlas_file")           settings_.atlas_file_ = value;
-			else if (key == "json")                 settings_.json_ = value;
-			else if (key == "pvs")                  settings_.pvs_ = value;
-			else if (key == "selection")            settings_.selection_ = value;
-			else if (key == "background_image")     settings_.background_image_ = value;
-			else if (key == "max_radius")           settings_.max_radius_ = std::max(std::atof(value.c_str()), 0.1);
-			else if (key == "scale_radius")         settings_.scale_radius_ = std::max(std::atof(value.c_str()), 0.1);
-			else { std::cerr << "unrecognized key: " << key << std::endl; std::exit(EXIT_FAILURE); }
-		}
-	}
-	for (auto const& m : settings_.models_) {
-		std::cout << "Loaded model: " << m << std::endl;
-	}
 }
 
 

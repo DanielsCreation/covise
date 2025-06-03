@@ -138,8 +138,8 @@ public:
     unsigned int compile_shader(unsigned int type, const std::string& source, uint8_t ctx_id);
 
     void init_uniforms();
-    void set_surfel_uniforms();
     void set_point_uniforms();
+    void set_surfel_uniforms();
 
     void startMeasurement();
     void stopMeasurement();

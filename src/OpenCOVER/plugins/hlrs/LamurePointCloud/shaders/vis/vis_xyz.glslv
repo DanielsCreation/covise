@@ -7,7 +7,6 @@
 
 #version 420 core
 
-
 out VertexData {
     //output to geometry shader
     vec3 pass_ms_u;
@@ -60,32 +59,24 @@ void main()
   if (radius > max_radius) {
     radius = max_radius;
   }
+  radius *= model_radius_scale;
 
   vec3 normal = in_normal;
   if (face_eye) {
-    normal = normalize(eye-(model_matrix*vec4(in_position, 1.0)).xyz);
+    normal = normalize(eye - (model_matrix * vec4(in_position, 1.0)).xyz);
   }
- 
-  // precalculate tangent vectors to establish the surfel shape
+
   vec3 tangent   = vec3(0.0);
   vec3 bitangent = vec3(0.0);
   compute_tangent_vectors(normal, radius, tangent, bitangent);
 
-  if (!face_eye) {
-    normal = normalize((inv_mv_matrix * vec4(in_normal, 0.0)).xyz );
-  }
-
-
- 
-  // finalize color with provenance overlay
   vec3 in_out_color = get_color(in_position, normal, vec3(in_r, in_g, in_b), radius);
 
-  // passed attributes: vertex shader -> geometry shader
   VertexOut.pass_ms_u = tangent;
   VertexOut.pass_ms_v = bitangent;
   VertexOut.pass_normal = normal;
-  gl_Position = vec4(in_position, 1.0);
   VertexOut.pass_point_color = in_out_color;
+  gl_Position = vec4(in_position, 1.0);
 
 
   OPTIONAL_BEGIN

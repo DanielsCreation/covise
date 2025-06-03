@@ -87,7 +87,7 @@ void main() {
   VertexOut.pass_ms_v = normalize(cross(ms_n, ms_u)) * point_size_factor * model_radius_scale * radius;
 
   if (!face_eye) {
-    normal = normalize((inv_mv_matrix * vec4(normal, 0.0)).xyz );
+    normal = normalize((inv_mv_matrix * vec4(normal, 0.0)).xyz);
   }
 
   VertexOut.pass_normal = normal;

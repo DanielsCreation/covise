@@ -38,8 +38,8 @@ void compute_tangent_vectors(in vec3 normal, in float radius, out vec3 ms_u, out
   }
 
   // assign tangent vectors
-  ms_u = normalize(tmp_ms_u) * point_size_factor * model_radius_scale * radius;
-  ms_v = normalize(cross(ms_n, tmp_ms_u)) * point_size_factor * model_radius_scale * radius;
+  ms_u = normalize(tmp_ms_u) * point_size_factor  * radius;
+  ms_v = normalize(cross(ms_n, tmp_ms_u)) * point_size_factor * radius;
 }
 
 

@@ -8,9 +8,9 @@
 #ifndef COMMON_CONFIG_IN_HPP
 #define COMMON_CONFIG_IN_HPP
 
-#define LAMURE_SHADERS_DIR "C:/src/externlibs/zebu/lamure/share/lamure/shaders"
-#define LAMURE_FONTS_DIR "C:/src/externlibs/zebu/lamure/share/lamure/fonts"
-#define LAMURE_PRIMITIVES_DIR "C:/src/externlibs/zebu/lamure/share/lamure/primitives"
+#define LAMURE_SHADERS_DIR "C:/src/covise/src/OpenCOVER/plugins/hlrs/LamurePointCloud/shaders"
+#define LAMURE_FONTS_DIR "C:/src/covise/src/OpenCOVER/plugins/hlrs/LamurePointCloud/fonts"
+#define LAMURE_PRIMITIVES_DIR "C:/src/covise/src/OpenCOVER/plugins/hlrs/LamurePointCloud/primitives"
 
 #define LAMURE_USE_CGAL_FOR_NNI
 
