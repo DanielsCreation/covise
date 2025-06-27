@@ -40,8 +40,6 @@ void main()
     float radius_clamped = min(in_radius, max_radius);
     vec3 normal = in_normal;
     if (face_eye) {
-        // Beispiel: billboard‐ähnliche Ausrichtung;
-        // falls nicht gebraucht, kannst du das weglassen
         normal = normalize(eye - (model_matrix * vec4(in_position,1.0)).xyz);
     }
 

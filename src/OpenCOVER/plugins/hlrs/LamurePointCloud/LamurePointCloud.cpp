@@ -136,8 +136,95 @@ LamurePointCloudPlugin::LamurePointCloudPlugin() : ui::Owner("LamurePointCloud",
 	plugin = this;
 }
 
-std::string vis_point_shader_vs_source;
-std::string vis_point_shader_fs_source;
+FT_Library ft_;
+FT_Face face_;
+static GLuint       g_FontTexture = 0;
+static coVRConfig* coco = coVRConfig::instance();
+static const osg::GraphicsContext::Traits* traits = coVRConfig::instance()->windows[0].context->getTraits();
+static lamure::context_t lmr_ctx;
+boost::mutex m;
+std::mutex gl_state_mutex;
+uint32_t render_width_;
+uint32_t render_height_;
+lamure::ren::Data_Provenance data_provenance_;
+bool prov_valid;
+float height_divided_by_top_minus_bottom_ = 0.0f;
+uint32_t num_models_ = 0;
+
+scm::gl::render_device_ptr      device_;
+scm::gl::render_context_ptr     context_;
+scm::gl::quad_geometry_ptr      screen_quad_;
+
+scm::gl::text_renderer_ptr      text_renderer_;
+scm::gl::text_ptr               renderable_text_;
+
+
+lmr_camera* lamure_camera_;
+lamure::ren::camera* scm_camera_;
+osg::ref_ptr<osg::Camera>   osg_camera_;
+osg::ref_ptr<osg::Camera>   rtt_camera_;
+
+
+scm::gl::program_ptr vis_point_shader_;
+scm::gl::program_ptr vis_point_prov_shader_;
+scm::gl::program_ptr vis_surfel_shader_;
+scm::gl::program_ptr vis_surfel_prov_shader_;
+
+scm::gl::program_ptr vis_line_bb_shader_; 
+scm::gl::program_ptr vis_text_shader_;
+scm::gl::program_ptr vis_box_shader_;
+scm::gl::program_ptr vis_xyz_shader_;
+scm::gl::program_ptr vis_xyz_pass1_shader_;
+scm::gl::program_ptr vis_xyz_pass2_shader_;
+scm::gl::program_ptr vis_xyz_pass3_shader_;
+scm::gl::program_ptr vis_xyz_lighting_shader_;
+scm::gl::program_ptr vis_xyz_pass2_lighting_shader_;
+scm::gl::program_ptr vis_xyz_pass3_lighting_shader_;
+scm::gl::program_ptr vis_xyz_qz_shader_;
+scm::gl::program_ptr vis_xyz_qz_pass1_shader_;
+scm::gl::program_ptr vis_xyz_qz_pass2_shader_;
+scm::gl::program_ptr vis_quad_shader_;
+scm::gl::program_ptr vis_plane_shader_;
+scm::gl::program_ptr vis_line_shader_;
+scm::gl::program_ptr vis_triangle_shader_;
+scm::gl::program_ptr vis_vt_shader_;
+
+scm::gl::frame_buffer_ptr fbo_;
+scm::gl::texture_2d_ptr fbo_color_buffer_;
+scm::gl::texture_2d_ptr fbo_depth_buffer_;
+scm::gl::frame_buffer_ptr pass1_fbo_;
+scm::gl::frame_buffer_ptr pass2_fbo_;
+scm::gl::frame_buffer_ptr pass3_fbo_;
+scm::gl::texture_2d_ptr pass1_depth_buffer_;
+scm::gl::texture_2d_ptr pass2_color_buffer_;
+scm::gl::texture_2d_ptr pass2_normal_buffer_;
+scm::gl::texture_2d_ptr pass2_view_space_pos_buffer_;
+scm::gl::texture_2d_ptr pass2_depth_buffer_;
+scm::gl::depth_stencil_state_ptr depth_state_disable_;
+scm::gl::depth_stencil_state_ptr depth_state_less_;
+scm::gl::depth_stencil_state_ptr depth_state_without_writing_;
+scm::gl::rasterizer_state_ptr no_backface_culling_rasterizer_state_;
+scm::gl::blend_state_ptr color_blending_state_;
+scm::gl::blend_state_ptr color_no_blending_state_;
+scm::gl::sampler_state_ptr filter_linear_;
+scm::gl::sampler_state_ptr filter_nearest_;
+scm::gl::sampler_state_ptr vt_filter_linear_;
+scm::gl::sampler_state_ptr vt_filter_nearest_;
+scm::gl::texture_2d_ptr bg_texture_;
+
+scm::time::accum_timer<scm::time::high_res_timer> frame_time_;
+
+
+std::string vis_point_vs_source;
+std::string vis_point_fs_source;
+std::string vis_point_prov_vs_source;
+std::string vis_point_prov_fs_source;
+std::string vis_surfel_vs_source;
+std::string vis_surfel_gs_source;
+std::string vis_surfel_fs_source;
+std::string vis_surfel_prov_vs_source;
+std::string vis_surfel_prov_fs_source;
+
 std::string vis_line_bb_vs_source;
 std::string vis_line_bb_fs_source;
 std::string vis_quad_vs_source;
@@ -182,6 +269,7 @@ std::string vis_xyz_pass3_fs_lighting_source;
 
 std::string shader_root_path = LAMURE_SHADERS_DIR;
 std::string font_root_path = LAMURE_FONTS_DIR;
+
 
 static osg::Vec3f vecConv3F(scm::math::vec3f& v);
 static osg::Vec3d vecConv3D(scm::math::vec3d& v);
@@ -256,78 +344,6 @@ scm::math::mat4d matConv4D(const osg::Matrixd& m) {
 	return mat_scm;
 }
 
-FT_Library ft_;
-FT_Face face_;
-static GLuint       g_FontTexture = 0;
-static coVRConfig* coco = coVRConfig::instance();
-static const osg::GraphicsContext::Traits* traits = coVRConfig::instance()->windows[0].context->getTraits();
-static lamure::context_t lmr_ctx;
-boost::mutex m;
-std::mutex gl_state_mutex;
-uint32_t render_width_;
-uint32_t render_height_;
-lamure::ren::Data_Provenance data_provenance_;
-float height_divided_by_top_minus_bottom_ = 0.0f;
-uint32_t num_models_ = 0;
-
-scm::gl::render_device_ptr      device_;
-scm::gl::render_context_ptr     context_;
-scm::gl::quad_geometry_ptr      screen_quad_;
-
-scm::gl::text_renderer_ptr      text_renderer_;
-scm::gl::text_ptr               renderable_text_;
-
-
-lmr_camera* lamure_camera_;
-lamure::ren::camera* scm_camera_;
-osg::ref_ptr<osg::Camera>   osg_camera_;
-osg::ref_ptr<osg::Camera>   rtt_camera_;
-
-scm::gl::program_ptr vis_point_shader_;
-scm::gl::program_ptr vis_line_bb_shader_; 
-scm::gl::program_ptr vis_text_shader_;
-scm::gl::program_ptr vis_box_shader_;
-scm::gl::program_ptr vis_xyz_shader_;
-scm::gl::program_ptr vis_xyz_pass1_shader_;
-scm::gl::program_ptr vis_xyz_pass2_shader_;
-scm::gl::program_ptr vis_xyz_pass3_shader_;
-scm::gl::program_ptr vis_xyz_lighting_shader_;
-scm::gl::program_ptr vis_xyz_pass2_lighting_shader_;
-scm::gl::program_ptr vis_xyz_pass3_lighting_shader_;
-scm::gl::program_ptr vis_xyz_qz_shader_;
-scm::gl::program_ptr vis_xyz_qz_pass1_shader_;
-scm::gl::program_ptr vis_xyz_qz_pass2_shader_;
-scm::gl::program_ptr vis_quad_shader_;
-scm::gl::program_ptr vis_plane_shader_;
-scm::gl::program_ptr vis_line_shader_;
-scm::gl::program_ptr vis_triangle_shader_;
-scm::gl::program_ptr vis_vt_shader_;
-
-scm::gl::frame_buffer_ptr fbo_;
-scm::gl::texture_2d_ptr fbo_color_buffer_;
-scm::gl::texture_2d_ptr fbo_depth_buffer_;
-scm::gl::frame_buffer_ptr pass1_fbo_;
-scm::gl::frame_buffer_ptr pass2_fbo_;
-scm::gl::frame_buffer_ptr pass3_fbo_;
-scm::gl::texture_2d_ptr pass1_depth_buffer_;
-scm::gl::texture_2d_ptr pass2_color_buffer_;
-scm::gl::texture_2d_ptr pass2_normal_buffer_;
-scm::gl::texture_2d_ptr pass2_view_space_pos_buffer_;
-scm::gl::texture_2d_ptr pass2_depth_buffer_;
-scm::gl::depth_stencil_state_ptr depth_state_disable_;
-scm::gl::depth_stencil_state_ptr depth_state_less_;
-scm::gl::depth_stencil_state_ptr depth_state_without_writing_;
-scm::gl::rasterizer_state_ptr no_backface_culling_rasterizer_state_;
-scm::gl::blend_state_ptr color_blending_state_;
-scm::gl::blend_state_ptr color_no_blending_state_;
-scm::gl::sampler_state_ptr filter_linear_;
-scm::gl::sampler_state_ptr filter_nearest_;
-scm::gl::sampler_state_ptr vt_filter_linear_;
-scm::gl::sampler_state_ptr vt_filter_nearest_;
-scm::gl::texture_2d_ptr bg_texture_;
-
-scm::time::accum_timer<scm::time::high_res_timer> frame_time_;
-
 
 struct settings {
 	int32_t frame_div_{ 1 };
@@ -349,6 +365,7 @@ struct settings {
 	bool use_pvs_{ 0 };
 	bool pvs_culling_{ 0 };
 	float point_size_factor_{ 1.0f };
+	float surfel_size_factor_{ 1.0f };
 	float aux_point_size_{ 1.0f };
 	float aux_point_distance_{ 0.5f };
 	float aux_point_scale_{ 1.0f };
@@ -382,12 +399,12 @@ struct settings {
 	std::string pvs_{ "" };
 	std::string background_image_{ "" };
 	std::vector<std::string> models_;
+	std::vector<uint32_t> selection_;
 	std::map<uint32_t, scm::math::mat4d> transforms_;
 	std::map<uint32_t, std::shared_ptr<lamure::prov::octree>> octrees_;
 	std::map<uint32_t, std::vector<lamure::prov::aux::view>> views_;
 	std::map<uint32_t, std::string> aux_;
-	std::string selection_{ "" };
-	float max_radius_{ std::min(std::numeric_limits<float>::max(), 0.2f) };
+	float max_radius_{ std::min(std::numeric_limits<float>::max(), 0.1f) };
 	float scale_radius_{ 1.5f };
 	std::vector<float> bvh_color_{ 1.0f, 1.0f, 0.0f, 1.0f };
 	std::vector<float> frustum_color_{ 0.0f, 0.0f, 0.0f, 1.0f };
@@ -397,141 +414,199 @@ settings settings_;
 
 void LamurePointCloudPlugin::load_settings(std::string const& filename) {
 	using namespace std::filesystem;
+
 	std::cout << "load_settings()" << std::endl;
-	// Hilfs-Lambda zum Trimmen
+
+	auto parseIndices = [](const std::string &s, size_t max_index) {
+		std::vector<uint32_t> out;
+		if (s.empty()) {
+			for (uint32_t i = 0; i < max_index; ++i) out.push_back(i);
+			return out;
+		}
+		std::istringstream ss(s);
+		std::string part;
+		while (std::getline(ss, part, ',')) {
+			size_t dash = part.find('-');
+			if (dash != std::string::npos) {
+				int32_t a = std::stoi(part.substr(0, dash));
+				int32_t b = std::stoi(part.substr(dash + 1));
+				for (int32_t i = a; i <= b; ++i)
+					if (i >= 0 && static_cast<size_t>(i) < max_index) out.push_back(i);
+			} else {
+				int32_t val = std::stoi(part);
+				if (val >= 0 && static_cast<size_t>(val) < max_index) out.push_back(val);
+			}
+		}
+		std::sort(out.begin(), out.end());
+		out.erase(std::unique(out.begin(), out.end()), out.end());
+		return out;
+		};
+
 	auto strip_ws = [](std::string s) {
 		auto not_ws = [](char c) { return !std::isspace(c); };
 		s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_ws));
 		s.erase(std::find_if(s.rbegin(), s.rend(), not_ws).base(), s.end());
 		return s;
 		};
-	// 1) Datei einlesen
+
 	std::ifstream file(filename);
-	if (!file.is_open()) { std::cerr << "could not open lmr file: " << filename << std::endl; std::exit(EXIT_FAILURE); }
-	std::vector<std::string> lines; for (std::string line; std::getline(file, line); ) lines.push_back(line);
+	if (!file.is_open()) {
+		std::cerr << "could not open lmr file: " << filename << std::endl;
+		std::exit(EXIT_FAILURE);
+	}
+	std::vector<std::string> lines;
+	for (std::string line; std::getline(file, line); ) lines.push_back(line);
 	file.close();
-	// 2) Alte Einträge löschen
-	settings_.models_.clear(); settings_.transforms_.clear(); settings_.aux_.clear();
-	// 3) erste Key:Value-Pässe
-	std::string data_dir; std::vector<std::string> manual_files;
-	for (auto const& raw : lines) {
-		auto l = strip_ws(raw);
+
+	settings_.models_.clear();
+	settings_.transforms_.clear();
+	settings_.json_.clear();
+
+	std::set<std::string> unique_models;
+	std::string data_dir;
+	for (const auto& raw : lines) {
+		std::string l = strip_ws(raw);
 		if (l.empty() || l[0] == '#') continue;
-		auto colon = l.find(':');
-		if (colon == std::string::npos)
-			manual_files.push_back(l);
-		else {
-			auto key = strip_ws(l.substr(0, colon)),
-				value = strip_ws(l.substr(colon + 1));
-			if (key == "data_directory") data_dir = value;
+		size_t colon = l.find(':');
+		if (colon <= 1) {
+			if (exists(l)) {
+				if (is_directory(l)) {
+					data_dir = l;
+				} else {
+					unique_models.insert(absolute(l).string());
+				}
+			}
 		}
 	}
-	// 4) externe Modelle sammeln
-	std::vector<std::string> external_models;
-	if (!data_dir.empty())
-		for (auto const& e : recursive_directory_iterator(data_dir))
-			if (e.is_regular_file() && e.path().extension() == ".bvh")
-				external_models.push_back(e.path().string());
-	external_models.insert(external_models.end(), manual_files.begin(), manual_files.end());
-	bool use_external = !external_models.empty();
-	// 5) falls vorhanden, direkt hinzufügen
+
+	if (!data_dir.empty()) {
+		for (const auto& e : recursive_directory_iterator(data_dir)) {
+			if (e.is_regular_file() && e.path().extension() == ".bvh") {
+				unique_models.insert(absolute(e.path()).string());
+			}
+		}
+	}
+
+	for (const auto& path : unique_models) {
+		settings_.models_.push_back(path);
+	}
+
+	prov_valid = true;
+	std::string first_json;
+	for (const auto& model_path : settings_.models_) {
+		std::filesystem::path p(model_path);
+		std::filesystem::path prov_file = p;
+		prov_file.replace_extension(".prov");
+		std::filesystem::path json_file = p;
+		json_file.replace_extension(".json");
+		if (!exists(prov_file) || !exists(json_file)) {
+			prov_valid = false;
+			break;
+		} else {
+			if (first_json.empty()) {
+				first_json = json_file.string();
+			}
+		}
+	}
+
 	lamure::model_t model_id = 0;
-	if (use_external)
-		for (auto const& m : external_models)
-			settings_.models_.push_back(m),
-			settings_.transforms_[model_id] = scm::math::mat4d::identity(),
-			settings_.aux_[model_id++] = "";
-	// 6) restliche Zeilen verarbeiten, alle Settings in einer Zeile
-	for (auto const& raw : lines) {
+	for (const auto& model_path : settings_.models_) {
+		if (settings_.transforms_.find(model_id) == settings_.transforms_.end()) {
+			settings_.transforms_[model_id] = scm::math::mat4d::identity();
+		}
+		++model_id;
+	}
+
+	for (const auto& raw : lines) {
 		auto l = strip_ws(raw);
 		if (l.empty() || l[0] == '#') continue;
 		auto colon = l.find(':');
-		if (colon == std::string::npos) {
-			if (use_external) continue;
-			std::istringstream ss(l); std::string model; ss >> model;
-			settings_.models_.push_back(model), settings_.transforms_[model_id] = scm::math::mat4d::identity(), settings_.aux_[model_id++] = "";
-		}
-		else {
-			auto key = strip_ws(l.substr(0, colon)),
-				value = strip_ws(l.substr(colon + 1));
-			if (key == "data_directory") continue;
-			if (!key.empty() && key[0] == '@') {
-				auto ws = l.find_first_of(' ');
-				uint32_t addr = std::atoi(strip_ws(l.substr(1, ws - 1)).c_str());
-				key = strip_ws(l.substr(ws + 1, colon - (ws + 1)));
-				if (key == "tf")  settings_.transforms_[addr] = load_matrix(value);
-				else if (key == "aux") settings_.aux_[addr] = value;
-				else { std::cerr << "unrecognized @-key: " << key << std::endl; std::exit(EXIT_FAILURE); }
+		if (colon <= 1 || (colon == std::string::npos)) continue;
+		auto key = strip_ws(l.substr(0, colon));
+		auto value = strip_ws(l.substr(colon + 1));
+
+		if (!key.empty() && key[0] == '@') {
+			auto ws = l.find_first_of(' ');
+			uint32_t addr = std::atoi(strip_ws(l.substr(1, ws - 1)).c_str());
+			key = strip_ws(l.substr(ws + 1, colon - (ws + 1)));
+			if (key == "tf") settings_.transforms_[addr] = load_matrix(value);
+			else {
+				std::cerr << "unrecognized @-key: " << key << std::endl;
+				std::exit(EXIT_FAILURE);
 			}
-			else if (key == "surfel_shader")        settings_.surfel_shader_ = std::atoi(value.c_str());
-			else if (key == "frame_div")            settings_.frame_div_ = std::max(std::atoi(value.c_str()), 1);
-			else if (key == "vram")                 settings_.vram_ = std::max(std::atoi(value.c_str()), 8);
-			else if (key == "ram")                  settings_.ram_ = std::max(std::atoi(value.c_str()), 8);
-			else if (key == "upload")               settings_.upload_ = std::max(std::atoi(value.c_str()), 8);
-			else if (key == "splatting")            settings_.splatting_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "face_eye")             settings_.face_eye_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "gamma_correction")     settings_.gamma_correction_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "pvs_culling")          settings_.pvs_culling_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "use_pvs")              settings_.use_pvs_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "point_size_factor")    settings_.point_size_factor_ = std::clamp(std::atof(value.c_str()), 1.0, 10.0);
-			else if (key == "aux_point_size")       settings_.aux_point_size_ = std::clamp(std::atof(value.c_str()), 0.00001, 1.0);
-			else if (key == "aux_point_distance")   settings_.aux_point_distance_ = std::clamp(std::atof(value.c_str()), 0.00001, 1.0);
-			else if (key == "aux_focal_length")     settings_.aux_focal_length_ = std::clamp(std::atof(value.c_str()), 0.001, 10.0);
-			else if (key == "max_brush_size")       settings_.max_brush_size_ = std::clamp(std::atoi(value.c_str()), 64, 1024 * 1024);
-			else if (key == "lod_error")            settings_.lod_error_ = std::clamp(std::atof(value.c_str()), 1.0, 10.0);
-			else if (key == "provenance")           settings_.provenance_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "create_aux_resources") settings_.create_aux_resources_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_normals")         settings_.show_normals_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_accuracy")        settings_.show_accuracy_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_radius_deviation")settings_.show_radius_deviation_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_output_sensitivity") settings_.show_output_sensitivity_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_sparse")          settings_.show_sparse_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_views")           settings_.show_views_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_photos")          settings_.show_photos_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_octrees")         settings_.show_octrees_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_bvhs")            settings_.show_bvhs_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "show_pvs")             settings_.show_pvs_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "channel")              settings_.channel_ = std::max(std::atoi(value.c_str()), 0);
-			else if (key == "enable_lighting")      settings_.enable_lighting_ = std::clamp(std::atoi(value.c_str()), 0, 1) != 0;
-			else if (key == "use_material_color")   settings_.use_material_color_ = std::clamp(std::atoi(value.c_str()), 0, 1) != 0;
-			else if (key == "material_diffuse_r")   settings_.material_diffuse_.x = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_diffuse_g")   settings_.material_diffuse_.y = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_diffuse_b")   settings_.material_diffuse_.z = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_specular_r")  settings_.material_specular_.x = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_specular_g")  settings_.material_specular_.y = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_specular_b")  settings_.material_specular_.z = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "material_specular_exponent") settings_.material_specular_.w = std::clamp(std::atof(value.c_str()), 0.0, 10000.0);
-			else if (key == "ambient_light_color_r")settings_.ambient_light_color_.r = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "ambient_light_color_g")settings_.ambient_light_color_.g = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "ambient_light_color_b")settings_.ambient_light_color_.b = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "point_light_color_r")  settings_.point_light_color_.r = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "point_light_color_g")  settings_.point_light_color_.g = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "point_light_color_b")  settings_.point_light_color_.b = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
-			else if (key == "point_light_intensity")settings_.point_light_color_.w = std::clamp<float>(std::atof(value.c_str()), 0.0f, 10000.0);
-			else if (key == "background_color_r")   settings_.background_color_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "background_color_g")   settings_.background_color_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "background_color_b")   settings_.background_color_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap")              settings_.heatmap_ = std::max(std::atoi(value.c_str()), 0) != 0;
-			else if (key == "heatmap_min")          settings_.heatmap_min_ = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "heatmap_max")          settings_.heatmap_max_ = std::max<float>(std::atof(value.c_str()), 0.0f);
-			else if (key == "heatmap_min_r")        settings_.heatmap_color_min_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_min_g")        settings_.heatmap_color_min_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_min_b")        settings_.heatmap_color_min_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_max_r")        settings_.heatmap_color_max_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_max_g")        settings_.heatmap_color_max_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "heatmap_max_b")        settings_.heatmap_color_max_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
-			else if (key == "atlas_file")           settings_.atlas_file_ = value;
-			else if (key == "json")                 settings_.json_ = value;
-			else if (key == "pvs")                  settings_.pvs_ = value;
-			else if (key == "selection")            settings_.selection_ = value;
-			else if (key == "background_image")     settings_.background_image_ = value;
-			else if (key == "max_radius")           settings_.max_radius_ = std::max(std::atof(value.c_str()), 0.1);
-			else if (key == "scale_radius")         settings_.scale_radius_ = std::max(std::atof(value.c_str()), 0.1);
-			else { std::cerr << "unrecognized key: " << key << std::endl; std::exit(EXIT_FAILURE); }
 		}
+		else if (key == "surfel_shader")        settings_.surfel_shader_ = std::atoi(value.c_str());
+		else if (key == "frame_div")            settings_.frame_div_ = std::max(std::atoi(value.c_str()), 1);
+		else if (key == "vram")                 settings_.vram_ = std::max(std::atoi(value.c_str()), 8);
+		else if (key == "ram")                  settings_.ram_ = std::max(std::atoi(value.c_str()), 8);
+		else if (key == "upload")               settings_.upload_ = std::max(std::atoi(value.c_str()), 8);
+		else if (key == "splatting")            settings_.splatting_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "face_eye")             settings_.face_eye_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "gamma_correction")     settings_.gamma_correction_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "pvs_culling")          settings_.pvs_culling_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "use_pvs")              settings_.use_pvs_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "point_size_factor")    settings_.point_size_factor_ =  std::atoi(value.c_str());
+		else if (key == "surfel_size_factor")   settings_.surfel_size_factor_ =  std::atoi(value.c_str());
+		else if (key == "aux_point_size")       settings_.aux_point_size_ = std::clamp(std::atof(value.c_str()), 0.00001, 1.0);
+		else if (key == "aux_point_distance")   settings_.aux_point_distance_ = std::clamp(std::atof(value.c_str()), 0.00001, 1.0);
+		else if (key == "aux_focal_length")     settings_.aux_focal_length_ = std::clamp(std::atof(value.c_str()), 0.001, 10.0);
+		else if (key == "max_brush_size")       settings_.max_brush_size_ = std::clamp(std::atoi(value.c_str()), 64, 1024 * 1024);
+		else if (key == "lod_error")            settings_.lod_error_ = std::clamp(std::atof(value.c_str()), 1.0, 10.0);
+		else if (key == "provenance")			settings_.provenance_ = (std::max(std::atoi(value.c_str()), 0) != 0) && prov_valid;
+		else if (key == "create_aux_resources") settings_.create_aux_resources_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_normals")         settings_.show_normals_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_accuracy")        settings_.show_accuracy_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_radius_deviation")settings_.show_radius_deviation_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_output_sensitivity") settings_.show_output_sensitivity_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_sparse")          settings_.show_sparse_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_views")           settings_.show_views_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_photos")          settings_.show_photos_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_octrees")         settings_.show_octrees_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_bvhs")            settings_.show_bvhs_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "show_pvs")             settings_.show_pvs_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "channel")              settings_.channel_ = std::max(std::atoi(value.c_str()), 0);
+		else if (key == "enable_lighting")      settings_.enable_lighting_ = std::clamp(std::atoi(value.c_str()), 0, 1) != 0;
+		else if (key == "use_material_color")   settings_.use_material_color_ = std::clamp(std::atoi(value.c_str()), 0, 1) != 0;
+		else if (key == "material_diffuse_r")   settings_.material_diffuse_.x = std::max<float>(std::atof(value.c_str()), 0.0f);
+		else if (key == "material_diffuse_g")   settings_.material_diffuse_.y = std::max<float>(std::atof(value.c_str()), 0.0f);
+		else if (key == "material_diffuse_b")   settings_.material_diffuse_.z = std::max<float>(std::atof(value.c_str()), 0.0f);
+		else if (key == "material_specular_r")  settings_.material_specular_.x = std::max<float>(std::atof(value.c_str()), 0.0f);
+		else if (key == "material_specular_g")  settings_.material_specular_.y = std::max<float>(std::atof(value.c_str()), 0.0f);
+		else if (key == "material_specular_b")  settings_.material_specular_.z = std::max<float>(std::atof(value.c_str()), 0.0f);
+		else if (key == "material_specular_exponent") settings_.material_specular_.w = std::clamp(std::atof(value.c_str()), 0.0, 10000.0);
+		else if (key == "ambient_light_color_r")settings_.ambient_light_color_.r = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+		else if (key == "ambient_light_color_g")settings_.ambient_light_color_.g = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+		else if (key == "ambient_light_color_b")settings_.ambient_light_color_.b = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+		else if (key == "point_light_color_r")  settings_.point_light_color_.r = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+		else if (key == "point_light_color_g")  settings_.point_light_color_.g = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+		else if (key == "point_light_color_b")  settings_.point_light_color_.b = std::clamp<float>(std::atof(value.c_str()), 0.0f, 1.0f);
+		else if (key == "point_light_intensity")settings_.point_light_color_.w = std::clamp<float>(std::atof(value.c_str()), 0.0f, 10000.0);
+		else if (key == "background_color_r")   settings_.background_color_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+		else if (key == "background_color_g")   settings_.background_color_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+		else if (key == "background_color_b")   settings_.background_color_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+		else if (key == "heatmap")              settings_.heatmap_ = std::max(std::atoi(value.c_str()), 0) != 0;
+		else if (key == "heatmap_min")          settings_.heatmap_min_ = std::max<float>(std::atof(value.c_str()), 0.0f);
+		else if (key == "heatmap_max")          settings_.heatmap_max_ = std::max<float>(std::atof(value.c_str()), 0.0f);
+		else if (key == "heatmap_min_r")        settings_.heatmap_color_min_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+		else if (key == "heatmap_min_g")        settings_.heatmap_color_min_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+		else if (key == "heatmap_min_b")        settings_.heatmap_color_min_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+		else if (key == "heatmap_max_r")        settings_.heatmap_color_max_.x = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+		else if (key == "heatmap_max_g")        settings_.heatmap_color_max_.y = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+		else if (key == "heatmap_max_b")        settings_.heatmap_color_max_.z = std::min(std::max(std::atoi(value.c_str()), 0), 255) / 255.0f;
+		else if (key == "json")					settings_.json_ = !value.empty() ? value : (!first_json.empty() ? first_json : settings_.json_);
+		else if (key == "selection")            settings_.selection_ = parseIndices(value, settings_.models_.size());
+		else if (key == "pvs")                  settings_.pvs_ = value;
+		else if (key == "background_image")     settings_.background_image_ = value;
+		else if (key == "max_radius")           settings_.max_radius_ = std::max(std::atof(value.c_str()), 0.1);
+		else if (key == "scale_radius")         settings_.scale_radius_ = std::max(std::atof(value.c_str()), 0.1);
+		else { std::cerr << "unrecognized key: " << key << std::endl; std::exit(EXIT_FAILURE); }
+		
 	}
 	for (auto const& m : settings_.models_) {
 		std::cout << "Loaded model: " << m << std::endl;
+	}
+	for (auto const& m : settings_.selection_) {
+		std::cout << "Selected models: " << m << std::endl;
 	}
 }
 
@@ -674,54 +749,34 @@ struct render_info {
 };
 render_info render_info_;
 
+
+
+
+struct point_shader {
+	GLuint program{0};
+	GLint mvp_matrix_loc{-1};
+	GLint max_radius_loc{-1};
+	GLint scale_radius_loc{-1};
+	GLint point_size_factor_loc{-1};
+	GLint proj_scale_loc{-1};
+};
+point_shader point_shader_;
+
+
 struct surfel_shader {
-	GLuint program_ = 0;
-
-	// Core-Matrizen
-	GLint mvp_matrix_location = -1;
-	GLint view_matrix_location = -1;
-	GLint projection_matrix_location = -1;
-	GLint model_matrix_location = -1;
-	GLint model_view_matrix_location = -1;
-	GLint inverse_mv_matrix_location = -1;
-	GLint model_to_screen_matrix_location = -1;
-	GLint viewport_location = -1;
-	GLint eye_location = -1;
-	GLint face_eye_location = -1;
-
-	// Point-Cloud-Parameter
-	GLint model_radius_scale_location = -1;
-	GLint max_radius_location = -1;
-	GLint window_size_location = -1;
-	GLint near_plane_location = -1;
-	GLint far_plane_location = -1;
-	GLint point_size_factor_location = -1;
-
-	// Anzeige-Flags
-	GLint show_normals_location = -1;
-	GLint show_accuracy_location = -1;
-	GLint show_output_sensitivity_location = -1;
-	GLint channel_location = -1;
-	GLint heatmap_enabled_location = -1;
-
-	// Heatmap-Bereiche
-	GLint heatmap_min_location = -1;
-	GLint heatmap_max_location = -1;
-	GLint heatmap_min_color_location = -1;
-	GLint heatmap_max_color_location = -1;
-
-	// Beleuchtung
-	GLint use_material_color_location = -1;
-	GLint material_diffuse_location = -1;
-	GLint material_specular_location = -1;
-	GLint ambient_light_color_location = -1;
-	GLint point_light_color_location = -1;
-
+	GLuint program;
+	GLint max_radius_loc;
+	GLint scale_radius_loc;
+	GLint surfel_size_factor_loc;
+	GLint mvp_matrix_loc;
+	GLint model_view_matrix_loc;  // Neue Uniform Location
+	GLint proj_scale_loc;
+	GLint viewport_loc; 
 };
 surfel_shader surfel_shader_;
 
 
-struct point_shader {
+struct point_prov_shader {
 	GLuint program_ = 0;
 
 	// Core-Matrizen
@@ -736,7 +791,7 @@ struct point_shader {
 	GLint height_divided_by_top_minus_bottom_location = -1;
 
 	// Point-Cloud-Parameter
-	GLint model_radius_scale_location = -1;
+	GLint scale_radius_location = -1;
 	GLint max_radius_location = -1;
 	GLint window_size_location = -1;
 	GLint near_plane_location = -1;
@@ -763,7 +818,7 @@ struct point_shader {
 	GLint ambient_light_color_location = -1;
 	GLint point_light_color_location = -1;
 };
-point_shader point_shader_;
+point_prov_shader point_prov_shader_;
 
 
 struct line_shader {
@@ -822,15 +877,15 @@ struct coord_recourse {
 	GLuint ibo_ = 0;
 	GLuint program_ = 0;
 	std::array<float, 12> vertices_ = {
-		  0.f,   0.f,   0.f,
-		 50.f,   0.f,   0.f,  // X-Achse
-		  0.f,  50.f,   0.f,  // Y-Achse
-		  0.f,   0.f,   50.f  // Z-Achse
+		0.f,   0.f,   0.f,
+		50.f,   0.f,   0.f,  // X-Achse
+		0.f,  50.f,   0.f,  // Y-Achse
+		0.f,   0.f,   50.f  // Z-Achse
 	};
 	std::array<unsigned short, 6> idx_ = {
-	0, 1,
-	0, 2,
-	0, 3,
+		0, 1,
+		0, 2,
+		0, 3,
 	};
 };
 coord_recourse coord_resource_;
@@ -842,9 +897,9 @@ struct frustum_resource {
 	GLuint program_ = 0;
 	std::array<float, 24> vertices_;
 	std::array<unsigned short, 24> idx_ = {
-	0, 1, 2, 3, 4, 5, 6, 7,
-	0, 2, 1, 3, 4, 6, 5, 7,
-	0, 4, 1, 5, 2, 6, 3, 7,
+		0, 1, 2, 3, 4, 5, 6, 7,
+		0, 2, 1, 3, 4, 6, 5, 7,
+		0, 4, 1, 5, 2, 6, 3, 7,
 	};
 };
 frustum_resource frustum_resource_;
@@ -999,8 +1054,8 @@ std::vector<vector<float>> LamurePointCloudPlugin::getSerializedBvhMinMax(const 
 		scm::math::vec3f min_vertex = bounding_boxes[node_id].min_vertex();
 		scm::math::vec3f max_vertex = bounding_boxes[node_id].max_vertex();
 		vector<float> elements{
-					min_vertex.x, min_vertex.y, min_vertex.z,
-					max_vertex.x, max_vertex.y, max_vertex.z };
+			min_vertex.x, min_vertex.y, min_vertex.z,
+			max_vertex.x, max_vertex.y, max_vertex.z };
 		vecOfVec.push_back(elements);
 	}
 	return vecOfVec;
@@ -1483,7 +1538,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 		glDisable(GL_CULL_FACE);
 
 		osg::State* state = renderInfo.getState();
-		//state->setCheckForGLErrors(osg::State::CheckForGLErrors::ONCE_PER_ATTRIBUTE);
+		state->setCheckForGLErrors(osg::State::CheckForGLErrors::ONCE_PER_ATTRIBUTE);
 
 		scm::math::mat4 view_matrix_ = matConv4F(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
 		scm::math::mat4 projection_matrix_ = matConv4F(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
@@ -1530,20 +1585,35 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 			context_->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_, data_provenance_));
 		}
 		else { context_->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, device_)); }
-		
-		if (settings_.surfel_shader_) {
-			glUseProgram(surfel_shader_.program_);
-			_plugin->set_surfel_uniforms();
-		}
-		else {
-			glUseProgram(point_shader_.program_);
+
+
+		const scm::math::mat4d viewport_scale = scm::math::make_scale(traits->width * 0.5, traits->height * 0.5, 0.5);
+		const scm::math::mat4d viewport_translate = scm::math::make_translation(1.0, 1.0, 1.0);
+		const scm::math::mat4 model_to_screen_matrix_ = scm::math::mat4(viewport_scale * viewport_translate);
+		scm::math::vec3 eye_ = scm::math::vec3f(scm_camera_->get_cam_pos());
+		scm::math::vec2 viewport_ = scm::math::vec2f(traits->width, traits->height);
+
+		if (!settings_.surfel_shader_ && !settings_.provenance_) {
+			glUseProgram(point_shader_.program);
 			glEnable(GL_POINT_SMOOTH);
 			glEnable(GL_PROGRAM_POINT_SIZE);
-			_plugin->set_point_uniforms();
+			glUniform1f(point_shader_.max_radius_loc, settings_.max_radius_);
+			glUniform1f(point_shader_.scale_radius_loc, settings_.scale_radius_);
+			glUniform1f(point_shader_.point_size_factor_loc,  settings_.point_size_factor_ * cover->getScale());
+			glUniform1f(point_shader_.proj_scale_loc, viewport_.y * 0.5f * projection_matrix_.data_array[5]);
+		}
+		else if (settings_.surfel_shader_ && !settings_.provenance_) {
+			glUseProgram(surfel_shader_.program);
+			glUniform1f(surfel_shader_.max_radius_loc, settings_.max_radius_);
+			glUniform1f(surfel_shader_.scale_radius_loc,settings_.scale_radius_);
+			glUniform1f(surfel_shader_.surfel_size_factor_loc,settings_.surfel_size_factor_);
+			glUniform1f(surfel_shader_.proj_scale_loc, viewport_.y * 0.5f * projection_matrix_.data_array[5]);
+			glUniform2f(surfel_shader_.viewport_loc, viewport_.x, viewport_.y);
 		}
 
 		uint64_t rendered_splats_ = 0;
 		uint64_t rendered_nodes_ = 0;
+
 		for (uint16_t model_id = 0; model_id < num_models_; ++model_id) {
 			if (!_plugin->model_visible_[model_id]) { continue; }
 			lamure::ren::cut& cut = cuts->get_cut(context_id, lmr_ctx, model_id);
@@ -1551,75 +1621,33 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 			const lamure::ren::bvh* bvh = database->get_model(model_id)->get_bvh();
 			std::vector<scm::gl::boxf>const& bounding_box_vector = bvh->get_bounding_boxes();
 
-			const scm::math::mat4d viewport_scale = scm::math::make_scale(traits->width * 0.5, traits->height * 0.5, 0.5);
-			const scm::math::mat4d viewport_translate = scm::math::make_translation(1.0, 1.0, 1.0);
-			const scm::math::mat4 model_to_screen_matrix_ = scm::math::mat4(viewport_scale * viewport_translate);
-
-			scm::math::vec3 eye_ = scm::math::vec3f(scm_camera_->get_cam_pos());
-			scm::math::vec2 viewport_ = scm::math::vec2f(traits->width, traits->height);
-			scm::math::mat4 osg_xform = matConv4F(cover->getObjectsXform()->getMatrix());
-			scm::math::mat4 osg_scale = matConv4F(cover->getObjectsScale()->getMatrix());
 			scm::math::mat4 model_matrix_ = scm::math::mat4(model_info_.model_transformations_[model_id]);
 			scm::math::mat4 model_view_matrix_ = view_matrix_ * model_matrix_;
 			scm::math::mat4 mvp_matrix_ = projection_matrix_ * model_view_matrix_;
-			scm::math::mat4 inverse_model_view_matrix_ = scm::math::inverse(model_view_matrix_);
 			scm::gl::frustum frustum_ = scm_camera_->get_frustum_by_model(model_matrix_);
 
-			if (_plugin->dump_button->state()) {
-				scm::math::mat4d osg_xform = matConv4D(cover->getObjectsXform()->getMatrix());
-				scm::math::mat4d osg_scale = matConv4D(cover->getObjectsScale()->getMatrix());
-				scm::math::mat4d osg_viewer_mat = matConv4D(cover->getViewerMat());
-				scm::math::mat4d osg_view_mat = matConv4D(osg_camera_->getViewMatrix());
-				scm::math::mat4d osg_projection_mat = matConv4D(osg_camera_->getProjectionMatrix());
-
-				std::cout << "osg_xform: " << std::endl << osg_xform << std::endl;
-				std::cout << "osg_scale: " << std::endl << osg_scale << std::endl;
-				std::cout << "osg_viewer_mat: " << std::endl << osg_viewer_mat << std::endl;
-				std::cout << "osg_view_mat: " << std::endl << osg_view_mat << std::endl;
-				std::cout << "osg_projection_mat: " << std::endl << osg_projection_mat << std::endl;
-				std::cout << "gl_view_matrix_: " << std::endl << view_matrix_ << std::endl;
-				std::cout << "gl_projection_matrix_: " << std::endl << projection_matrix_ << std::endl;
-				std::cout << "model_view_matrix_: " << std::endl << model_view_matrix_ << std::endl;
-				std::cout << "inverse_model_view_matrix_: " << std::endl << inverse_model_view_matrix_ << std::endl;
-
-				_plugin->dump_button->setState(false);
+			if (!settings_.surfel_shader_ && !settings_.provenance_) {
+				glUniformMatrix4fv(point_shader_.mvp_matrix_loc, 1, GL_FALSE, mvp_matrix_.data_array);
+			}
+			else if (settings_.surfel_shader_ && !settings_.provenance_) {
+				glUniformMatrix4fv(surfel_shader_.model_view_matrix_loc,     1, GL_FALSE, model_view_matrix_.data_array);
+				glUniformMatrix4fv(surfel_shader_.mvp_matrix_loc, 1, GL_FALSE, mvp_matrix_.data_array);
 			}
 
-
-			if (settings_.surfel_shader_) {
-				glUniformMatrix4fv(surfel_shader_.mvp_matrix_location, 1, GL_FALSE, mvp_matrix_.data_array);
-				glUniformMatrix4fv(surfel_shader_.model_matrix_location, 1, GL_FALSE, model_matrix_.data_array);
-				glUniformMatrix4fv(surfel_shader_.view_matrix_location, 1, GL_FALSE, view_matrix_.data_array);
-				glUniformMatrix4fv(surfel_shader_.projection_matrix_location, 1, GL_FALSE, projection_matrix_.data_array);
-				glUniformMatrix4fv(surfel_shader_.model_view_matrix_location, 1, GL_FALSE, model_view_matrix_.data_array);
-				glUniformMatrix4fv(surfel_shader_.inverse_mv_matrix_location, 1, GL_FALSE, inverse_model_view_matrix_.data_array);
-				glUniformMatrix4fv(surfel_shader_.model_to_screen_matrix_location, 1, GL_FALSE, model_to_screen_matrix_.data_array);
-				glUniform3f(surfel_shader_.eye_location, eye_[0], eye_[1], eye_[2]);
-				glUniform1f(surfel_shader_.face_eye_location, settings_.face_eye_);
-			}
-			else {
-				glUniformMatrix4fv(point_shader_.mvp_matrix_location, 1, GL_FALSE, mvp_matrix_.data_array);
-				glUniformMatrix4fv(point_shader_.model_matrix_location, 1, GL_FALSE, model_matrix_.data_array);
-				glUniformMatrix4fv(point_shader_.view_matrix_location, 1, GL_FALSE, view_matrix_.data_array);
-				glUniformMatrix4fv(point_shader_.projection_matrix_location, 1, GL_FALSE, projection_matrix_.data_array);
-				glUniformMatrix4fv(point_shader_.model_to_screen_matrix_location, 1, GL_FALSE, model_to_screen_matrix_.data_array);
-				glUniform2f(point_shader_.viewport_location, viewport_.x, viewport_.y);
-				glUniform1f(point_shader_.model_radius_scale_location, settings_.scale_radius_);
-				glUniform1f(point_shader_.max_radius_location, settings_.max_radius_);
-				glUniform1f(point_shader_.point_size_factor_location, settings_.point_size_factor_* cover->getScale());
-			}
-
-			bool draw = true;
 			for (auto const& node_slot_aggregate : renderable) {
 				if (scm_camera_->cull_against_frustum(frustum_, bounding_box_vector[node_slot_aggregate.node_id_]) != 1) {
-					if (draw) {
-						glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
-						rendered_splats_ += surfels_per_node;
-						++rendered_nodes_;
-					}
+					glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
+					rendered_splats_ += surfels_per_node;
+					++rendered_nodes_;
 				}
 			}
 		}
+
+		if (_plugin->dump_button->state()) { 
+			_plugin->debug_print_settings();
+			_plugin->dump_button->setState(0);
+		}
+
 		render_info_.rendered_splats_ = rendered_splats_;
 		render_info_.rendered_nodes_ = rendered_nodes_;
 		_plugin->rendering_ = false;
@@ -1709,13 +1737,6 @@ struct InitDrawCallback : public osg::Drawable::DrawCallback {
 			_plugin->create_framebuffers();
 			_plugin->init_render_states();
 			_plugin->init_lamure_shader();
-			std::cout << "[Notify] surfel_shader_" << std::endl;
-			surfel_shader_.program_ = _plugin->compile_and_link_shaders(vis_xyz_vs_source, vis_xyz_gs_source, vis_xyz_fs_source);
-			std::cout << "[Notify] point_shader_" << std::endl;
-			point_shader_.program_ = _plugin->compile_and_link_shaders(vis_point_shader_vs_source, vis_point_shader_fs_source);
-			std::cout << "[Notify] line_shader_" << std::endl;
-			line_shader_.program_ = _plugin->compile_and_link_shaders(vis_line_bb_vs_source, vis_line_bb_fs_source);
-
 			_plugin->init_uniforms();
 			_plugin->init_frustum_resources();
 			_plugin->init_box_resources();
@@ -1769,7 +1790,6 @@ bool LamurePointCloudPlugin::init2() {
 	cover->getObjectsRoot()->addChild(plugin->LamureGroup);
 	osg::ref_ptr<osg::MatrixTransform> frustumTransform = new osg::MatrixTransform;
 
-
 	lamure_menu = new ui::Menu("Lamure", this);
 	lamure_menu->setText("Lamure");
 	lamure_menu->allowRelayout(true);
@@ -1807,9 +1827,11 @@ bool LamurePointCloudPlugin::init2() {
 		opencover::ui::Button* btn = new ui::Button(model_group, filename_strip, nullptr, m_id);
 		model_group->add(btn);
 		btn->setShared(true);
-		btn->setState(true);
+		bool checked = settings_.selection_.empty() ||
+			(std::find(settings_.selection_.begin(), settings_.selection_.end(), m_id) != settings_.selection_.end());
+		btn->setState(checked);
+		model_visible_.push_back(checked);
 		model_buttons_.push_back(btn);
-		model_visible_.push_back(true);
 		btn->setCallback([this, m_id](bool state) { model_visible_[m_id] = state; });
 	}
 
@@ -1850,7 +1872,7 @@ bool LamurePointCloudPlugin::init2() {
 
 	scaleRadiusSlider = new ui::Slider(adaption_group, "scale_radius");
 	scaleRadiusSlider->setText("scale radius");
-	scaleRadiusSlider->setBounds(0.25, settings_.scale_radius_ * 5.0f);
+	scaleRadiusSlider->setBounds(0.0001, settings_.scale_radius_ * 5.0f);
 	scaleRadiusSlider->setValue(settings_.scale_radius_);
 	scaleRadiusSlider->setScale(ui::Slider::Logarithmic);
 	scaleRadiusSlider->setShared(true);
@@ -1881,22 +1903,30 @@ bool LamurePointCloudPlugin::init2() {
 	//	lamure::ren::controller::get_instance()->set_max_updates_per_frame(static_cast<uint32_t>(v));
 	//});
 
-	action_group = new ui::Group(lamure_menu, "Action");
+	rendering_group = new ui::Group(lamure_menu, "Rendering");
 
-	_surfelButton = new ui::Button(action_group, "surfel_shader");
+	_surfelButton = new ui::Button(rendering_group, "surfel_shader");
 	_surfelButton->setText("surfel shader");
 	_surfelButton->setShared(true);
 	_surfelButton->setState(settings_.surfel_shader_);
 	_surfelButton->setCallback([this](bool state) { settings_.surfel_shader_ = state; });
-	action_group->add(_surfelButton);
+	rendering_group->add(_surfelButton);
 
-	_measureButton = new ui::Button(action_group, "measurement");
+	if (prov_valid) { 
+		_provButton = new ui::Button(rendering_group, "provenance");
+		_provButton->setText("provenance");
+		_provButton->setShared(true);
+		_provButton->setState(settings_.provenance_);
+		_provButton->setCallback([this](bool state) { settings_.provenance_ = (state);  });
+		rendering_group->add(_provButton); 
+	}
+
+	_measureButton = new ui::Button(rendering_group, "measurement");
 	_measureButton->setShared(true);
 	_measureButton->setState(false);
-	action_group->add(_measureButton);
+	rendering_group->add(_measureButton);
 
 	_measureCB = [this](bool state) {
-		std::cout << "callback: state=" << state << std::endl;
 		if (state) startMeasurement();
 		else       stopMeasurement();
 		};
@@ -1986,8 +2016,8 @@ bool LamurePointCloudPlugin::init2() {
 	coVRNavigationManager::instance()->setNavMode("Point");
 
 	if (plugin->notify_button->state()) {
-		std::cout << "[Notify] === SceneGraph ===" << std::endl;
-		printChildNodes(osg_camera_, 5);
+		//std::cout << "[Notify] === SceneGraph ===" << std::endl;
+		//printChildNodes(osg_camera_, 5);
 	}
 
 	return 1;
@@ -1997,8 +2027,11 @@ int counter = 0;
 
 void LamurePointCloudPlugin::preFrame() {
 
-	float deltaTime = cover->frameDuration(); 
-	float moveAmount = 1000 * deltaTime;
+	float deltaTime = std::clamp(float(cover->frameDuration()), 1.0f / 60.0f, 1.0f / 15.0f);
+	float moveAmount = 1000.0f * deltaTime;
+
+	//const float fixedFps = 60.0f;
+	//float moveAmount = 1000.0f / fixedFps;
 
 	osg::Matrix oldMat = VRSceneGraph::instance()->getTransform()->getMatrix();
 
@@ -2370,94 +2403,80 @@ scm::math::mat4d LamurePointCloudPlugin::swapMiddleRows(const scm::math::mat4d& 
 
 
 void LamurePointCloudPlugin::init_uniforms() {
-	glUseProgram(surfel_shader_.program_);
-	surfel_shader_.mvp_matrix_location = glGetUniformLocation(surfel_shader_.program_, "mvp_matrix");
-	surfel_shader_.model_matrix_location = glGetUniformLocation(surfel_shader_.program_, "model_matrix");
-	surfel_shader_.view_matrix_location = glGetUniformLocation(surfel_shader_.program_, "view_matrix");
-	surfel_shader_.projection_matrix_location = glGetUniformLocation(surfel_shader_.program_, "projection_matrix");
-	surfel_shader_.model_view_matrix_location = glGetUniformLocation(surfel_shader_.program_, "model_view_matrix");
-	surfel_shader_.inverse_mv_matrix_location = glGetUniformLocation(surfel_shader_.program_, "inv_mv_matrix");
-	surfel_shader_.model_to_screen_matrix_location = glGetUniformLocation(surfel_shader_.program_, "model_to_screen_matrix");
-	surfel_shader_.model_radius_scale_location = glGetUniformLocation(surfel_shader_.program_, "model_radius_scale");
-	surfel_shader_.max_radius_location = glGetUniformLocation(surfel_shader_.program_, "max_radius");
-	surfel_shader_.window_size_location = glGetUniformLocation(surfel_shader_.program_, "win_size");
-	surfel_shader_.near_plane_location = glGetUniformLocation(surfel_shader_.program_, "near_plane");
-	surfel_shader_.far_plane_location = glGetUniformLocation(surfel_shader_.program_, "far_plane");
-	surfel_shader_.point_size_factor_location = glGetUniformLocation(surfel_shader_.program_, "point_size_factor");
-	surfel_shader_.show_normals_location = glGetUniformLocation(surfel_shader_.program_, "show_normals");
-	surfel_shader_.show_accuracy_location = glGetUniformLocation(surfel_shader_.program_, "show_accuracy");
-	surfel_shader_.show_output_sensitivity_location = glGetUniformLocation(surfel_shader_.program_, "show_output_sensitivity");
-	surfel_shader_.channel_location = glGetUniformLocation(surfel_shader_.program_, "channel");
-	surfel_shader_.heatmap_enabled_location = glGetUniformLocation(surfel_shader_.program_, "heatmap");
-	surfel_shader_.heatmap_min_location = glGetUniformLocation(surfel_shader_.program_, "heatmap_min");
-	surfel_shader_.heatmap_max_location = glGetUniformLocation(surfel_shader_.program_, "heatmap_max");
-	surfel_shader_.heatmap_min_color_location = glGetUniformLocation(surfel_shader_.program_, "heatmap_min_color");
-	surfel_shader_.heatmap_max_color_location = glGetUniformLocation(surfel_shader_.program_, "heatmap_max_color");
-	surfel_shader_.use_material_color_location = glGetUniformLocation(surfel_shader_.program_, "use_material_color");
-	surfel_shader_.material_diffuse_location = glGetUniformLocation(surfel_shader_.program_, "material_diffuse");
-	surfel_shader_.material_specular_location = glGetUniformLocation(surfel_shader_.program_, "material_specular");
-	surfel_shader_.ambient_light_color_location = glGetUniformLocation(surfel_shader_.program_, "ambient_light_color");
-	surfel_shader_.point_light_color_location = glGetUniformLocation(surfel_shader_.program_, "point_light_color");
-	surfel_shader_.eye_location = glGetUniformLocation(surfel_shader_.program_, "eye");
-	surfel_shader_.face_eye_location = glGetUniformLocation(surfel_shader_.program_, "face_eye");
+	cout << "[Notify] init_uniforms()" << endl;
+
+	glUseProgram(point_shader_.program);
+	point_shader_.mvp_matrix_loc         = glGetUniformLocation(point_shader_.program, "mvp_matrix");
+	point_shader_.max_radius_loc         = glGetUniformLocation(point_shader_.program, "max_radius");
+	point_shader_.scale_radius_loc		 = glGetUniformLocation(point_shader_.program, "scale_radius");
+	point_shader_.point_size_factor_loc  = glGetUniformLocation(point_shader_.program, "point_size_factor");
+	point_shader_.proj_scale_loc         = glGetUniformLocation(point_shader_.program, "proj_scale");
+
+
+	glUseProgram(surfel_shader_.program);
+	surfel_shader_.mvp_matrix_loc           = glGetUniformLocation(surfel_shader_.program, "mvp_matrix");
+	surfel_shader_.max_radius_loc           = glGetUniformLocation(surfel_shader_.program, "max_radius");
+	surfel_shader_.scale_radius_loc			= glGetUniformLocation(surfel_shader_.program, "scale_radius");
+	surfel_shader_.surfel_size_factor_loc   = glGetUniformLocation(surfel_shader_.program, "surfel_size_factor");
+	surfel_shader_.proj_scale_loc           = glGetUniformLocation(surfel_shader_.program, "proj_scale");
+	surfel_shader_.model_view_matrix_loc    = glGetUniformLocation(surfel_shader_.program, "model_view_matrix");
+	surfel_shader_.viewport_loc             = glGetUniformLocation(surfel_shader_.program, "viewport");
+
+
+	//glUseProgram(surfel_prov_shader_.program_);
+	//surfel_shader_.mvp_matrix_location = glGetUniformLocation(surfel_shader_.program_, "mvp_matrix");
+	//surfel_shader_.model_matrix_location = glGetUniformLocation(surfel_shader_.program_, "model_matrix");
+	//surfel_shader_.view_matrix_location = glGetUniformLocation(surfel_shader_.program_, "view_matrix");
+	//surfel_shader_.projection_matrix_location = glGetUniformLocation(surfel_shader_.program_, "projection_matrix");
+	//surfel_shader_.model_view_matrix_location = glGetUniformLocation(surfel_shader_.program_, "model_view_matrix");
+	//surfel_shader_.inverse_mv_matrix_location = glGetUniformLocation(surfel_shader_.program_, "inv_mv_matrix");
+	//surfel_shader_.model_to_screen_matrix_location = glGetUniformLocation(surfel_shader_.program_, "model_to_screen_matrix");
+	//surfel_shader_.scale_radius_location = glGetUniformLocation(surfel_shader_.program_, "scale_radius");
+	//surfel_shader_.max_radius_location = glGetUniformLocation(surfel_shader_.program_, "max_radius");
+	//surfel_shader_.window_size_location = glGetUniformLocation(surfel_shader_.program_, "win_size");
+	//surfel_shader_.near_plane_location = glGetUniformLocation(surfel_shader_.program_, "near_plane");
+	//surfel_shader_.far_plane_location = glGetUniformLocation(surfel_shader_.program_, "far_plane");
+	//surfel_shader_.surfel_size_factor_location = glGetUniformLocation(surfel_shader_.program_, "surfel_size_factor");
+	//surfel_shader_.show_normals_location = glGetUniformLocation(surfel_shader_.program_, "show_normals");
+	//surfel_shader_.show_accuracy_location = glGetUniformLocation(surfel_shader_.program_, "show_accuracy");
+	//surfel_shader_.show_output_sensitivity_location = glGetUniformLocation(surfel_shader_.program_, "show_output_sensitivity");
+	//surfel_shader_.channel_location = glGetUniformLocation(surfel_shader_.program_, "channel");
+	//surfel_shader_.heatmap_enabled_location = glGetUniformLocation(surfel_shader_.program_, "heatmap");
+	//surfel_shader_.heatmap_min_location = glGetUniformLocation(surfel_shader_.program_, "heatmap_min");
+	//surfel_shader_.heatmap_max_location = glGetUniformLocation(surfel_shader_.program_, "heatmap_max");
+	//surfel_shader_.heatmap_min_color_location = glGetUniformLocation(surfel_shader_.program_, "heatmap_min_color");
+	//surfel_shader_.heatmap_max_color_location = glGetUniformLocation(surfel_shader_.program_, "heatmap_max_color");
+	//surfel_shader_.use_material_color_location = glGetUniformLocation(surfel_shader_.program_, "use_material_color");
+	//surfel_shader_.material_diffuse_location = glGetUniformLocation(surfel_shader_.program_, "material_diffuse");
+	//surfel_shader_.material_specular_location = glGetUniformLocation(surfel_shader_.program_, "material_specular");
+	//surfel_shader_.ambient_light_color_location = glGetUniformLocation(surfel_shader_.program_, "ambient_light_color");
+	//surfel_shader_.point_light_color_location = glGetUniformLocation(surfel_shader_.program_, "point_light_color");
+	//surfel_shader_.eye_location = glGetUniformLocation(surfel_shader_.program_, "eye");
+	//surfel_shader_.face_eye_location = glGetUniformLocation(surfel_shader_.program_, "face_eye");
+
+
+	//glUseProgram(point_prov_shader_.program_);
+	//point_prov_shader_.mvp_matrix_location = glGetUniformLocation(point_prov_shader_.program_, "mvp_matrix");
+	//point_prov_shader_.model_matrix_location = glGetUniformLocation(point_prov_shader_.program_, "model_matrix");
+	//point_prov_shader_.view_matrix_location = glGetUniformLocation(point_prov_shader_.program_, "view_matrix");
+	//point_prov_shader_.projection_matrix_location = glGetUniformLocation(point_prov_shader_.program_, "projection_matrix");
+	//point_prov_shader_.model_view_matrix_location = glGetUniformLocation(point_prov_shader_.program_, "model_view_matrix");
+	//point_prov_shader_.inverse_mv_matrix_location = glGetUniformLocation(point_prov_shader_.program_, "inv_mv_matrix");
+	//point_prov_shader_.model_to_screen_matrix_location = glGetUniformLocation(point_prov_shader_.program_, "model_to_screen_matrix");
+	//point_prov_shader_.viewport_location = glGetUniformLocation(point_prov_shader_.program_, "viewport");
+	//point_prov_shader_.scale_radius_location = glGetUniformLocation(point_prov_shader_.program_, "scale_radius");
+	//point_prov_shader_.max_radius_location = glGetUniformLocation(point_prov_shader_.program_, "max_radius");
+	//point_prov_shader_.point_size_factor_location = glGetUniformLocation(point_prov_shader_.program_, "point_size_factor");
+	//point_prov_shader_.near_plane_location = glGetUniformLocation(point_prov_shader_.program_, "near_plane");
+	//point_prov_shader_.far_plane_location = glGetUniformLocation(point_prov_shader_.program_, "far_plane");
+	//point_prov_shader_.height_divided_by_top_minus_bottom_location = glGetUniformLocation(point_prov_shader_.program_, "height_divided_by_top_minus_bottom");
+
 
 	glUseProgram(line_shader_.program_);
 	line_shader_.mvp_matrix_location = glGetUniformLocation(line_shader_.program_, "mvp_matrix");
 	line_shader_.in_color_location = glGetUniformLocation(line_shader_.program_, "in_color");
 
-	glUseProgram(point_shader_.program_);
-	point_shader_.mvp_matrix_location = glGetUniformLocation(point_shader_.program_, "mvp_matrix");
-	point_shader_.model_matrix_location = glGetUniformLocation(point_shader_.program_, "model_matrix");
-	point_shader_.view_matrix_location = glGetUniformLocation(point_shader_.program_, "view_matrix");
-	point_shader_.projection_matrix_location = glGetUniformLocation(point_shader_.program_, "projection_matrix");
-	point_shader_.model_view_matrix_location = glGetUniformLocation(point_shader_.program_, "model_view_matrix");
-	point_shader_.inverse_mv_matrix_location = glGetUniformLocation(point_shader_.program_, "inv_mv_matrix");
-	point_shader_.model_to_screen_matrix_location = glGetUniformLocation(point_shader_.program_, "model_to_screen_matrix");
-	point_shader_.viewport_location = glGetUniformLocation(point_shader_.program_, "viewport");
-	point_shader_.model_radius_scale_location = glGetUniformLocation(point_shader_.program_, "model_radius_scale");
-	point_shader_.max_radius_location = glGetUniformLocation(point_shader_.program_, "max_radius");
-	point_shader_.point_size_factor_location = glGetUniformLocation(point_shader_.program_, "point_size_factor");
-	point_shader_.near_plane_location = glGetUniformLocation(point_shader_.program_, "near_plane");
-	point_shader_.far_plane_location = glGetUniformLocation(point_shader_.program_, "far_plane");
-	point_shader_.height_divided_by_top_minus_bottom_location = glGetUniformLocation(point_shader_.program_, "height_divided_by_top_minus_bottom");
-
 	glUseProgram(0);
-}
-
-
-void LamurePointCloudPlugin::set_surfel_uniforms() {
-	glUniform1f(surfel_shader_.model_radius_scale_location, settings_.scale_radius_);
-	glUniform1f(surfel_shader_.max_radius_location, settings_.max_radius_);
-	glUniform1f(surfel_shader_.face_eye_location, settings_.face_eye_);
-	glUniform2f(surfel_shader_.window_size_location, traits->width, traits->height);
-	glUniform1f(surfel_shader_.near_plane_location, static_cast<float>(coco->nearClip()));
-	glUniform1f(surfel_shader_.far_plane_location, static_cast<float>(coco->farClip()));
-	glUniform1f(surfel_shader_.point_size_factor_location, settings_.point_size_factor_ * cover->getScale());
-	glUniform1i(surfel_shader_.show_normals_location, settings_.show_normals_);
-	glUniform1i(surfel_shader_.show_accuracy_location, static_cast<int>(settings_.show_accuracy_));
-	glUniform1i(surfel_shader_.show_output_sensitivity_location, static_cast<int>(settings_.show_output_sensitivity_));
-	glUniform1i(surfel_shader_.channel_location, settings_.channel_);
-	glUniform1i(surfel_shader_.heatmap_enabled_location, static_cast<int>(settings_.heatmap_));
-	glUniform1f(surfel_shader_.heatmap_min_location, settings_.heatmap_min_);
-	glUniform1f(surfel_shader_.heatmap_max_location, settings_.heatmap_max_);
-	glUniform3f(surfel_shader_.heatmap_min_color_location, settings_.heatmap_color_min_[0], settings_.heatmap_color_min_[1], settings_.heatmap_color_min_[2]);
-	glUniform3f(surfel_shader_.heatmap_max_color_location, settings_.heatmap_color_max_[0], settings_.heatmap_color_max_[1], settings_.heatmap_color_max_[2]);
-	if (settings_.enable_lighting_) {
-		glUniform1i(surfel_shader_.use_material_color_location, static_cast<int>(settings_.use_material_color_));
-		glUniform3f(surfel_shader_.material_diffuse_location, settings_.material_diffuse_[0], settings_.material_diffuse_[1], settings_.material_diffuse_[2]);
-		glUniform4f(surfel_shader_.material_specular_location, settings_.material_specular_[0], settings_.material_specular_[1], settings_.material_specular_[2], settings_.material_specular_[3]);
-		glUniform3f(surfel_shader_.ambient_light_color_location, settings_.ambient_light_color_[0], settings_.ambient_light_color_[1], settings_.ambient_light_color_[2]);
-		glUniform4f(surfel_shader_.point_light_color_location, settings_.point_light_color_[0], settings_.point_light_color_[1], settings_.point_light_color_[2], settings_.point_light_color_[3]);
-	}
-}
-
-void LamurePointCloudPlugin::set_point_uniforms() {
-	glUniform1f(point_shader_.model_radius_scale_location, settings_.scale_radius_);
-	glUniform1f(point_shader_.max_radius_location, settings_.max_radius_);
-	glUniform1f(point_shader_.point_size_factor_location, settings_.point_size_factor_ * cover->getScale());
-	glUniform1f(point_shader_.near_plane_location, coco->nearClip());
-	glUniform1f(point_shader_.far_plane_location, coco->farClip());
-	glUniform1f(point_shader_.height_divided_by_top_minus_bottom_location, height_divided_by_top_minus_bottom_);
 }
 
 
@@ -2495,7 +2514,7 @@ unsigned int LamurePointCloudPlugin::compile_shader(unsigned int type, const std
 		std::cout << "Failed to compile " <<
 			(type == GL_VERTEX_SHADER ? "vertex" : "fragment") << " shader!" << std::endl;
 		std::cout << message << std::endl;
-		gl_api->glDeleteProgram(id);
+		gl_api->glDeleteShader(id);
 		return 0;
 	};
 	return id;
@@ -2579,8 +2598,15 @@ void LamurePointCloudPlugin::init_lamure_shader()
 	if (plugin->notify_button->state() == 1) { std::cout << "[Notify] init_lamure_shader()" << std::endl; }
 	try
 	{
-		if (!read_shader(shader_root_path + "/vis/vis_point_shader.glslv", vis_point_shader_vs_source)
-			|| !read_shader(shader_root_path + "/vis/vis_point_shader.glslf", vis_point_shader_fs_source)
+		if (   !read_shader(shader_root_path + "/vis/vis_point.glslv", vis_point_vs_source)
+			|| !read_shader(shader_root_path + "/vis/vis_point.glslf", vis_point_fs_source)
+			|| !read_shader(shader_root_path + "/vis/vis_point_prov.glslv", vis_point_prov_vs_source)
+			|| !read_shader(shader_root_path + "/vis/vis_point_prov.glslf", vis_point_prov_fs_source)
+			|| !read_shader(shader_root_path + "/vis/vis_surfel.glslv", vis_surfel_vs_source)
+			|| !read_shader(shader_root_path + "/vis/vis_surfel.glslg", vis_surfel_gs_source)
+			|| !read_shader(shader_root_path + "/vis/vis_surfel.glslf", vis_surfel_fs_source)
+			|| !read_shader(shader_root_path + "/vis/vis_surfel_prov.glslv", vis_surfel_prov_vs_source)
+			|| !read_shader(shader_root_path + "/vis/vis_surfel_prov.glslf", vis_surfel_prov_fs_source)
 			|| !read_shader(shader_root_path + "/vis/vis_line_bb.glslv", vis_line_bb_vs_source)
 			|| !read_shader(shader_root_path + "/vis/vis_line_bb.glslf", vis_line_bb_fs_source)
 			|| !read_shader(shader_root_path + "/vis/vis_quad.glslv", vis_quad_vs_source)
@@ -2623,6 +2649,17 @@ void LamurePointCloudPlugin::init_lamure_shader()
 			) {
 			std::cout << "error reading shader files" << std::endl; exit(1);
 		}
+
+
+		point_shader_.program = compile_and_link_shaders(vis_point_vs_source, vis_point_fs_source);
+		surfel_shader_.program = compile_and_link_shaders(vis_surfel_vs_source, vis_surfel_gs_source, vis_surfel_fs_source);
+		line_shader_.program_ = compile_and_link_shaders(vis_line_bb_vs_source, vis_line_bb_fs_source);
+
+
+		//std::cout << "[Notify] point_shader_" << std::endl;
+		//point_prov_shader_.program_ = compile_and_link_shaders(vis_point_prov_vs_source, vis_point_prov_fs_source);
+		//std::cout << "[Notify] line_shader_" << std::endl;
+
 
 		//vis_point_shader_ = device_->create_program(
 		//	boost::assign::list_of
@@ -2733,6 +2770,7 @@ void LamurePointCloudPlugin::debug_print_settings() const {
 	cout << "ram: " << settings_.ram_ << endl;
 	cout << "upload: " << settings_.upload_ << endl;
 	cout << "provenance: " << settings_.provenance_ << endl;
+	cout << "surfel_shader: " << settings_.surfel_shader_ << endl;
 	cout << "create_aux_resources: " << settings_.create_aux_resources_ << endl;
 	cout << "splatting: " << settings_.splatting_ << endl;
 	cout << "gamma_correction: " << settings_.gamma_correction_ << endl;
@@ -2741,6 +2779,8 @@ void LamurePointCloudPlugin::debug_print_settings() const {
 	cout << "use_pvs: " << settings_.use_pvs_ << endl;
 	cout << "pvs_culling: " << settings_.pvs_culling_ << endl;
 	cout << "point_size_factor: " << settings_.point_size_factor_ << endl;
+	cout << "surfel_size_factor: " << settings_.surfel_size_factor_ << endl;
+	cout << "face_eye: " << settings_.face_eye_ << endl;
 	cout << "aux_point_size: " << settings_.aux_point_size_ << endl;
 	cout << "aux_point_distance: " << settings_.aux_point_distance_ << endl;
 	cout << "aux_point_scale: " << settings_.aux_point_scale_ << endl;
@@ -2775,14 +2815,13 @@ void LamurePointCloudPlugin::debug_print_settings() const {
 	cout << "json: " << settings_.json_ << endl;
 	cout << "pvs: " << settings_.pvs_ << endl;
 	cout << "background_image: " << settings_.background_image_ << endl;
-	cout << "selection: " << settings_.selection_ << endl;
 	cout << "max_radius: " << settings_.max_radius_ << endl;
 	cout << "scale_radius: " << settings_.scale_radius_ << endl;
 	cout << "bvh_color: (" << settings_.bvh_color_[0] << ", " << settings_.bvh_color_[1] << ", " << settings_.bvh_color_[2] << ", " << settings_.bvh_color_[3] << ")" << endl;
 	cout << "frustum_color: (" << settings_.frustum_color_[0] << ", " << settings_.frustum_color_[1] << ", " << settings_.frustum_color_[2] << ", " << settings_.frustum_color_[3] << ")" << endl;
 	cout << "models (" << settings_.models_.size() << "):" << endl;
 	for (size_t i = 0; i < settings_.models_.size(); ++i) {
-		cout << "  [" << i << "] " << settings_.models_[i] << endl;
+		cout << "  [" << i << "] " << settings_.models_[i] << std::endl; 
 	}
 	cout << "transforms (" << settings_.transforms_.size() << "):" << endl;
 	for (auto const& [id, mat] : settings_.transforms_) {
@@ -2860,7 +2899,7 @@ void LamurePointCloudPlugin::set_lamure_uniforms(scm::gl::program_ptr shader)
 	shader->uniform("channel", settings_.channel_);
 	shader->uniform("heatmap", (bool)settings_.heatmap_);
 	shader->uniform("face_eye", false);
-	shader->uniform("model_radius_scale", settings_.scale_radius_);
+	shader->uniform("scale_radius", settings_.scale_radius_);
 	shader->uniform("max_radius", settings_.max_radius_);
 	shader->uniform("heatmap_min", settings_.heatmap_min_);
 	shader->uniform("heatmap_max", settings_.heatmap_max_);
@@ -2960,7 +2999,7 @@ void LamurePointCloudPlugin::readMenuConfigData(const char* menu, vector<ImageFi
 		temp->setCallback([this, entry](bool state)
 			{
 				if (state)
-				std::printf("createGeodes(planetTrans, entry.second)");
+					std::printf("createGeodes(planetTrans, entry.second)");
 			});
 		menulist.push_back(ImageFileEntry(entry.first.c_str(), entry.second.c_str(), (ui::Element*)temp));
 	}
@@ -3058,7 +3097,7 @@ void LamurePointCloudPlugin::draw_brush(scm::gl::program_ptr shader) {
 		shader->uniform("inv_mv_matrix", scm::math::mat4f(scm::math::transpose(scm::math::inverse(model_view_matrix))));
 		shader->uniform("point_size_factor", settings_.aux_point_scale_);
 		shader->uniform("model_to_screen_matrix", scm::math::mat4f::identity());
-		shader->uniform("model_radius_scale", 1.0f);
+		shader->uniform("scale_radius", 1.0f);
 		shader->uniform("show_normals", false);
 		shader->uniform("show_accuracy", false);
 		shader->uniform("show_radius_deviation", false);
@@ -3268,7 +3307,7 @@ void LamurePointCloudPlugin::draw_resources(const lamure::context_t context_id, 
 			vis_xyz_shader_->uniform("inv_mv_matrix", scm::math::mat4f(scm::math::transpose(scm::math::inverse(model_view_matrix))));
 			vis_xyz_shader_->uniform("point_size_factor", settings_.aux_point_scale_);
 			vis_xyz_shader_->uniform("model_to_screen_matrix", scm::math::mat4f::identity());
-			vis_xyz_shader_->uniform("model_radius_scale", 1.f);
+			vis_xyz_shader_->uniform("scale_radius", 1.f);
 
 			scm::math::mat4f inv_view = scm::math::inverse(scm::math::mat4f(view_matrix));
 			scm::math::vec3f eye = scm::math::vec3f(inv_view[12], inv_view[13], inv_view[14]);

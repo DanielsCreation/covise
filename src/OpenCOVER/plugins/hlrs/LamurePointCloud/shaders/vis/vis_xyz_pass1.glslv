@@ -47,7 +47,6 @@ void main() {
     radius = max_radius;
   }
 
-
   vec3 normal = in_normal;
   if (face_eye) {
     normal = normalize(eye-(model_matrix*vec4(in_position, 1.0)).xyz);
@@ -58,13 +57,8 @@ void main() {
   vec3 bitangent = vec3(0.0);
   compute_tangent_vectors(normal, radius, tangent, bitangent);
 
-  if (!face_eye) {
-    normal = normalize((inv_mv_matrix * vec4(in_normal, 0.0)).xyz );
-  }
-
   VertexOut.pass_ms_u = tangent;
   VertexOut.pass_ms_v = bitangent;
   VertexOut.pass_normal = normal;
   gl_Position = vec4(in_position, 1.0);
-
 }

@@ -213,7 +213,7 @@ public:
     ui::Group* model_group = nullptr;
     ui::Group* selection_group = nullptr;
     ui::Group* adaption_group = nullptr;
-    ui::Group* action_group = nullptr;
+    ui::Group* rendering_group = nullptr;
 
     std::vector<ui::Button*>    model_buttons_;
     std::vector<bool>           model_visible_;
@@ -227,8 +227,10 @@ public:
     ui::Button* text_button = nullptr;
     ui::Button* dump_button = nullptr;
 
+    ui::Button* _provButton = nullptr;
     ui::Button* _surfelButton = nullptr;
     ui::Button* _measureButton = nullptr;
+    ui::Button* _faceEyeBotton = nullptr;
 
     bool dump = false;
 

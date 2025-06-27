@@ -1,19 +1,15 @@
-# data_directory : \Users\Daniel\Documents\Studium\Forschungsarbeit\Data
+#D:\Forschungsarbeit\Data
+C:\Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_bin
 
-\Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_000\naturkundemuseum_School000.bvh
-\Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_001\naturkundemuseum_School001.bvh
-\Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_002\naturkundemuseum_School002.bvh
-\Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_003\naturkundemuseum_School003.bvh
-
-show_pvs : 0.0
+selection : 0,1
+show_pvs : 0
 surfel_shader : 0
 point_size_factor : 1.0
+surfel_size_factor : 1.0
 max_radius : 0.1
 scale_radius : 1.0
-lod_error : 2.5
-face_eye : 0
-provenance : 1.0
-
+lod_error : 7.5
+provenance : 0
 
 # \Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_012\naturkundemuseum_School012.bvh
 # width : 64
