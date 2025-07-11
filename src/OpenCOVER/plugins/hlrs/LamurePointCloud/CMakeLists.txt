@@ -51,28 +51,36 @@ pcl_project_files(SOURCE_FILES      ${SRC_DIR}/quality_measurement/src          
 pcl_project_files(HEADER_FILES      ${SRC_DIR}/quality_measurement/include/lamure/qm            *.h)
 
 pcl_project_files(SOURCE_FILES      ${SRC_DIR}/lamure                                           *.cpp)
-pcl_project_files(HEADER_FILES      ${SRC_DIR}/lamure                                           *.h)
+pcl_project_files(HEADER_FILES      ${SRC_DIR}/lamure						                    *.h)
 
 SET(HEADERS 
   ${HEADER_FILES}
-  LamurePointCloud.h
-  LamurePointCloudInteractor.h
-  LamureGeometry.h
-  LamureDrawable.h
+  #LamurePointCloud.h
+  #LamurePointCloudInteractor.h
+  #LamureGeometry.h
+  #LamureDrawable.h
   gl_state.h
   osg_util.h
   measurement.h
+  Lamure.h
+  LamureUI.h
+  renderer.h
+  util.h
 )
 
 SET(SOURCES 
   ${SOURCE_FILES}
-  LamurePointCloud.cpp
-  LamurePointCloudInteractor.cpp
-  LamureGeometry.cpp
-  LamureDrawable.cpp
+  #LamurePointCloud.cpp
+  #LamurePointCloudInteractor.cpp
+  #LamureGeometry.cpp
+  #LamureDrawable.cpp
   gl_state.cpp
   osg_util.cpp
   measurement.cpp
+  Lamure.cpp
+  LamureUI.cpp
+  renderer.cpp
+  util.cpp
 )
 
 set(SCHISM_INCLUDE_DIRS

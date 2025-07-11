@@ -46,18 +46,19 @@
 #include <osg/BufferTemplate>
 #include <osg/State>
 
-#include "measurement.h"
 #include "LamureDrawable.h"
 #include "LamureGeometry.h"
 #include <lamure/types.h>
-#include <scm/gl_core/shader_objects/shader_objects_fwd.h>
 #include <lamure/ren/camera.h>
 #include <lamure/lmr_camera.h>
 #include <lamure/ren/trackball.h>
+
 #include <scm/gl_util/font/font_face.h>
 #include <scm/gl_util/font/text.h>
 #include <scm/gl_util/font/text_renderer.h>
+#include <scm/gl_core/shader_objects/shader_objects_fwd.h>
 
+#include "measurement.h"
 #include <ft2build.h>
 #include <LamurePointCloudInteractor.h>
 #include FT_FREETYPE_H
@@ -96,7 +97,6 @@ public:
 
     static LamurePointCloudPlugin* instance();
     bool init2();
-    void config();
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
     void preFrame();
@@ -106,23 +106,12 @@ public:
     // shared functions
     void init_lamure_shader();
     void init_schism_objects();
-    void sync_cameras();
     bool read_shader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
     void create_aux_resources();
-    void draw_resources(const lamure::context_t context_id, const lamure::view_t view_id);
-    void draw_brush(scm::gl::program_ptr shader);
     void set_lamure_uniforms(scm::gl::program_ptr shader);
-    void add_stateset_uniforms(osg::ref_ptr<osg::StateSet> stateset);
-    void set_stateset_uniforms(osg::ref_ptr<osg::StateSet> stateset);
-    void set_gl_uniforms(GLuint program);
-    float get_atlas_scale_factor();
     void create_framebuffers();
     void init_render_states();
-    void init_text_rendering();
     void init_camera();
-    void lamure_display();
-    void draw_all_models(const lamure::context_t context_id, const lamure::view_t view_id, scm::math::mat4d view_matrix, scm::math::mat4d projection_matrix, scm::gl::program_ptr shader);
-    void sync_cameras(lmr_camera* lamure_camera, osg::Camera* osg_camera);
     void debug_print_settings() const;
     void setViewerPos(float x, float y, float z);
 
@@ -130,7 +119,6 @@ public:
     void init_box_resources();
     void init_coord_resources();
     void init_frustum_resources();
-    void create_aux_representation();
 
     GLuint compile_and_link_shaders(std::string vs_source, std::string fs_source);
     GLuint compile_and_link_shaders(std::string vs_source, std::string gs_source, std::string fs_source);
@@ -150,19 +138,11 @@ public:
     bool parse_prefix(std::string& in_string, std::string const& prefix);
     string getConfigEntry(string scope);
     string getConfigEntry(string scope, string name);
-    string extractFilename(const string pathname);
-    void strcpyTail(char* suffix, const char* str, char c);
-    const char* stringToConstChar(string str);
-    scm::gl::data_format get_tex_format();
-    void apply_vt_cut_update();
-    //float get_atlas_scale_factor();
-    void lines_from_min_max(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, std::vector<scm::math::vec3f>& lines);
     
     // objects and pointers
     ui::Group* FileGroup;
     scm::math::mat4d load_matrix(const std::string& filename);
     void load_settings(const std::string &filename);
-    void load_settings(std::string const& filename, std::string const& data_directory, std::vector<std::string> const& manual_files);
     bool rendering_ = false;
 
     HWND HWND_cover;
@@ -186,7 +166,6 @@ public:
 
 private:
     static LamurePointCloudPlugin* plugin;
-    void selectedMenuButton(ui::Element*);
     std::vector<ImageFileEntry> pointVec;
     std::string const strip_whitespace(std::string const& in_string);
     void readMenuConfigData(const char*, std::vector<ImageFileEntry>&, ui::Group*);
@@ -204,8 +183,6 @@ public:
     void printNodePath(osg::ref_ptr<osg::Node> pointer);
     std::vector<vector<float>> getSerializedBvhMinMax(const std::vector<scm::gl::boxf>);
     std::vector<float> getBoxCorners(scm::gl::boxf);
-    float* VecToArr(std::vector<std::vector<float>> vec);
-    int* VecToArr(std::vector<std::vector<int>> vec);
     osg::ref_ptr<osg::MatrixTransform> transform;
 
     ui::Menu* lamure_menu = nullptr;
@@ -292,9 +269,6 @@ public:
 
     scm::math::vec3d rotationAngles = scm::math::vec3d(0.0, 0.0, 0.0);
 
-    void updateModelRotation();
-    scm::math::mat4f createSwapYZMatrix();
-    scm::math::mat4d createSwapYZ();
     scm::math::mat4d swapMiddleColumns(const scm::math::mat4d& m);
     scm::math::mat4d swapMiddleRows(const scm::math::mat4d& m);
     scm::math::mat4d swapMiddleColumns(scm::math::mat4d& m);

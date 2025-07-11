@@ -1,0 +1,236 @@
+#ifndef LAMURE_POINT_CLOUD_CLI_H
+#define LAMURE_POINT_CLOUD_CLI_H
+
+#include <cover/coVRPlugin.h>
+#include <cover/ui/Owner.h>
+#include <lamure/types.h>
+#include <lamure/ren/camera.h>
+#include <scm/core/math.h>
+#include <scm/gl_core/render_device.h>
+#include <osg/Group>
+#include <osg/Camera>
+#include <vector>
+#include <string>
+#include <map>
+#include <functional>
+#include <cover/coVRConfig.h>
+#include <cover/coVRFileManager.h>
+#include <cover/VRSceneGraph.h>
+#include <cover/VRViewer.h>
+#include <cover/ui/Button.h>
+#include <cover/ui/Label.h>
+#include <cover/ui/Menu.h>
+#include <cover/ui/Slider.h>
+#include <cover/ui/SelectionList.h>
+#include "measurement.h"
+#include <limits>
+#include <memory>
+#include <lamure/config.h>
+#include <lamure/prov/octree.h>
+#include <lamure/prov/prov_aux.h>
+
+class PointCloudRenderer;
+class PointCloudUIManager;
+class LamurePointCloudInteractor;
+class Measurement;
+
+struct AppSettings
+{
+    int32_t frame_div{ 1 };
+    int32_t vram{ 1024 };
+    int32_t ram{ 4096 };
+    int32_t upload{ 32 };
+    bool provenance{ true };
+    bool create_aux_resources{ true };
+    bool gamma_correction{ false };
+    bool surfel_shader{ true };
+    bool face_eye{ false };
+    int32_t gui{ 1 };
+    int32_t travel{ 2 };
+    float travel_speed{ 20.5f };
+    int32_t max_brush_size{ 4096 };
+    bool lod_update{ true };
+    float lod_error{ 1.0f };
+    bool use_pvs{ false };
+    bool pvs_culling{ false };
+    float point_size_factor{ 1.0f };
+    float surfel_size_factor{ 1.0f };
+    float aux_point_size{ 1.0f };
+    float aux_point_distance{ 0.5f };
+    float aux_point_scale{ 1.0f };
+    float aux_focal_length{ 1.0f };
+    int32_t vis{ 0 };
+    int32_t show_normals{ 0 };
+    bool show_accuracy{ false };
+    bool show_radius_deviation{ false };
+    bool show_output_sensitivity{ false };
+    bool show_sparse{ false };
+    bool show_views{ false };
+    bool show_photos{ false };
+    bool show_octrees{ false };
+    bool show_bvhs{ false };
+    bool show_pvs{ false };
+    int32_t channel{ 0 };
+    bool enable_lighting{ false };
+    bool use_material_color{ true };
+    scm::math::vec3f material_diffuse{ 0.6f, 0.6f, 0.6f };
+    scm::math::vec4f material_specular{ 0.4f, 0.4f, 0.4f, 1000.0f };
+    scm::math::vec3f ambient_light_color{ 0.1f, 0.1f, 0.1f };
+    scm::math::vec4f point_light_color{ 1.0f, 1.0f, 1.0f, 1.2f };
+    bool heatmap{ false };
+    float heatmap_min{ 0.0f };
+    float heatmap_max{ 0.05f };
+    scm::math::vec3f background_color{ LAMURE_DEFAULT_COLOR_R, LAMURE_DEFAULT_COLOR_G, LAMURE_DEFAULT_COLOR_B };
+    scm::math::vec3f heatmap_color_min{ 68.0f / 255.0f, 0.0f, 84.0f / 255.0f };
+    scm::math::vec3f heatmap_color_max{ 251.f / 255.f, 231.f / 255.f, 35.f / 255.f };
+    std::string atlas_file{ "" };
+    std::string json{ "" };
+    std::string pvs{ "" };
+    std::string background_image{ "" };
+    std::vector<std::string> models;
+    std::vector<uint32_t> selection;
+    std::map<uint32_t, scm::math::mat4d> transforms;
+    std::map<uint32_t, std::shared_ptr<lamure::prov::octree>> octrees;
+    std::map<uint32_t, std::vector<lamure::prov::aux::view>> views;
+    std::map<uint32_t, std::string> aux;
+    float max_radius{ std::min(std::numeric_limits<float>::max(), 0.1f) };
+    float scale_radius{ 1.5f };
+    std::vector<float> bvh_color{ 1.0f, 1.0f, 0.0f, 1.0f };
+    std::vector<float> frustum_color{ 0.0f, 0.0f, 0.0f, 1.0f };
+};
+
+class PointCloudRenderer;
+class PointCloudUIManager;
+class LamurePointCloudInteractor;
+class Measurement;
+
+
+
+class LamurePointCloud_cli : public opencover::coVRPlugin, public opencover::ui::Owner
+{
+public:
+    LamurePointCloud_cli();
+    ~LamurePointCloud_cli();
+
+    static LamurePointCloud_cli* get_instance();
+
+    bool init() override;
+    void preFrame() override;
+
+    int loadLamureModel(const std::string& filename);
+
+    // Getters for child classes
+    lamure::ren::camera* get_lamure_camera() { return m_lamure_camera; }
+    osg::Camera* get_osg_camera() { return m_osg_camera; }
+    const AppSettings& get_settings() const { return m_settings; }
+    const std::vector<bool>& get_model_visibility() const { return m_model_visible; }
+    uint32_t get_num_models() const { return m_num_models; }
+    const std::map<uint32_t, scm::math::mat4d>& getModelTransforms() const { return m_settings.transforms; }
+
+    // UI callbacks
+    void setModelVisibility(int model_index, bool visible);
+    void togglePointcloudRendering(bool enabled);
+    void toggleBoundingBoxRendering(bool enabled);
+    void toggleFrustumRendering(bool enabled);
+    void toggleCoordsRendering(bool enabled);
+    void toggleTextRendering(bool enabled);
+    void setSyncCamera(bool enabled) { m_sync_camera = enabled; }
+    void dumpSettings();
+    void setSurfelShader(bool enabled) { m_settings.surfel_shader = enabled; }
+    void setProvenance(bool enabled) { m_settings.provenance = enabled; }
+    void setMaxRadius(float radius) { m_settings.max_radius = radius; }
+    void setScaleRadius(float radius) { m_settings.scale_radius = radius; }
+    void setLodError(float error) { m_settings.lod_error = error; }
+    void setUploadBudget(size_t budget);
+    void startMeasurement();
+    void stopMeasurement();
+
+private:
+    void loadSettings(const std::string& filename);
+    void initCamera();
+    void printNodePath(osg::ref_ptr<osg::Node> pointer);
+    void debugPrintSettings() const;
+    void updateModelRotation();
+    scm::math::mat4f createSwapYZMatrix();
+    scm::math::mat4d createSwapYZ();
+    scm::math::mat4d swapMiddleColumns(const scm::math::mat4d& m);
+    scm::math::mat4d swapMiddleRows(const scm::math::mat4d& m);
+    scm::math::mat4d swapMiddleColumns(scm::math::mat4d& m);
+    scm::math::mat4d swapMiddleRows(scm::math::mat4d& m);
+    std::string const stripWhitespace(std::string const& in_string);
+    void readMenuConfigData(const char* filename, std::vector<ImageFileEntry>& pointVec, opencover::ui::Group* group);
+    float getAtlasScaleFactor();
+    void linesFromMinMax(const scm::math::vec3f& min_vertex, const scm::math::vec3f& max_vertex, std::vector<scm::math::vec3f>& lines);
+    void applyVtCutUpdate();
+    scm::gl::data_format getTexFormat();
+    const char* stringToConstChar(std::string str);
+    std::string extractFilename(const std::string pathname);
+    std::string getConfigEntry(std::string scope);
+    std::string getConfigEntry(std::string scope, std::string name);
+    void strcpyTail(char* suffix, const char* str, char c);
+    size_t queryVideoMemoryInMb();
+    void initLamureShader();
+    void syncCameras();
+    bool readShader(std::string const& path_string, std::string& shader_string, bool keep_optional_shader_code);
+    void createAuxResources();
+    void drawResources(const lamure::context_t context_id, const lamure::view_t view_id);
+    void drawBrush(scm::gl::program_ptr shader);
+    void setLamureUniforms(scm::gl::program_ptr shader);
+    void addStatesetUniforms(osg::ref_ptr<osg::StateSet> stateset);
+    void setStatesetUniforms(osg::ref_ptr<osg::StateSet> stateset);
+    void setGlUniforms(GLuint program);
+    void createFramebuffers();
+    void initRenderStates();
+    void initTextRendering();
+        void lamureDisplay();
+    void drawAllModels(const lamure::context_t context_id, const lamure::view_t view_id, scm::math::mat4d view_matrix, scm::math::mat4d projection_matrix, scm::gl::program_ptr shader);
+    void syncCameras(lmr_camera* lamure_camera, osg::Camera* osg_camera);
+    void initPclResources();
+    void initBoxResources();
+    void initCoordResources();
+    void initFrustumResources();
+    void createAuxRepresentation();
+    GLuint compileAndLinkShaders(std::string vs_source, std::string fs_source);
+    GLuint compileAndLinkShaders(std::string vs_source, std::string gs_source, std::string fs_source);
+    unsigned int createShader(const std::string& vertexShader, const std::string& fragmentShader, uint8_t ctx_id);
+    unsigned int compileShader(unsigned int type, const std::string& source, uint8_t ctx_id);
+    void initUniforms();
+    void setPointUniforms();
+    void setSurfelUniforms();
+    void setViewerPos(float x, float y, float z);
+    void updateFrustumTransform(osg::ref_ptr<osg::MatrixTransform> matrixTransform, const osg::Vec3& translation);
+
+    static LamurePointCloud_cli* s_instance;
+
+    PointCloudRenderer* m_renderer = nullptr;
+    PointCloudUIManager* m_ui_manager = nullptr;
+    LamurePointCloudInteractor* m_interactor = nullptr;
+    Measurement* m_measurement = nullptr;
+
+    // OSG Scene Graph Nodes
+    // OSG Scene Graph Nodes
+    osg::ref_ptr<osg::Group> m_lamure_group;
+    osg::ref_ptr<osg::Camera> m_hud_camera;
+    
+
+    // Cameras
+    osg::ref_ptr<osg::Camera> m_osg_camera;
+    lamure::ren::camera* m_lamure_camera = nullptr;
+    lamure::ren::camera* m_scm_camera = nullptr;
+
+    // State
+    AppSettings m_settings;
+    uint32_t m_num_models = 0;
+    std::vector<bool> m_model_visible;
+    bool m_sync_camera = true;
+    osgViewer::ViewerBase::FrameScheme m_rendering_scheme;
+
+    
+    
+
+    
+
+    
+};
+
+#endif // LAMURE_POINT_CLOUD_CLI_H

@@ -1,7 +1,7 @@
 #D:\Forschungsarbeit\Data
 C:\Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_bin
 
-selection : 0,1
+initial_selection : 0,1
 show_pvs : 0
 surfel_shader : 0
 point_size_factor : 1.0
@@ -10,6 +10,14 @@ max_radius : 0.1
 scale_radius : 1.0
 lod_error : 7.5
 provenance : 0
+pointcloud_state : 1
+boundingbox_state : 0
+frustum_state : 0
+coord_state : 0
+text_state : 0
+sync_state : 1
+notify_state : 0
+
 
 # \Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_012\naturkundemuseum_School012.bvh
 # width : 64

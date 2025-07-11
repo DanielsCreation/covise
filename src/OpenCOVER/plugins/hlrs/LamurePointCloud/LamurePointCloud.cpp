@@ -6,10 +6,6 @@
 #include "osg_util.h"
 #include "LamurePointCloudInteractor.h"
 
-#include <lamure/imgui.h>
-#include <lamure/imgui_internal.h>
-#include <lamure/imgui_impl_glfw_gl3.h>
-
 // std
 #include <iostream>
 #include <fstream>
@@ -357,7 +353,6 @@ struct settings {
 	int32_t upload_{ 32 };
 	bool provenance_{ 1 };
 	bool create_aux_resources_{ 1 };
-	bool splatting_{ 0 };  // multipass is not working yet (bc of storage buffers/rtt mode?)
 	bool gamma_correction_{ 0 };
 	bool surfel_shader_{ 1 };
 	bool face_eye_{ 0 };
@@ -545,7 +540,6 @@ void LamurePointCloudPlugin::load_settings(std::string const& filename) {
 		else if (key == "vram")                 settings_.vram_ = std::max(std::atoi(value.c_str()), 8);
 		else if (key == "ram")                  settings_.ram_ = std::max(std::atoi(value.c_str()), 8);
 		else if (key == "upload")               settings_.upload_ = std::max(std::atoi(value.c_str()), 8);
-		else if (key == "splatting")            settings_.splatting_ = std::max(std::atoi(value.c_str()), 0) != 0;
 		else if (key == "face_eye")             settings_.face_eye_ = std::max(std::atoi(value.c_str()), 0) != 0;
 		else if (key == "gamma_correction")     settings_.gamma_correction_ = std::max(std::atoi(value.c_str()), 0) != 0;
 		else if (key == "pvs_culling")          settings_.pvs_culling_ = std::max(std::atoi(value.c_str()), 0) != 0;
@@ -927,7 +921,6 @@ void APIENTRY openglCallbackFunction(GLenum source, GLenum type, GLuint id, GLen
 	std::cerr << "---------------------" << std::endl;
 }
 
-
 float* gl_mat_to_array(GLdouble mat[16]) {
 	scm::math::mat4d gl_mat = scm::math::mat4d(mat[0], mat[1], mat[2], mat[3], mat[4], mat[5], mat[6], mat[7], mat[8], mat[9], mat[10], mat[11], mat[12], mat[13], mat[14], mat[15]);
 	float* gl_array = scm::math::mat4f(gl_mat).data_array;
@@ -951,34 +944,6 @@ std::vector<float> LamurePointCloudPlugin::getBoxCorners(scm::gl::boxf bbv) {
 		bbv.corner(7).data_array[0], bbv.corner(7).data_array[1], bbv.corner(7).data_array[2],
 	};
 	return corners_;
-}
-
-float* LamurePointCloudPlugin::VecToArr(std::vector<std::vector<float>> vec) {
-	std::size_t totalsize = 0;
-	for (int i = 0; i < vec.size(); i++) {
-		totalsize += vec[i].size();
-	}
-	float* newarr = new float[totalsize];
-	int index = 0;
-	for (int i = 0; i < vec.size(); i++) {
-		std::copy(vec[i].begin(), vec[i].end(), &newarr[index]);
-		index += vec[i].size();
-	}
-	return newarr;
-}
-
-int* LamurePointCloudPlugin::VecToArr(std::vector<std::vector<int>> vec) {
-	std::size_t totalsize = 0;
-	for (int i = 0; i < vec.size(); i++) {
-		totalsize += vec[i].size();
-	}
-	int* newarr = new int[totalsize];
-	int index = 0;
-	for (int i = 0; i < vec.size(); i++) {
-		std::copy(vec[i].begin(), vec[i].end(), &newarr[index]);
-		index += vec[i].size();
-	}
-	return newarr;
 }
 
 std::vector<vector<float>> LamurePointCloudPlugin::getSerializedBvhMinMax(const std::vector<scm::gl::boxf> bounding_boxes) {
@@ -1955,7 +1920,6 @@ void LamurePointCloudPlugin::preFrame() {
 		//	std::cerr << "  Tab[" << i << "] = " << name << "\n";
 		//}
 		//coVRNavigationManager::instance()->enableViewerPosRotation(true);
-
 		//pointcloud_geode->setNodeMask(Isect::Visible);
 		//pointcloud_geometry->setNodeMask(Isect::Visible);
 		//osg::BoundingSphere bs = pointcloud_geometry->computeBound();
@@ -1964,9 +1928,7 @@ void LamurePointCloudPlugin::preFrame() {
 		counter = counter + 1;
 	}
 
-	if ((cover->getMouseButton()->getState() == 1) && (counter != 0)) {
-
-	}
+	if ((cover->getMouseButton()->getState() == 1) && (counter != 0)) { }
 }
 
 
@@ -2100,7 +2062,6 @@ void LamurePointCloudPlugin::init_camera() {
 		if (model_info_.root_bb_max[model_id][1] > root_max_temp[1]) { root_max_temp[1] = model_info_.root_bb_max[model_id][1]; }
 		if (model_info_.root_bb_max[model_id][2] > root_max_temp[2]) { root_max_temp[2] = model_info_.root_bb_max[model_id][2]; }
 	}
-
 	model_info_.models_center = temp_center / num_models_;
 	model_info_.models_min = root_min_temp;
 	model_info_.models_max = root_max_temp;
@@ -2161,10 +2122,7 @@ void LamurePointCloudPlugin::init_coord_resources() {
 }
 
 void LamurePointCloudPlugin::init_box_resources() {
-	if (plugin->notify_button->state()) {
-		std::cout << "[Notify] init_box_resources() " << std::endl;
-	}
-
+	if (plugin->notify_button->state()) { std::cout << "[Notify] init_box_resources() " << std::endl; }
 	for (uint32_t model_id = 0; model_id < num_models_; ++model_id) {
 		std::vector<vector<float>> corners_;
 		const auto& bvh_ = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh();
@@ -2269,7 +2227,6 @@ void LamurePointCloudPlugin::init_uniforms() {
 	point_shader_.point_size_factor_loc  = glGetUniformLocation(point_shader_.program, "point_size_factor");
 	point_shader_.proj_scale_loc         = glGetUniformLocation(point_shader_.program, "proj_scale");
 
-
 	glUseProgram(surfel_shader_.program);
 	surfel_shader_.mvp_matrix_loc           = glGetUniformLocation(surfel_shader_.program, "mvp_matrix");
 	surfel_shader_.max_radius_loc           = glGetUniformLocation(surfel_shader_.program, "max_radius");
@@ -2363,8 +2320,7 @@ unsigned int LamurePointCloudPlugin::compile_shader(unsigned int type, const std
 		gl_api->glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
 		char* message = (char*)alloca(length * sizeof(char));
 		gl_api->glGetShaderInfoLog(id, length, &length, message);
-		std::cout << "Failed to compile " <<
-			(type == GL_VERTEX_SHADER ? "vertex" : "fragment") << " shader!" << std::endl;
+		std::cout << "Failed to compile " << (type == GL_VERTEX_SHADER ? "vertex" : "fragment") << " shader!" << std::endl;
 		std::cout << message << std::endl;
 		gl_api->glDeleteShader(id);
 		return 0;
@@ -2616,7 +2572,6 @@ void LamurePointCloudPlugin::debug_print_settings() const {
 	cout << "provenance: " << settings_.provenance_ << endl;
 	cout << "surfel_shader: " << settings_.surfel_shader_ << endl;
 	cout << "create_aux_resources: " << settings_.create_aux_resources_ << endl;
-	cout << "splatting: " << settings_.splatting_ << endl;
 	cout << "gamma_correction: " << settings_.gamma_correction_ << endl;
 	cout << "max_brush_size: " << settings_.max_brush_size_ << endl;
 	cout << "lod_update: " << settings_.lod_update_ << endl;
@@ -2836,5 +2791,3 @@ void LamurePointCloudPlugin::readMenuConfigData(const char* menu, vector<ImageFi
 		menulist.push_back(ImageFileEntry(entry.first.c_str(), entry.second.c_str(), (ui::Element*)temp));
 	}
 }
-
-
