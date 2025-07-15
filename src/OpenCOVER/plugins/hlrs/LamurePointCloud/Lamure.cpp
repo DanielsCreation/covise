@@ -16,13 +16,9 @@
 #include <chrono>
 #include <vector>
 #include <algorithm>
-#include <list>
-#include <iosfwd>
 #include <sstream>
-#include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <ctype.h>
 #include <math.h>
 #include <winbase.h>
@@ -31,69 +27,31 @@
 #include <memory>
 
 //boost
-#include <boost/assign/list_of.hpp>
 #include <boost/regex.hpp>
-#include <boost/thread.hpp>
 
 //schism
-#include <scm/time.h>
-//#include <scm/core.h>
 #include <scm/core/math.h>
-#include <scm/core/io/tools.h>
-#include <scm/core/pointer_types.h>
-//#include <scm/core/platform/platform.h>
-//#include <scm/core/utilities/platform_warning_disable.h>
-#include <scm/gl_util/primitives/primitives_fwd.h>
-#include <scm/gl_util/primitives.h>
-#include <scm/gl_core/buffer_objects/scoped_buffer_map.h>
 
 //lamure
 #include <lamure/pvs/pvs_database.h>
 #include <lamure/prov/prov_aux.h>
-#include <lamure/vt/pre/AtlasFile.h>
 #include <lamure/prov/octree.h>
-#include <lamure/vt/VTConfig.h>
-#include <lamure/vt/ren/CutDatabase.h>
-#include <lamure/vt/ren/CutUpdate.h>
-#include <lamure/utils.h>
 #include "lamure/ren/controller.h"
-#include <lamure/config.h>
 #include <lamure/ren/cut.h>
+#include <lamure/ren/policy.h>
 
 #include <config/coConfigConstants.h>
-#include <config/coConfigLog.h>
-#include <config/coConfig.h>
-#include <config/coConfigString.h>
-#include <config/coConfigEntryString.h>
+#include <config/CoviseConfig.h>
 
-#include <cover/ui/SelectionList.h>
-#include <cover/coVRStatsDisplay.h>
 #include <cover/VRSceneGraph.h>
 #include "cover/OpenCOVER.h"
-#include <cover/VRWindow.h>
 #include <cover/VRViewer.h>
-#include <cover/coHud.h>
-#include <cover/coVRTui.h>
-#include <cover/ui/Menu.h>
-#include "cover/coVRCollaboration.h"
-#include "cover/coIntersection.h"
-
-#include <osgViewer/GraphicsWindow>
-#include <osgViewer/Renderer>
-#include <osgGA/EventQueue>
-#include <osg/PolygonMode>
-#include <osg/StateSet>
-
-#include <util/coExport.h>
-#include <PluginUtil/FeedbackManager.h>
-#include <PluginUtil/ModuleInteraction.h>
-#include <OpenVRUI/coButtonInteraction.h>
-#include <config/CoviseConfig.h>
+#include <cover/coVRFileManager.h>
+#include <cover/coVRPluginSupport.h>
+#include <cover/coVRConfig.h>
 
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
-#include <cover/coVRFileManager.h>
-#include <cover/coVRPluginSupport.h>
 
 
 #ifdef __cplusplus
@@ -175,74 +133,74 @@ void Lamure::loadSettings(const std::string& filename) {
     std::unordered_map<std::string, SettingHandler> setting_handlers;
     auto& s = plugin->m_settings;
 
-    setting_handlers["surfel_shader"]       = [&](const auto& v) { s.surfel_shader_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["frame_div"]           = [&](const auto& v) { s.frame_div_ = std::max(std::atoi(v.c_str()), 1); };
-    setting_handlers["vram"]                = [&](const auto& v) { s.vram_ = std::max(std::atoi(v.c_str()), 8); };
-    setting_handlers["ram"]                 = [&](const auto& v) { s.ram_ = std::max(std::atoi(v.c_str()), 8); };
-    setting_handlers["upload"]              = [&](const auto& v) { s.upload_ = std::max(std::atoi(v.c_str()), 8); };
-    setting_handlers["face_eye"]            = [&](const auto& v) { s.face_eye_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["gamma_correction"]    = [&](const auto& v) { s.gamma_correction_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["pvs_culling"]         = [&](const auto& v) { s.pvs_culling_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["use_pvs"]             = [&](const auto& v) { s.use_pvs_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["point_size_factor"]   = [&](const auto& v) { s.point_size_factor_ = std::stof(v.c_str()); };
-    setting_handlers["surfel_size_factor"]  = [&](const auto& v) { s.surfel_size_factor_ = std::stof(v.c_str()); };
-    setting_handlers["aux_point_size"]      = [&](const auto& v) { s.aux_point_size_ = std::clamp(std::stof(v.c_str()), 0.00001f, 1.0f); };
-    setting_handlers["aux_point_distance"]  = [&](const auto& v) { s.aux_point_distance_ = std::clamp(std::stof(v.c_str()), 0.00001f, 1.0f); };
-    setting_handlers["aux_focal_length"]    = [&](const auto& v) { s.aux_focal_length_ = std::clamp(std::stof(v.c_str()), 0.001f, 10.0f); };
-    setting_handlers["max_brush_size"]      = [&](const auto& v) { s.max_brush_size_ = std::clamp(std::atoi(v.c_str()), 64, 1024 * 1024); };
-    setting_handlers["lod_error"]           = [&](const auto& v) { s.lod_error_ = std::clamp(std::stof(v.c_str()), 1.0f, 10.0f); };
-    setting_handlers["create_aux_resources"]= [&](const auto& v) { s.create_aux_resources_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_normals"]        = [&](const auto& v) { s.show_normals_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_accuracy"]       = [&](const auto& v) { s.show_accuracy_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_radius_deviation"] = [&](const auto& v) { s.show_radius_deviation_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_output_sensitivity"] = [&](const auto& v) { s.show_output_sensitivity_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_sparse"]         = [&](const auto& v) { s.show_sparse_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_views"]          = [&](const auto& v) { s.show_views_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_photos"]         = [&](const auto& v) { s.show_photos_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_octrees"]        = [&](const auto& v) { s.show_octrees_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_bvhs"]           = [&](const auto& v) { s.show_bvhs_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["show_pvs"]            = [&](const auto& v) { s.show_pvs_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["channel"]             = [&](const auto& v) { s.channel_ = std::max(std::atoi(v.c_str()), 0); };
-    setting_handlers["enable_lighting"]     = [&](const auto& v) { s.enable_lighting_ = (std::clamp(std::atoi(v.c_str()), 0, 1) != 0); };
-    setting_handlers["use_material_color"]  = [&](const auto& v) { s.use_material_color_ = (std::clamp(std::atoi(v.c_str()), 0, 1) != 0); };
-    setting_handlers["material_diffuse_r"]  = [&](const auto& v) { s.material_diffuse_.x = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_diffuse_g"]  = [&](const auto& v) { s.material_diffuse_.y = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_diffuse_b"]  = [&](const auto& v) { s.material_diffuse_.z = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular_r"] = [&](const auto& v) { s.material_specular_.x = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular_g"] = [&](const auto& v) { s.material_specular_.y = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular_b"] = [&](const auto& v) { s.material_specular_.z = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular_exponent"] = [&](const auto& v) { s.material_specular_.w = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
-    setting_handlers["ambient_light_color_r"]= [&](const auto& v) { s.ambient_light_color_.r = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["ambient_light_color_g"]= [&](const auto& v) { s.ambient_light_color_.g = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["ambient_light_color_b"]= [&](const auto& v) { s.ambient_light_color_.b = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["point_light_color_r"] = [&](const auto& v) { s.point_light_color_.r = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["point_light_color_g"] = [&](const auto& v) { s.point_light_color_.g = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["point_light_color_b"] = [&](const auto& v) { s.point_light_color_.b = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["point_light_intensity"]= [&](const auto& v) { s.point_light_color_.w = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
+    setting_handlers["surfel_shader"]       = [&](const auto& v) { s.surfel_shader = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["frame_div"]           = [&](const auto& v) { s.frame_div = std::max(std::atoi(v.c_str()), 1); };
+    setting_handlers["vram"]                = [&](const auto& v) { s.vram = std::max(std::atoi(v.c_str()), 8); };
+    setting_handlers["ram"]                 = [&](const auto& v) { s.ram = std::max(std::atoi(v.c_str()), 8); };
+    setting_handlers["upload"]              = [&](const auto& v) { s.upload = std::max(std::atoi(v.c_str()), 8); };
+    setting_handlers["face_eye"]            = [&](const auto& v) { s.face_eye = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["gamma_correction"]    = [&](const auto& v) { s.gamma_correction = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["pvs_culling"]         = [&](const auto& v) { s.pvs_culling = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["use_pvs"]             = [&](const auto& v) { s.use_pvs = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["point_size_factor"]   = [&](const auto& v) { s.point_size_factor = std::stof(v.c_str()); };
+    setting_handlers["surfel_size_factor"]  = [&](const auto& v) { s.surfel_size_factor = std::stof(v.c_str()); };
+    setting_handlers["aux_point_size"]      = [&](const auto& v) { s.aux_point_size = std::clamp(std::stof(v.c_str()), 0.00001f, 1.0f); };
+    setting_handlers["aux_point_distance"]  = [&](const auto& v) { s.aux_point_distance = std::clamp(std::stof(v.c_str()), 0.00001f, 1.0f); };
+    setting_handlers["aux_focal_length"]    = [&](const auto& v) { s.aux_focal_length = std::clamp(std::stof(v.c_str()), 0.001f, 10.0f); };
+    setting_handlers["max_brush_size"]      = [&](const auto& v) { s.max_brush_size = std::clamp(std::atoi(v.c_str()), 64, 1024 * 1024); };
+    setting_handlers["lod_error"]           = [&](const auto& v) { s.lod_error = std::clamp(std::stof(v.c_str()), 1.0f, 10.0f); };
+    setting_handlers["create_aux_resources"]= [&](const auto& v) { s.create_aux_resources = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_normals"]        = [&](const auto& v) { s.show_normals = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_accuracy"]       = [&](const auto& v) { s.show_accuracy = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_radius_deviation"] = [&](const auto& v) { s.show_radius_deviation = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_output_sensitivity"] = [&](const auto& v) { s.show_output_sensitivity = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_sparse"]         = [&](const auto& v) { s.show_sparse = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_views"]          = [&](const auto& v) { s.show_views = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_photos"]         = [&](const auto& v) { s.show_photos = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_octrees"]        = [&](const auto& v) { s.show_octrees = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_bvhs"]           = [&](const auto& v) { s.show_bvhs = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_pvs"]            = [&](const auto& v) { s.show_pvs = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["channel"]             = [&](const auto& v) { s.channel = std::max(std::atoi(v.c_str()), 0); };
+    setting_handlers["enable_lighting"]     = [&](const auto& v) { s.enable_lighting = (std::clamp(std::atoi(v.c_str()), 0, 1) != 0); };
+    setting_handlers["use_material_color"]  = [&](const auto& v) { s.use_material_color = (std::clamp(std::atoi(v.c_str()), 0, 1) != 0); };
+    setting_handlers["material_diffuse_r"]  = [&](const auto& v) { s.material_diffuse.x = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["material_diffuse_g"]  = [&](const auto& v) { s.material_diffuse.y = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["material_diffuse_b"]  = [&](const auto& v) { s.material_diffuse.z = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["material_specular_r"] = [&](const auto& v) { s.material_specular.x = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["material_specular_g"] = [&](const auto& v) { s.material_specular.y = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["material_specular_b"] = [&](const auto& v) { s.material_specular.z = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["material_specular_exponent"] = [&](const auto& v) { s.material_specular.w = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
+    setting_handlers["ambient_light_color_r"]= [&](const auto& v) { s.ambient_light_color.r = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
+    setting_handlers["ambient_light_color_g"]= [&](const auto& v) { s.ambient_light_color.g = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
+    setting_handlers["ambient_light_color_b"]= [&](const auto& v) { s.ambient_light_color.b = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
+    setting_handlers["point_light_color_r"] = [&](const auto& v) { s.point_light_color.r = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
+    setting_handlers["point_light_color_g"] = [&](const auto& v) { s.point_light_color.g = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
+    setting_handlers["point_light_color_b"] = [&](const auto& v) { s.point_light_color.b = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
+    setting_handlers["point_light_intensity"]= [&](const auto& v) { s.point_light_color.w = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
     auto parse_color = [&](const std::string& v) { return std::min(std::max(std::atoi(v.c_str()), 0), 255) / 255.0f; };
     setting_handlers["background_color_r"]  = [&](const auto& v) { s.background_color.x = parse_color(v); };
     setting_handlers["background_color_g"]  = [&](const auto& v) { s.background_color.y = parse_color(v); };
     setting_handlers["background_color_b"]  = [&](const auto& v) { s.background_color.z = parse_color(v); };
-    setting_handlers["heatmap"]             = [&](const auto& v) { s.heatmap_ = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["heatmap_min"]         = [&](const auto& v) { s.heatmap_min_ = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["heatmap_max"]         = [&](const auto& v) { s.heatmap_max_ = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["heatmap_min_r"]       = [&](const auto& v) { s.heatmap_color_min_.x = parse_color(v); };
-    setting_handlers["heatmap_min_g"]       = [&](const auto& v) { s.heatmap_color_min_.y = parse_color(v); };
-    setting_handlers["heatmap_min_b"]       = [&](const auto& v) { s.heatmap_color_min_.z = parse_color(v); };
-    setting_handlers["heatmap_max_r"]       = [&](const auto& v) { s.heatmap_color_max_.x = parse_color(v); };
-    setting_handlers["heatmap_max_g"]       = [&](const auto& v) { s.heatmap_color_max_.y = parse_color(v); };
-    setting_handlers["heatmap_max_b"]       = [&](const auto& v) { s.heatmap_color_max_.z = parse_color(v); };
-    setting_handlers["pvs"]                 = [&](const auto& v) { s.pvs_ = v; };
-    setting_handlers["background_image"]    = [&](const auto& v) { s.background_image_ = v; };
-    setting_handlers["max_radius"]          = [&](const auto& v) { s.max_radius_ = std::max(std::stof(v.c_str()), 0.1f); };
-    setting_handlers["scale_radius"]        = [&](const auto& v) { s.scale_radius_ = std::max(std::stof(v.c_str()), 0.1f); };
-    setting_handlers["pointcloud_state"]    = [&](const auto& v) { s.pointcloud_state = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["boundingbox_state"]   = [&](const auto& v) { s.boundingbox_state = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["frustum_state"]       = [&](const auto& v) { s.frustum_state = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["coord_state"]         = [&](const auto& v) { s.coord_state = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["text_state"]          = [&](const auto& v) { s.text_state = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["sync_state"]          = [&](const auto& v) { s.sync_state = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["notify_state"]        = [&](const auto& v) { s.notify_state = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["heatmap"]             = [&](const auto& v) { s.heatmap = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["heatmap_min"]         = [&](const auto& v) { s.heatmap_min = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["heatmap_max"]         = [&](const auto& v) { s.heatmap_max = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["heatmap_min_r"]       = [&](const auto& v) { s.heatmap_color_min.x = parse_color(v); };
+    setting_handlers["heatmap_min_g"]       = [&](const auto& v) { s.heatmap_color_min.y = parse_color(v); };
+    setting_handlers["heatmap_min_b"]       = [&](const auto& v) { s.heatmap_color_min.z = parse_color(v); };
+    setting_handlers["heatmap_max_r"]       = [&](const auto& v) { s.heatmap_color_max.x = parse_color(v); };
+    setting_handlers["heatmap_max_g"]       = [&](const auto& v) { s.heatmap_color_max.y = parse_color(v); };
+    setting_handlers["heatmap_max_b"]       = [&](const auto& v) { s.heatmap_color_max.z = parse_color(v); };
+    setting_handlers["pvs"]                 = [&](const auto& v) { s.pvs = v; };
+    setting_handlers["background_image"]    = [&](const auto& v) { s.background_image = v; };
+    setting_handlers["max_radius"]          = [&](const auto& v) { s.max_radius = std::max(std::stof(v.c_str()), 0.1f); };
+    setting_handlers["scale_radius"]        = [&](const auto& v) { s.scale_radius = std::max(std::stof(v.c_str()), 0.1f); };
+    setting_handlers["show_pointcloud"]    = [&](const auto& v) { s.show_pointcloud = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_boundingbox"]   = [&](const auto& v) { s.show_boundingbox = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_frustum"]       = [&](const auto& v) { s.show_frustum = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_coord"]         = [&](const auto& v) { s.show_coord = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_text"]          = [&](const auto& v) { s.show_text = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_sync"]          = [&](const auto& v) { s.show_sync = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["show_notify"]        = [&](const auto& v) { s.show_notify = (std::atoi(v.c_str()) != 0); };
 
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -251,8 +209,8 @@ void Lamure::loadSettings(const std::string& filename) {
     }
 
     s.models.clear();
-    s.transforms_.clear();
-    s.json_.clear();
+    s.transforms.clear();
+    s.json.clear();
 
     std::set<std::string> unique_models;
     std::string data_dir;
@@ -310,13 +268,13 @@ void Lamure::loadSettings(const std::string& filename) {
         }
     }
     
-    setting_handlers["provenance"] = [&](const auto& v) { s.provenance_ = (std::atoi(v.c_str()) != 0) && prov_valid; };
-    setting_handlers["json"] = [&](const auto& v) { s.json_ = !v.empty() ? v : (!first_json.empty() ? first_json : s.json_); };
+    setting_handlers["provenance"] = [&](const auto& v) { s.provenance = (std::atoi(v.c_str()) != 0) && prov_valid; };
+    setting_handlers["json"] = [&](const auto& v) { s.json = !v.empty() ? v : (!first_json.empty() ? first_json : s.json); };
     setting_handlers["initial_selection"] = [&](const auto& v) { s.initial_selection = parseIndices(v, s.models.size()); };
 
     // Set default transforms
     for (lamure::model_t model_id = 0; model_id < s.models.size(); ++model_id) {
-        s.transforms_[model_id] = scm::math::mat4d::identity();
+        s.transforms[model_id] = scm::math::mat4d::identity();
     }
 
     // Second pass: parse settings
@@ -330,7 +288,7 @@ void Lamure::loadSettings(const std::string& filename) {
             uint32_t addr = std::atoi(strip_ws(l.substr(1, ws - 1)).c_str());
             key = strip_ws(l.substr(ws + 1, colon - (ws + 1)));
             if (key == "tf") {
-                s.transforms_[addr] = LamureUtil::loadMatrix(value);
+                s.transforms[addr] = LamureUtil::loadMatrix(value);
             } else {
                 std::cerr << "unrecognized @-key: " << key << std::endl;
                 std::exit(EXIT_FAILURE);
@@ -357,22 +315,22 @@ int Lamure::loadLMR(const char* filename, osg::Group* parent, const char* covise
 	std::string lmr_file = std::string(filename);
 	plugin->loadSettings(lmr_file);
 
-	if (plugin->m_settings.provenance_ && plugin->m_settings.json_ != "") {
-		std::cout << "json: " << plugin->m_settings.json_ << std::endl;
-		plugin->m_data_provenance = lamure::ren::Data_Provenance::parse_json(plugin->m_settings.json_);
-		std::cout << "size of provenance: " << plugin->m_data_provenance.get_size_in_bytes() << std::endl;
-	}
+	    if (plugin->m_settings.provenance && plugin->m_settings.json != "") {
+        std::cout << "json: " << plugin->m_settings.json << std::endl;
+        plugin->m_data_provenance = lamure::ren::Data_Provenance::parse_json(plugin->m_settings.json);
+        std::cout << "size of provenance: " << plugin->m_data_provenance.get_size_in_bytes() << std::endl;
+    }
 
 	const osg::GraphicsContext::Traits *traits = opencover::coVRConfig::instance()->windows[0].context->getTraits();
-	uint32_t render_width_ = traits->width / plugin->m_settings.frame_div_;
-	uint32_t render_height_ = traits->height / plugin->m_settings.frame_div_;
+	    uint32_t render_width = traits->width / plugin->m_settings.frame_div;
+    uint32_t render_height = traits->height / plugin->m_settings.frame_div;
 
 	lamure::ren::policy* policy = lamure::ren::policy::get_instance();
-	policy->set_max_upload_budget_in_mb(plugin->m_settings.upload_);
-	policy->set_render_budget_in_mb(plugin->m_settings.vram_);
-	policy->set_out_of_core_budget_in_mb(plugin->m_settings.ram_);
-	policy->set_window_width(render_width_);
-	policy->set_window_height(render_height_);
+	    policy->set_max_upload_budget_in_mb(plugin->m_settings.upload);
+    policy->set_render_budget_in_mb(plugin->m_settings.vram);
+    policy->set_out_of_core_budget_in_mb(plugin->m_settings.ram);
+    policy->set_window_width(render_width);
+    policy->set_window_height(render_height);
 
 	lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
 	lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
@@ -382,7 +340,7 @@ int Lamure::loadLMR(const char* filename, osg::Group* parent, const char* covise
 	for (const auto &input_file : plugin->m_settings.models)
 	{
 		lamure::model_t model_id = database->add_model(input_file, std::to_string(num_models));
-		plugin->m_model_info.model_transformations_.push_back(plugin->m_settings.transforms_[num_models] * scm::math::mat4d(scm::math::make_translation(database->get_model(num_models)->get_bvh()->get_translation())));
+		        plugin->m_model_info.model_transformations.push_back(plugin->m_settings.transforms[num_models] * scm::math::mat4d(scm::math::make_translation(database->get_model(num_models)->get_bvh()->get_translation())));
 		++num_models;
 	}
 	plugin->m_settings.num_models = num_models;

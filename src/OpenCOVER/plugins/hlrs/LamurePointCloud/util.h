@@ -2,26 +2,12 @@
 #define _LAMURE_UTIL_H
 
 // std
-#include <iostream>
-#include <fstream>
 #include <string>
-#include <chrono>
 #include <vector>
-#include <iosfwd>
-#include <sstream>
-#include <inttypes.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <math.h>
-#include <mutex>
-#include <filesystem>
 
 #include <GL/glew.h>
 #include <scm/core/math.h>
 #include <scm/gl_core/primitives/primitives_fwd.h>
-//#include <scm/gl_util/primitives/box.h>
 
 #include <osg/Vec3>
 #include <osg/Vec4>

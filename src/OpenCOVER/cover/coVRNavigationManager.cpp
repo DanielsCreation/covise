@@ -2187,18 +2187,18 @@ void coVRNavigationManager::doPointNav() {
     const osg::Vec3 viewerPos = cover->getViewerMat().getTrans();
 
     // scalings
-    const float driveRotationScale          = 1.0f / height * deltaTime / 10.0f;
-    const float driveRotationScaleShift     = 1.0f / height * 2.0f;
+    const float driveRotationScale          = 1.0f / width * deltaTime / 10.0f;
+    const float driveRotationScaleShift     = 1.0f / width * 2.0f;
     const float driveTranslationScale       = 1.0f / height * cover->getScale() * deltaTime;
     const float driveTranslationScaleShift  = 1.0f / height * cover->getScale() * 20.0f;
-    const float xTranslationScale           = 1.0f / height * cover->getScale() * deltaTime;
-    const float xTranslationScaleShift      = 1.0f / height * cover->getScale() * 4.0f;
+    const float xTranslationScale           = 1.0f / width * cover->getScale() * deltaTime;
+    const float xTranslationScaleShift      = 1.0f / width * cover->getScale() * 4.0f;
     const float yTranslationScale           = 1.0f / height * cover->getScale() * deltaTime;
     const float yTranslationScaleShift      = 1.0f / height * cover->getScale() * 4.0f;
     const float pitchRotationScale          = 1.0f / height * deltaTime / 10.0f;
     const float pitchRotationScaleShift     = 1.0f / height * 2.0f;
-    const float yawRotationScale            = 1.0f / height * deltaTime / 10.0f;
-    const float yawRotationScaleShift       = 1.0f / height * 2.0f;
+    const float yawRotationScale            = 1.0f / width * deltaTime / 10.0f;
+    const float yawRotationScaleShift       = 1.0f / width * 2.0f;
 
     // transformations
     osg::Matrix dcs_mat = shiftMouseNav ? mat0 : VRSceneGraph::instance()->getTransform()->getMatrix();

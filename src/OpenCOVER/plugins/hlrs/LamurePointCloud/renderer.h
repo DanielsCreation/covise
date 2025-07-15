@@ -7,10 +7,6 @@
 #endif
 
 #include <scm/core/math.h>
-#include <scm/gl_core/shader_objects/shader_objects_fwd.h>
-#include <scm/gl_util/font/font_face.h>
-#include <scm/gl_util/font/text.h>
-#include <scm/gl_util/font/text_renderer.h>
 #include <osg/Geometry>
 #include <osg/StateSet>
 #include <osg/Geode>
@@ -21,27 +17,15 @@
 #include <osgText/Text>
 #include <lamure/ren/camera.h>
 
-
-#include <scm/time.h>
-#include <scm/core/math.h>
-#include <scm/core/io/tools.h>
 #include <scm/core/pointer_types.h>
-#include <scm/gl_util/primitives/primitives_fwd.h>
-#include <scm/gl_util/primitives.h>
-#include <scm/gl_core/buffer_objects/scoped_buffer_map.h>
 
 class Lamure;
-
 class LamureRenderer {
 
 public:
 
-    struct Resource {
-        uint64_t num_primitives_{ 0 };
-        scm::gl::buffer_ptr buffer_;
-        scm::gl::vertex_array_ptr array_;
-        std::vector<std::vector<float>> corners_;
-    };
+    std::map<uint32_t, std::vector<uint32_t>> m_bvh_node_vertex_offsets;
+
 
 
 private:
@@ -49,6 +33,8 @@ private:
     LamureRenderer* m_renderer;
 
     osg::ref_ptr<osg::Group> m_group;
+
+    bool m_rendering;
 
     // Private methods
     bool readShader(const std::string& pathString, std::string& shaderString, bool keepOptionalShaderCode);
@@ -143,17 +129,17 @@ private:
     LineShader m_line_shader;
 
     struct PclResource {
-        GLuint program_;
-        GLuint vao_;
+        GLuint program;
+        GLuint vao;
     };
 
+
     struct BoxResource {
-        GLuint vbo_ = 0;
-        GLuint ibo_ = 0;
-        GLuint vao_ = 0;
-        GLuint program_ = 0;
-        std::vector<std::vector<float>> vertices_;
-        std::array<unsigned short, 24> idx_ = {
+        GLuint vbo = 0;
+        GLuint ibo = 0;
+        GLuint vao = 0;
+        GLuint program = 0;
+        std::array<unsigned short, 24> idx = { 
             0, 1, 2, 3, 4, 5, 6, 7,
             0, 2, 1, 3, 4, 6, 5, 7,
             0, 4, 1, 5, 2, 6, 3, 7,
@@ -161,27 +147,27 @@ private:
     };
 
     struct PlaneResource {
-        GLuint vbo_{ 0 };
-        GLuint ibo_{ 0 };
-        GLuint vao_{ 0 };
-        GLuint program_{ 0 };
-        std::array<unsigned short, 6> idx_ = {
+        GLuint vbo{ 0 };
+        GLuint ibo{ 0 };
+        GLuint vao{ 0 };
+        GLuint program{ 0 };
+        std::array<unsigned short, 6> idx = {
             1,3,7,5,1,7
         };
     };
 
     struct CoordRecourse {
-        GLuint vao_ = 0;
-        GLuint vbo_ = 0;
-        GLuint ibo_ = 0;
-        GLuint program_ = 0;
-        std::array<float, 12> vertices_ = {
+        GLuint vao = 0;
+        GLuint vbo = 0;
+        GLuint ibo = 0;
+        GLuint program = 0;
+        std::array<float, 12> vertices = {
             0.f,   0.f,   0.f,
             50.f,   0.f,   0.f,  // X-Achse
             0.f,  50.f,   0.f,  // Y-Achse
             0.f,   0.f,   50.f  // Z-Achse
         };
-        std::array<unsigned short, 6> idx_ = {
+        std::array<unsigned short, 6> idx = {
             0, 1,
             0, 2,
             0, 3,
@@ -189,12 +175,12 @@ private:
     };
 
     struct FrustumResource {
-        GLuint vao_ = 0;
-        GLuint vbo_ = 0;
-        GLuint ibo_ = 0;
-        GLuint program_ = 0;
-        std::array<float, 24> vertices_;
-        std::array<unsigned short, 24> idx_ = {
+        GLuint vao = 0;
+        GLuint vbo = 0;
+        GLuint ibo = 0;
+        GLuint program = 0;
+        std::array<float, 24> vertices;
+        std::array<unsigned short, 24> idx = {
             0, 1, 2, 3, 4, 5, 6, 7,
             0, 2, 1, 3, 4, 6, 5, 7,
             0, 4, 1, 5, 2, 6, 3, 7,
@@ -202,12 +188,12 @@ private:
     };
 
     struct TextResource {
-        GLuint vao_{ 0 };
-        GLuint vbo_{ 0 };
-        GLuint program_{ 0 };
-        GLuint atlas_texture_{ 0 };
-        std::string text_;
-        size_t num_vertices_{ 0 };
+        GLuint vao{ 0 };
+        GLuint vbo{ 0 };
+        GLuint program{ 0 };
+        GLuint atlas_texture{ 0 };
+        std::string text;
+        size_t num_vertices{ 0 };
     };
 
     // Resources
@@ -218,7 +204,7 @@ private:
     FrustumResource m_frustum_resource;
     TextResource m_text_resource;
 
-    std::map<uint32_t, Resource> m_bvh_resource;
+    
 
     // Matrizen
     scm::math::mat4d m_modelview_matrix;
@@ -227,9 +213,6 @@ private:
     // Schism objects
     scm::gl::render_device_ptr      m_device;
     scm::gl::render_context_ptr     m_context;
-    scm::gl::quad_geometry_ptr      m_screen_quad;
-    scm::gl::text_renderer_ptr      m_text_renderer;
-    scm::gl::text_ptr               m_renderable_text;
 
     // Cameras
     lamure::ren::camera* m_scm_camera;
@@ -260,30 +243,30 @@ private:
     osg::ref_ptr<osg::Geometry> m_coord_geometry;
 
     // Framebuffers
-    scm::gl::frame_buffer_ptr fbo_;
-    scm::gl::texture_2d_ptr fbo_color_buffer_;
-    scm::gl::texture_2d_ptr fbo_depth_buffer_;
-    scm::gl::frame_buffer_ptr pass1_fbo_;
-    scm::gl::frame_buffer_ptr pass2_fbo_;
-    scm::gl::frame_buffer_ptr pass3_fbo_;
-    scm::gl::texture_2d_ptr pass1_depth_buffer_;
-    scm::gl::texture_2d_ptr pass2_color_buffer_;
-    scm::gl::texture_2d_ptr pass2_normal_buffer_;
-    scm::gl::texture_2d_ptr pass2_view_space_pos_buffer_;
-    scm::gl::texture_2d_ptr pass2_depth_buffer_;
+    scm::gl::frame_buffer_ptr fbo;
+    scm::gl::texture_2d_ptr fbo_color_buffer;
+    scm::gl::texture_2d_ptr fbo_depth_buffer;
+    scm::gl::frame_buffer_ptr pass1_fbo;
+    scm::gl::frame_buffer_ptr pass2_fbo;
+    scm::gl::frame_buffer_ptr pass3_fbo;
+    scm::gl::texture_2d_ptr pass1_depth_buffer;
+    scm::gl::texture_2d_ptr pass2_color_buffer;
+    scm::gl::texture_2d_ptr pass2_normal_buffer;
+    scm::gl::texture_2d_ptr pass2_view_space_pos_buffer;
+    scm::gl::texture_2d_ptr pass2_depth_buffer;
 
     // Render states
-    scm::gl::depth_stencil_state_ptr depth_state_disable_;
-    scm::gl::depth_stencil_state_ptr depth_state_less_;
-    scm::gl::depth_stencil_state_ptr depth_state_without_writing_;
-    scm::gl::rasterizer_state_ptr no_backface_culling_rasterizer_state_;
-    scm::gl::blend_state_ptr color_blending_state_;
-    scm::gl::blend_state_ptr color_no_blending_state_;
-    scm::gl::sampler_state_ptr filter_linear_;
-    scm::gl::sampler_state_ptr filter_nearest_;
-    scm::gl::sampler_state_ptr vt_filter_linear_;
-    scm::gl::sampler_state_ptr vt_filter_nearest_;
-    scm::gl::texture_2d_ptr bg_texture_;
+    scm::gl::depth_stencil_state_ptr depth_state_disable;
+    scm::gl::depth_stencil_state_ptr depth_state_less;
+    scm::gl::depth_stencil_state_ptr depth_state_without_writing;
+    scm::gl::rasterizer_state_ptr no_backface_culling_rasterizer_state;
+    scm::gl::blend_state_ptr color_blending_state;
+    scm::gl::blend_state_ptr color_no_blending_state;
+    scm::gl::sampler_state_ptr filter_linear;
+    scm::gl::sampler_state_ptr filter_nearest;
+    scm::gl::sampler_state_ptr vt_filter_linear;
+    scm::gl::sampler_state_ptr vt_filter_nearest;
+    scm::gl::texture_2d_ptr bg_texture;
 
     // Shader sources
     std::string vis_point_vs_source;
@@ -353,6 +336,9 @@ public:
     void initUniforms();
     void initFramebuffer();
 
+    bool getRendering() { return m_rendering; };
+    void setRendering(bool rendering) { m_rendering = rendering; };
+
     // Getters for private members
     lamure::ren::camera* getScmCamera() { return m_scm_camera; }
     osg::ref_ptr<osg::Camera> getOsgCamera() { return m_osg_camera; }
@@ -362,13 +348,11 @@ public:
     void setModelviewMatrix(scm::math::mat4d model_view_matrix) { m_modelview_matrix = model_view_matrix; }
     void setProjectionMatrix(scm::math::mat4d projection_matrix) { m_projection_matrix = projection_matrix; }
 
-
     osg::ref_ptr<osg::Geode> getPointcloudGeode() { return m_pointcloud_geode; }
     osg::ref_ptr<osg::Geode> getBoundingboxGeode() { return m_boundingbox_geode; }
     osg::ref_ptr<osg::Geode> getFrustumGeode() { return m_frustum_geode; }
     osg::ref_ptr<osg::Geode> getCoordGeode() { return m_coord_geode; }
     osg::ref_ptr<osg::Geode> getTextGeode() { return m_text_geode; }
-
 
     scm::gl::render_device_ptr getDevice() { return m_device; }
     scm::gl::render_context_ptr getContext() { return m_context; }
@@ -385,7 +369,6 @@ public:
     FrustumResource&  getFrustumResource()  { return m_frustum_resource; }
     TextResource&     getTextResource()     { return m_text_resource; }
 
-    std::map<uint32_t, Resource>& getBvhResource() { return m_bvh_resource; }
 };
 
 #endif // _LAMURE_RENDERER_H

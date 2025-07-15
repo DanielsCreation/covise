@@ -46,8 +46,8 @@ void main() {
     float scaledRadius = min(in_radius * scale_radius * surfel_size_factor, max_radius);
     
     // Ausgabe der skalierten Tangentenvektoren
-    VertexOut.pass_ms_u = u * scaledRadius;
-    VertexOut.pass_ms_v = v * scaledRadius;
+    VertexOut.pass_ms_u = u * scaledRadius / 2;
+    VertexOut.pass_ms_v = v * scaledRadius / 2;
     VertexOut.pass_point_color = vec3(in_r, in_g, in_b);
     VertexOut.pass_world_pos = in_position;
     

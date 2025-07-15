@@ -1,17 +1,10 @@
 #include "LamureUI.h"
 #include "Lamure.h"
-#include "renderer.h"
-#include "util.h"
-#include "measurement.h"
-
-#include <cover/coVRPluginSupport.h>
-#include <cover/VRSceneGraph.h>
-#include <cover/coVRFileManager.h>
-#include <osg/Group>
-#include <osg/MatrixTransform>
 #include <filesystem>
 #include <lamure/ren/policy.h>
 #include <lamure/ren/config.h>
+#include <algorithm>
+#include <iostream>
 
 LamureUI::LamureUI(Lamure* plugin, const std::string& name) : opencover::ui::Owner(name, opencover::cover->ui), m_plugin(plugin) 
 {
@@ -74,54 +67,62 @@ void LamureUI::setupUi() {
 
     m_max_radius_slider = new opencover::ui::Slider(m_adaption_group, "max_radius");
     m_max_radius_slider->setText("max. radius");
-    m_max_radius_slider->setBounds(0.0, m_plugin->getSettings().max_radius_ * 5.0f);
-    m_max_radius_slider->setValue(m_plugin->getSettings().max_radius_);
+    m_max_radius_slider->setBounds(0.0, m_plugin->getSettings().max_radius * 5.0f);
+    m_max_radius_slider->setValue(m_plugin->getSettings().max_radius);
     m_max_radius_slider->setShared(true);
     m_max_radius_slider->setCallback([this](double value, bool released)
-        { m_plugin->getSettings().max_radius_ = static_cast<float>(value); });
+        { m_plugin->getSettings().max_radius = static_cast<float>(value); });
 
     m_scale_radius_slider = new opencover::ui::Slider(m_adaption_group, "scale_radius");
     m_scale_radius_slider->setText("scale radius");
-    m_scale_radius_slider->setBounds(0.0001, m_plugin->getSettings().scale_radius_ * 5.0f);
-    m_scale_radius_slider->setValue(m_plugin->getSettings().scale_radius_);
+    m_scale_radius_slider->setBounds(0.0001, m_plugin->getSettings().scale_radius * 5.0f);
+    m_scale_radius_slider->setValue(m_plugin->getSettings().scale_radius);
     m_scale_radius_slider->setScale(opencover::ui::Slider::Logarithmic);
     m_scale_radius_slider->setShared(true);
     m_scale_radius_slider->setCallback([this](double value, bool released)
-        { m_plugin->getSettings().scale_radius_ = static_cast<float>(value); });
+        { m_plugin->getSettings().scale_radius = static_cast<float>(value); });
 
     m_lod_error_slider = new opencover::ui::Slider(m_adaption_group, "lod_error");
     m_lod_error_slider->setText("LOD Error");
     m_lod_error_slider->setBounds(LAMURE_MIN_THRESHOLD, LAMURE_MAX_THRESHOLD);
-    m_lod_error_slider->setValue(m_plugin->getSettings().lod_error_);
+    m_lod_error_slider->setValue(m_plugin->getSettings().lod_error);
     m_lod_error_slider->setShared(true);
     m_lod_error_slider->setCallback([this](double value, bool released)
-        { m_plugin->getSettings().lod_error_ = static_cast<float>(value); });
+        { m_plugin->getSettings().lod_error = static_cast<float>(value); });
 
-    m_upload_budget_slider = new opencover::ui::Slider(m_adaption_group, "upload_budget");
-    m_upload_budget_slider->setText("Upload Budget (MB)");
-    m_upload_budget_slider->setBounds(LAMURE_MIN_UPLOAD_BUDGET, 256);
-    m_upload_budget_slider->setValue(lamure::ren::policy::get_instance()->max_upload_budget_in_mb());
-    m_upload_budget_slider->setShared(true);
-    m_upload_budget_slider->setCallback([this](double v, bool)
-        { lamure::ren::policy::get_instance()->set_max_upload_budget_in_mb(static_cast<size_t>(v)); });
+    //m_upload_budget_slider = new opencover::ui::Slider(m_adaption_group, "upload_budget");
+    //m_upload_budget_slider->setText("Upload Budget (MB)");
+    //m_upload_budget_slider->setBounds(LAMURE_MIN_UPLOAD_BUDGET, 256);
+    //m_upload_budget_slider->setValue(lamure::ren::policy::get_instance()->max_upload_budget_in_mb());
+    //m_upload_budget_slider->setShared(true);
+    //m_upload_budget_slider->setCallback([this](double v, bool)
+    //    { lamure::ren::policy::get_instance()->set_max_upload_budget_in_mb(static_cast<size_t>(v)); });
 
     m_rendering_group = new opencover::ui::Group(m_lamure_menu, "Rendering");
+
+    m_lod_button = new opencover::ui::Button(m_rendering_group, "lod_update");
+    m_lod_button->setText("lod update");
+    m_lod_button->setShared(true);
+    m_lod_button->setState(m_plugin->getSettings().lod_update);
+    m_lod_button->setCallback([this](bool state)
+        { m_plugin->getSettings().surfel_shader = state; });
+    m_rendering_group->add(m_lod_button);
 
     m_surfel_button = new opencover::ui::Button(m_rendering_group, "surfel_shader");
     m_surfel_button->setText("surfel shader");
     m_surfel_button->setShared(true);
-    m_surfel_button->setState(m_plugin->getSettings().surfel_shader_);
+    m_surfel_button->setState(m_plugin->getSettings().surfel_shader);
     m_surfel_button->setCallback([this](bool state)
-        { m_plugin->getSettings().surfel_shader_ = state; });
+        { m_plugin->getSettings().surfel_shader = state; });
     m_rendering_group->add(m_surfel_button);
 
     if (m_plugin->getProvValid()) {
         m_prov_button = new opencover::ui::Button(m_rendering_group, "provenance");
         m_prov_button->setText("provenance");
         m_prov_button->setShared(true);
-        m_prov_button->setState(m_plugin->getSettings().provenance_);
+        m_prov_button->setState(m_plugin->getSettings().provenance);
         m_prov_button->setCallback([this](bool state)
-            { m_plugin->getSettings().provenance_ = (state); });
+            { m_plugin->getSettings().provenance = (state); });
         m_rendering_group->add(m_prov_button);
     }
 

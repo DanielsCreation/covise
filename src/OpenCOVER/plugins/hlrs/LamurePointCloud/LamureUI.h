@@ -8,8 +8,6 @@
 #include <cover/ui/Group.h>
 #include <cover/ui/Button.h>
 #include <cover/ui/Slider.h>
-#include <cover/ui/SelectionList.h>
-#include <cover/ui/Label.h>
 
 class Lamure;
 
@@ -49,6 +47,7 @@ private:
     opencover::ui::Button* m_dump_button         = nullptr;
     opencover::ui::Button* m_prov_button         = nullptr;
     opencover::ui::Button* m_measure_button      = nullptr;
+    opencover::ui::Button* m_lod_button          = nullptr;
 
     // Gruppen und Men�
     opencover::ui::Menu*   m_lamure_menu        = nullptr;

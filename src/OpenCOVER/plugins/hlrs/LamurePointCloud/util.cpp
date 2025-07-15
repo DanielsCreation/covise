@@ -4,9 +4,13 @@
 #include <config/CoviseConfig.h>
 
 //boost
-#include <boost/assign/list_of.hpp>
 #include <boost/regex.hpp>
-#include <boost/thread.hpp>
+
+#include <fstream> // For std::ifstream
+#include <sstream> // For std::stringstream
+#include <iomanip> // For std::setprecision
+#include <cmath> // For std::pow, std::round
+#include <GL/glu.h> // For gluErrorString
 
 namespace LamureUtil {
 
@@ -171,7 +175,7 @@ scm::math::mat4d LamureUtil::gl_mat(GLdouble mat[16])
 
 std::vector<float> LamureUtil::getBoxCorners(scm::gl::boxf box)
 {
-    std::vector<float> corners_ = {
+    std::vector<float> corners = {
         box.corner(0).data_array[0],
         box.corner(0).data_array[1],
         box.corner(0).data_array[2],
@@ -197,7 +201,7 @@ std::vector<float> LamureUtil::getBoxCorners(scm::gl::boxf box)
         box.corner(7).data_array[1],
         box.corner(7).data_array[2],
     };
-    return corners_;
+    return corners;
 }
 
 std::vector<std::vector<float>> LamureUtil::getSerializedBvhMinMax(const std::vector<scm::gl::box> &bounding_boxes)

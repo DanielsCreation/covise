@@ -57,107 +57,131 @@ static std::vector<GLVertexAttribInfo> captureVertexAttribState() {
 }
 
 // ----- 1) Capture aller GL-States -----
-GLState GLState::capture() {
+GLState GLState::capture()
+{
     GLState s;
-    // Basis-Zustände
-    glGetIntegerv(GL_CURRENT_PROGRAM, &s.m_currentProgram);
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &s.m_vertexArrayBinding);
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &s.m_arrayBufferBinding);
+
+    // --- Basis-Bindungen ----------------------------------------------------
+    glGetIntegerv(GL_CURRENT_PROGRAM,            &s.m_currentProgram);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING,       &s.m_vertexArrayBinding);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING,       &s.m_arrayBufferBinding);
     glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &s.m_elementArrayBufferBinding);
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING,        &s.m_framebufferBinding);
+    glGetIntegerv(GL_RENDERBUFFER_BINDING,       &s.m_renderbufferBinding);
+    glGetIntegerv(GL_ACTIVE_TEXTURE,             &s.m_activeTexture);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D,         &s.m_textureBinding2D);
 
-    // Buffer-Größen
-    s.m_arrayBufferSize = 0;
-    if (s.m_arrayBufferBinding) {
-        GLint old; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &old);
-        glBindBuffer(GL_ARRAY_BUFFER, s.m_arrayBufferBinding);
-        glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &s.m_arrayBufferSize);
-        glBindBuffer(GL_ARRAY_BUFFER, old);
-    }
-    s.m_elementArrayBufferSize = 0;
-    if (s.m_elementArrayBufferBinding) {
-        GLint old; glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &old);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s.m_elementArrayBufferBinding);
-        glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &s.m_elementArrayBufferSize);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, old);
-    }
+    // --- Enable-Flags -------------------------------------------------------
+    s.m_cullFaceEnabled       = glIsEnabled(GL_CULL_FACE);
+    s.m_depthTestEnabled      = glIsEnabled(GL_DEPTH_TEST);
+    s.m_blendEnabled          = glIsEnabled(GL_BLEND);
+    s.m_polyOffsetFillEnabled = glIsEnabled(GL_POLYGON_OFFSET_FILL);
+    s.m_polyOffsetLineEnabled = glIsEnabled(GL_POLYGON_OFFSET_LINE);
 
-    s.m_cullFaceEnabled = glIsEnabled(GL_CULL_FACE);
-    s.m_depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
-    s.m_blendEnabled = glIsEnabled(GL_BLEND);
-    glGetIntegerv(GL_POLYGON_MODE, s.m_polygonMode);
+    // --- Rasterizer ---------------------------------------------------------
+    glGetIntegerv(GL_CULL_FACE_MODE, &s.m_cullFaceMode);
+    glGetIntegerv(GL_FRONT_FACE,     &s.m_frontFace);
+    glGetIntegerv(GL_POLYGON_MODE,    s.m_polygonMode);      // [0]=Front,[1]=Back
+    glGetFloatv (GL_LINE_WIDTH,      &s.m_lineWidth);
+    glGetFloatv (GL_POINT_SIZE,      &s.m_pointSize);
+    glGetFloatv (GL_POLYGON_OFFSET_FACTOR, &s.m_polygonOffsetFactor);
+    glGetFloatv (GL_POLYGON_OFFSET_UNITS,  &s.m_polygonOffsetUnits);
 
-    // Erweiterte Zustände
-    glGetIntegerv(GL_VIEWPORT, s.m_viewport);
-    glGetIntegerv(GL_SCISSOR_BOX, s.m_scissorBox);
-    glGetFloatv(GL_COLOR_CLEAR_VALUE, s.m_clearColor);
-    glGetFloatv(GL_DEPTH_CLEAR_VALUE, &s.m_clearDepth);
-    glGetFloatv(GL_BLEND_COLOR, s.m_blendColor);
-    glGetIntegerv(GL_BLEND_SRC_RGB, &s.m_blendSrcRGB);
-    glGetIntegerv(GL_BLEND_DST_RGB, &s.m_blendDstRGB);
-    glGetIntegerv(GL_BLEND_SRC_ALPHA, &s.m_blendSrcAlpha);
-    glGetIntegerv(GL_BLEND_DST_ALPHA, &s.m_blendDstAlpha);
+    // --- Depth --------------------------------------------------------------
+    glGetIntegerv(GL_DEPTH_FUNC,     &s.m_depthFunc);
+    glGetBooleanv(GL_DEPTH_WRITEMASK,&s.m_depthMask);
+    glGetFloatv (GL_DEPTH_CLEAR_VALUE, &s.m_clearDepth);
+    glGetFloatv (GL_DEPTH_RANGE,      s.m_depthRange);       // [0]=near,[1]=far
+
+    // --- Blend --------------------------------------------------------------
+    glGetFloatv (GL_BLEND_COLOR,          s.m_blendColor);
+    glGetIntegerv(GL_BLEND_SRC_RGB,      &s.m_blendSrcRGB);
+    glGetIntegerv(GL_BLEND_DST_RGB,      &s.m_blendDstRGB);
+    glGetIntegerv(GL_BLEND_SRC_ALPHA,    &s.m_blendSrcAlpha);
+    glGetIntegerv(GL_BLEND_DST_ALPHA,    &s.m_blendDstAlpha);
     glGetIntegerv(GL_BLEND_EQUATION_RGB, &s.m_blendEquationRGB);
-    glGetIntegerv(GL_BLEND_EQUATION_ALPHA, &s.m_blendEquationAlpha);
-    glGetFloatv(GL_DEPTH_RANGE, s.m_depthRange);
-    glGetFloatv(GL_LINE_WIDTH, &s.m_lineWidth);
-    glGetFloatv(GL_POINT_SIZE, &s.m_pointSize);
-    glGetFloatv(GL_POLYGON_OFFSET_FACTOR, &s.m_polygonOffsetFactor);
-    glGetFloatv(GL_POLYGON_OFFSET_UNITS, &s.m_polygonOffsetUnits);
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &s.m_activeTexture);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &s.m_textureBinding2D);
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &s.m_framebufferBinding);
-    glGetIntegerv(GL_RENDERBUFFER_BINDING, &s.m_renderbufferBinding);
+    glGetIntegerv(GL_BLEND_EQUATION_ALPHA,&s.m_blendEquationAlpha);
 
-    // Buffers
-    for (GLuint id : enumerateAllBufferIDs()) {
-        s.m_bufferInfos.push_back(queryBufferInfo(id, GL_ARRAY_BUFFER));
-        s.m_bufferInfos.push_back(queryBufferInfo(id, GL_ELEMENT_ARRAY_BUFFER));
-    }
+    // --- Viewport / Scissor / Clear ----------------------------------------
+    glGetIntegerv(GL_VIEWPORT,     s.m_viewport);
+    glGetIntegerv(GL_SCISSOR_BOX,  s.m_scissorBox);
+    glGetFloatv (GL_COLOR_CLEAR_VALUE, s.m_clearColor);
 
-    // Vertex-Attribs
+    // --- Vertex-Attrib Arrays ----------------------------------------------
     s.m_vertexAttribInfos = captureVertexAttribState();
+
+    // --- Puffer-Größen (optional) ------------------------------------------
+    // [Ihre bisherige Logik beibehalten]
+
     return s;
 }
 
-// ----- 2) Restore der gesicherten States -----
-void GLState::restore() const {
-    // Programm + VAO
-    glUseProgram(m_currentProgram);
-    glBindVertexArray(m_vertexArrayBinding);
+void GLState::restore() const
+{
+    // --- Bindings -----------------------------------------------------------
+    glUseProgram       (m_currentProgram);
+    glBindVertexArray  (m_vertexArrayBinding);
+    glBindFramebuffer  (GL_FRAMEBUFFER,  m_framebufferBinding);
+    glBindRenderbuffer (GL_RENDERBUFFER, m_renderbufferBinding);
+    glBindBuffer       (GL_ARRAY_BUFFER, m_arrayBufferBinding);
+    glBindBuffer       (GL_ELEMENT_ARRAY_BUFFER, m_elementArrayBufferBinding);
 
-    // Vertex-Attribs
+    glActiveTexture    (m_activeTexture);
+    glBindTexture      (GL_TEXTURE_2D, m_textureBinding2D);
+
+    // --- Enable-Flags -------------------------------------------------------
+    setEnable(GL_CULL_FACE,           m_cullFaceEnabled);
+    setEnable(GL_DEPTH_TEST,          m_depthTestEnabled);
+    setEnable(GL_BLEND,               m_blendEnabled);
+    setEnable(GL_POLYGON_OFFSET_FILL, m_polyOffsetFillEnabled);
+    setEnable(GL_POLYGON_OFFSET_LINE, m_polyOffsetLineEnabled);
+
+    // --- Rasterizer ---------------------------------------------------------
+    glCullFace   (m_cullFaceMode);
+    glFrontFace  (m_frontFace);
+    glPolygonMode(GL_FRONT, m_polygonMode[0]);
+    glPolygonMode(GL_BACK,  m_polygonMode[1]);
+    glLineWidth  (m_lineWidth);
+    glPointSize  (m_pointSize);
+    glPolygonOffset(m_polygonOffsetFactor, m_polygonOffsetUnits);
+
+    // --- Depth --------------------------------------------------------------
+    glDepthFunc (m_depthFunc);
+    glDepthMask (m_depthMask);
+    glClearDepth(m_clearDepth);
+    glDepthRangef(m_depthRange[0], m_depthRange[1]);
+
+    // --- Blend --------------------------------------------------------------
+    glBlendColor (m_blendColor[0], m_blendColor[1], m_blendColor[2], m_blendColor[3]);
+    glBlendFuncSeparate(m_blendSrcRGB,  m_blendDstRGB,
+                        m_blendSrcAlpha,m_blendDstAlpha);
+    glBlendEquationSeparate(m_blendEquationRGB, m_blendEquationAlpha);
+
+    // --- Viewport / Scissor / Clear ----------------------------------------
+    glViewport (m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+    glScissor  (m_scissorBox[0], m_scissorBox[1],
+                m_scissorBox[2], m_scissorBox[3]);
+    glClearColor(m_clearColor[0], m_clearColor[1],
+                 m_clearColor[2], m_clearColor[3]);
+
+    // --- Vertex-Attrib Arrays ----------------------------------------------
     for (const auto& a : m_vertexAttribInfos) {
         glBindBuffer(GL_ARRAY_BUFFER, a.bufferBinding);
-        glVertexAttribPointer(a.index,
-            a.size,
-            a.type,
-            a.normalized,
-            a.stride,
-            a.pointer);
+        glVertexAttribPointer(a.index, a.size, a.type,
+                              a.normalized, a.stride, a.pointer);
         glVertexAttribDivisor(a.index, a.divisor);
         if (a.enabled) glEnableVertexAttribArray(a.index);
         else           glDisableVertexAttribArray(a.index);
     }
 
-    // Buffers
+    // Wichtig: VBO-Bindung auf zuletzt gültigen Wert zurücksetzen
     glBindBuffer(GL_ARRAY_BUFFER, m_arrayBufferBinding);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_elementArrayBufferBinding);
+}
 
-    // FBO + Renderbuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, m_framebufferBinding);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_renderbufferBinding);
-
-    // Texturen
-    glActiveTexture(m_activeTexture);
-    glBindTexture(GL_TEXTURE_2D, m_textureBinding2D);
-
-    // Viewport + Scissor
-    glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
-    glScissor(m_scissorBox[0], m_scissorBox[1], m_scissorBox[2], m_scissorBox[3]);
-
-    // Clear-Werte
-    glClearColor(m_clearColor[0], m_clearColor[1], m_clearColor[2], m_clearColor[3]);
-    glClearDepth(m_clearDepth);
+inline void GLState::setEnable(GLenum cap, GLboolean enabled) const
+{
+    if (enabled) glEnable(cap);
+    else         glDisable(cap);
 }
 
 // ----- 3) Vergleich zweier States -----

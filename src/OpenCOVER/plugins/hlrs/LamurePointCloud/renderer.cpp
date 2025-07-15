@@ -7,38 +7,32 @@
 #include <cover/VRSceneGraph.h>
 #include <cover/coVRFileManager.h>
 
-#include <osg/Version>
 #include <osg/Geometry>
 #include <osg/Vec3>
-#include <osg/Vec3ui>
-#include <osg/BufferObject>
-#include <osg/Point>
-#include <osg/PointSprite>
-#include <osg/Texture2D>
-#include <osgDB/ReadFile>
-#include <osgViewer/Viewer>
-#include <osgViewer/ViewerEventHandlers>
-#include <osg/LineStipple>
-#include <osg/BufferTemplate>
 #include <osg/State>
-
-#include <scm/gl_util/primitives/quad.h>
-#include <scm/gl_util/font/font_face.h>
-#include <scm/gl_util/font/text.h>
-#include <scm/gl_util/font/text_renderer.h>
+#include <osgViewer/Viewer>
+#include <osgViewer/Renderer>
+#include <osgText/Text>
 
 #include <lamure/ren/camera.h>
-#include <lamure/lmr_camera.h>
-#include <lamure/ren/trackball.h>
-
 #include <lamure/ren/model_database.h>
 #include <lamure/ren/cut_database.h>
 #include <lamure/ren/controller.h>
 #include <lamure/pvs/pvs_database.h>
+#include <lamure/ren/policy.h>
 
 #include <iostream>
 #include <gl_state.h>
 #include <config/CoviseConfig.h>
+
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
 
 std::string shader_root_path = LAMURE_SHADERS_DIR;
 std::string font_root_path = LAMURE_FONTS_DIR;
@@ -47,6 +41,7 @@ LamureRenderer::LamureRenderer(Lamure *plugin) :
     m_plugin(plugin)
 {
     m_renderer = this;
+    m_rendering = false;
 
     m_group = new osg::Group();
     m_group->setName("LamureRendererGroup");
@@ -57,7 +52,7 @@ LamureRenderer::~LamureRenderer()
 }
 
 struct InitDrawCallback : public osg::Drawable::DrawCallback {
-    InitDrawCallback(osg::ref_ptr<osg::StateSet> stateset, Lamure* plugin) : _stateset(stateset), _plugin(plugin), _initialized(false) 
+    InitDrawCallback(Lamure* plugin) : _plugin(plugin), _initialized(false) 
     {
         if (_plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] InitDrawCallback()" << std::endl; }
         _renderer = _plugin->getRenderer();
@@ -76,7 +71,6 @@ struct InitDrawCallback : public osg::Drawable::DrawCallback {
         }
         if (!_initialized) {
             GLState before = GLState::capture();
-            std::cout << "test" << std::endl;
             _renderer->initSchismObjects();
             _renderer->initFramebuffer();
             _renderer->initLamureShader();
@@ -93,19 +87,18 @@ struct InitDrawCallback : public osg::Drawable::DrawCallback {
             before.restore();
         }
     }
-    osg::ref_ptr<osg::StateSet> _stateset;
     Lamure* _plugin;
     LamureRenderer* _renderer;
     mutable bool _initialized;
 };
 
 struct InitGeometry : public osg::Geometry {
-    InitGeometry(osg::ref_ptr<osg::StateSet> stateset, Lamure* plugin) : _plugin(plugin) {
+    InitGeometry(Lamure* plugin) : _plugin(plugin) {
         if (_plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] InitGeometry()" << std::endl; }
         setUseDisplayList(false);
         setUseVertexBufferObjects(true);
         setUseVertexArrayObject(false);
-        setDrawCallback(new InitDrawCallback(stateset, plugin));
+        setDrawCallback(new InitDrawCallback(plugin));
     }
     Lamure* _plugin;
 };
@@ -165,9 +158,7 @@ struct TextCullCallback : public osg::Drawable::CullCallback
             value_ss << "\n"
                 << std::fixed << std::setprecision(2)
                 << 1.0f / opencover::cover->frameDuration() << "\n"
-                << _render_info->rendered_nodes_ << "\n"
-                << _render_info->rendered_splats_ << "\n"
-                << _render_info->rendered_bounding_boxes_ << "\n\n\n"
+                << _render_info->rendered_nodes << "\n"                << _render_info->rendered_splats << "\n"                << _render_info->rendered_bounding_boxes << "\n\n\n"
                 << camPos.x << "\n"
                 << camPos.y << "\n"
                 << camPos.z << "\n\n\n\n"
@@ -263,9 +254,8 @@ struct TextGeode : public osg::Geode
 
 struct CoordDrawCallback : public osg::Drawable::DrawCallback
 {
-    CoordDrawCallback(osg::ref_ptr<osg::StateSet> stateset, Lamure* plugin)
-        : _stateset(stateset),
-        _plugin(plugin),
+    CoordDrawCallback(Lamure* plugin)
+        : _plugin(plugin),
         _initialized(false) 
     {
         _renderer = _plugin->getRenderer();
@@ -274,24 +264,21 @@ struct CoordDrawCallback : public osg::Drawable::DrawCallback
     virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const override
     {
         GLState before = GLState::capture();
-        glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-        glBindVertexArray(_renderer->getCoordResource().vao_);
-        glBindBuffer(GL_ARRAY_BUFFER, _renderer->getCoordResource().vbo_);
+        glBindVertexArray(_renderer->getCoordResource().vao);
+        glBindBuffer(GL_ARRAY_BUFFER, _renderer->getCoordResource().vbo);
         glUseProgram(_renderer->getLineShader().program);
 
-        scm::math::mat4 view_matrix_ = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
-        scm::math::mat4 projection_matrix_ = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
-        scm::math::mat4 mvp_matrix = projection_matrix_ * view_matrix_;
+        scm::math::mat4 view_matrix = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
+        scm::math::mat4 projection_matrix = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
+        scm::math::mat4 mvp_matrix = projection_matrix * view_matrix;
 
         glUniformMatrix4fv(_renderer->getLineShader().mvp_matrix_location, 1, GL_FALSE, mvp_matrix.data_array);
-        glUniform4f(_renderer->getLineShader().in_color_location, _plugin->getSettings().frustum_color_[0], _plugin->getSettings().frustum_color_[1], _plugin->getSettings().frustum_color_[2], _plugin->getSettings().frustum_color_[3]);
-        glDrawElements(GL_LINES, _renderer->getCoordResource().idx_.size(), GL_UNSIGNED_SHORT, nullptr);
+        glUniform4f(_renderer->getLineShader().in_color_location, _plugin->getSettings().frustum_color[0], _plugin->getSettings().frustum_color[1], _plugin->getSettings().frustum_color[2], _plugin->getSettings().frustum_color[3]);
+        glDrawElements(GL_LINES, _renderer->getCoordResource().idx.size(), GL_UNSIGNED_SHORT, nullptr);
 
-        glPopAttrib();
         before.restore();
     }
-    osg::ref_ptr<osg::StateSet> _stateset;
     Lamure* _plugin;
     LamureRenderer* _renderer;
     mutable bool _initialized;
@@ -299,25 +286,22 @@ struct CoordDrawCallback : public osg::Drawable::DrawCallback
 
 struct CoordGeometry : public osg::Geometry
 {
-    CoordGeometry(osg::ref_ptr<osg::StateSet> stateset, Lamure* plugin)
-        : _stateset(stateset), _plugin(plugin)
+    CoordGeometry(Lamure* plugin)
+        : _plugin(plugin)
     {
         if (plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] CoordGeometry()" << std::endl; }
         setUseDisplayList(false);
         setUseVertexBufferObjects(true);
         setUseVertexArrayObject(false);
-        setDrawCallback(new CoordDrawCallback(stateset, plugin));
+        setDrawCallback(new CoordDrawCallback(plugin));
     }
-    osg::ref_ptr<osg::StateSet> _stateset;
     Lamure* _plugin;
 };
 
 struct FrustumDrawCallback : public osg::Drawable::DrawCallback
 {
-    FrustumDrawCallback(osg::ref_ptr<osg::StateSet> stateset, Lamure* plugin)
-        : _stateset(stateset),
-        _plugin(plugin),
-        _initialized(false) 
+    FrustumDrawCallback(Lamure* plugin)
+        : _plugin(plugin)
     {
         _renderer = _plugin->getRenderer();
     }
@@ -326,110 +310,103 @@ struct FrustumDrawCallback : public osg::Drawable::DrawCallback
     {
         GLState before = GLState::capture();
 
-        if (!_initialized)
-        {
-            _renderer->initFrustumResources();
-            _initialized = true;
-        }
-
+        //scm::math::mat4 model_matrix = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
+        scm::math::mat4d view_matrix = LamureUtil::matConv4D(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
+        scm::math::mat4d projection_matrix = LamureUtil::matConv4D(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
+        scm::math::mat4f mvp_matrix = scm::math::mat4f(projection_matrix * view_matrix);
         std::vector<scm::math::vec3d> corner_values = _renderer->getScmCamera()->get_frustum_corners();
+
         for (size_t i = 0; i < corner_values.size(); ++i) {
             auto vv = scm::math::vec3f(corner_values[i]);
-            _renderer->getFrustumResource().vertices_[i * 3 + 0] = vv.x;
-            _renderer->getFrustumResource().vertices_[i * 3 + 1] = vv.y;
-            _renderer->getFrustumResource().vertices_[i * 3 + 2] = vv.z;
+            _renderer->getFrustumResource().vertices[i * 3 + 0] = vv.x;
+            _renderer->getFrustumResource().vertices[i * 3 + 1] = vv.y;
+            _renderer->getFrustumResource().vertices[i * 3 + 2] = vv.z;
         }
 
-        glBindVertexArray(_renderer->getFrustumResource().vao_);
-        glBindBuffer(GL_ARRAY_BUFFER, _renderer->getFrustumResource().vbo_);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * _renderer->getFrustumResource().vertices_.size(), _renderer->getFrustumResource().vertices_.data(), GL_STATIC_DRAW);
+        glEnable(GL_DEPTH_CLAMP);
+        glDisable(GL_DEPTH_TEST);
+        glLineWidth(2);
+        glBindVertexArray(_renderer->getFrustumResource().vao);
+        glBindBuffer(GL_ARRAY_BUFFER, _renderer->getFrustumResource().vbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * _renderer->getFrustumResource().vertices.size(), _renderer->getFrustumResource().vertices.data());
         glUseProgram(_renderer->getLineShader().program);
-
-        scm::math::mat4 view_matrix_ = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
-        scm::math::mat4 projection_matrix_ = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
-        scm::math::mat4 mvp_matrix = projection_matrix_ * view_matrix_;
-
         glUniformMatrix4fv(_renderer->getLineShader().mvp_matrix_location, 1, GL_FALSE, mvp_matrix.data_array);
-        glUniform4f(_renderer->getLineShader().in_color_location, _plugin->getSettings().frustum_color_[0], _plugin->getSettings().frustum_color_[1], _plugin->getSettings().frustum_color_[2], _plugin->getSettings().frustum_color_[3]);
-        glDrawElements(GL_LINES, _renderer->getFrustumResource().idx_.size(), GL_UNSIGNED_SHORT, nullptr);
+        glUniform4f(_renderer->getLineShader().in_color_location, _plugin->getSettings().frustum_color[0], _plugin->getSettings().frustum_color[1], _plugin->getSettings().frustum_color[2], _plugin->getSettings().frustum_color[3]);
+        glDrawElements(GL_LINES, _renderer->getFrustumResource().idx.size(), GL_UNSIGNED_SHORT, nullptr);
 
         before.restore();
     }
-    osg::ref_ptr<osg::StateSet> _stateset;
     Lamure* _plugin;
     LamureRenderer* _renderer;
-    mutable bool _initialized;
 };
 
 struct FrustumGeometry : public osg::Geometry
 {
-    FrustumGeometry(osg::ref_ptr<osg::StateSet> stateset, Lamure* _plugin)
+    FrustumGeometry(Lamure* _plugin)
     {
         if (_plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] FrustumGeometryGL()" << std::endl; }
         setUseDisplayList(false);
         setUseVertexBufferObjects(true);
         setUseVertexArrayObject(false);
-        setDrawCallback(new FrustumDrawCallback(stateset, _plugin));
+        setDrawCallback(new FrustumDrawCallback(_plugin));
     }
 };
 
 struct BoundingBoxDrawCallback : public virtual osg::Drawable::DrawCallback
 {
-    BoundingBoxDrawCallback(osg::ref_ptr<osg::StateSet> stateset, Lamure* plugin)
-        : _stateset(stateset),
-        _plugin(plugin)
+    BoundingBoxDrawCallback(Lamure* plugin)
+        : _plugin(plugin)
     {
         if (_plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] BoundingBoxDrawCallback()" << std::endl; }
         _renderer = _plugin->getRenderer();
     }
 
-    virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const {
-
+    virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const 
+    {
         GLState before = GLState::capture();
-        glPushAttrib(GL_ALL_ATTRIB_BITS);
-
         osg::State* state = renderInfo.getState();
-        scm::math::mat4 view_matrix_ = LamureUtil::matConv4F(state->getModelViewMatrix());
-        scm::math::mat4 projection_matrix_ = LamureUtil::matConv4F(state->getProjectionMatrix());
+        scm::math::mat4 view_matrix = LamureUtil::matConv4F(state->getModelViewMatrix());
+        scm::math::mat4 projection_matrix = LamureUtil::matConv4F(state->getProjectionMatrix());
         scm::math::mat4 osg_scale = LamureUtil::matConv4F(opencover::cover->getObjectsScale()->getMatrix());
 
         lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
         lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
         lamure::ren::controller* controller = lamure::ren::controller::get_instance();
         lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
+
         if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) { controller->reset_system(_plugin->getDataProvenance()); }
         else { controller->reset_system(); }
 
         lamure::context_t context_id = controller->deduce_context_id(_renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID());
         for (lamure::model_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
             lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
-            cuts->send_transform(context_id, m_id, osg_scale * scm::math::mat4(_plugin->getModelInfo().model_transformations_[m_id]));
-            cuts->send_threshold(context_id, m_id, _plugin->getSettings().lod_error_);
+            cuts->send_transform(context_id, m_id, scm::math::mat4(_plugin->getModelInfo().model_transformations[m_id]));
+            cuts->send_threshold(context_id, m_id, _plugin->getSettings().lod_error);
             cuts->send_rendered(context_id, m_id);
-            database->get_model(m_id)->set_transform(osg_scale * scm::math::mat4(_plugin->getModelInfo().model_transformations_[m_id]));
+            database->get_model(m_id)->set_transform(scm::math::mat4(_plugin->getModelInfo().model_transformations[m_id]));
         }
 
         lamure::view_t view_id = controller->deduce_view_id(context_id, _renderer->getScmCamera()->view_id());
         cuts->send_camera(context_id, view_id, *_renderer->getScmCamera());
         std::vector<scm::math::vec3d> corner_values = _renderer->getScmCamera()->get_frustum_corners();
         double top_minus_bottom = scm::math::length((corner_values[2]) - (corner_values[0]));
-        float height_divided_by_top_minus_bottom_ = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height / top_minus_bottom;
-        cuts->send_height_divided_by_top_minus_bottom(context_id, view_id, height_divided_by_top_minus_bottom_);
+        float height_divided_by_top_minus_bottom = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height / top_minus_bottom;
+        cuts->send_height_divided_by_top_minus_bottom(context_id, view_id, height_divided_by_top_minus_bottom);
 
-        if (_plugin->getSettings().use_pvs_) {
+        if (_plugin->getSettings().use_pvs) {
             scm::math::vec3d cam_pos = _renderer->getScmCamera()->get_cam_pos();
             pvs->set_viewer_position(cam_pos);
         }
 
-        if (_plugin->getSettings().lod_update_) {
+        if (_plugin->getSettings().lod_update) {
             if (lamure::ren::policy::get_instance()->size_of_provenance() > 0)
             { controller->dispatch(context_id, _renderer->getDevice(), _plugin->getDataProvenance()); }
             else { controller->dispatch(context_id, _renderer->getDevice()); }
         }
 
-        glBindVertexArray(_renderer->getBoxResource().vao_);
+        glBindVertexArray(_renderer->getBoxResource().vao);
         glUseProgram(_renderer->getLineShader().program);
-        glUniform4f(_renderer->getLineShader().in_color_location, _plugin->getSettings().bvh_color_[0], _plugin->getSettings().bvh_color_[1], _plugin->getSettings().bvh_color_[2], _plugin->getSettings().bvh_color_[3]);
+        glUniform4f(_renderer->getLineShader().in_color_location, _plugin->getSettings().bvh_color[0], _plugin->getSettings().bvh_color[1], _plugin->getSettings().bvh_color[2], _plugin->getSettings().bvh_color[3]);
 
         uint64_t rendered_bounding_boxes = 0;
         for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
@@ -438,49 +415,43 @@ struct BoundingBoxDrawCallback : public virtual osg::Drawable::DrawCallback
             std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
             const lamure::ren::bvh* bvh = database->get_model(model_id)->get_bvh();
             std::vector<scm::gl::boxf>const& bbv = bvh->get_bounding_boxes();
-            scm::math::mat4 model_matrix_ = scm::math::mat4(_plugin->getModelInfo().model_transformations_[model_id]);
-            scm::math::mat4 mvp_matrix_ = projection_matrix_ * view_matrix_ * model_matrix_;
-            scm::gl::frustum frustum_ = _renderer->getScmCamera()->get_frustum_by_model(model_matrix_);
-            glUniformMatrix4fv(_renderer->getLineShader().mvp_matrix_location, 1, GL_FALSE, mvp_matrix_.data_array);
+            scm::math::mat4 model_matrix = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
+            scm::math::mat4 mvp_matrix = projection_matrix * view_matrix * model_matrix;
+            scm::gl::frustum frustum = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
+            glUniformMatrix4fv(_renderer->getLineShader().mvp_matrix_location, 1, GL_FALSE, mvp_matrix.data_array);
+            const std::vector<uint32_t>& node_offsets = _renderer->m_bvh_node_vertex_offsets.at(model_id);
+
             for (auto const& node_slot_aggregate : renderable) {
-                uint32_t node_culling_result = _renderer->getScmCamera()->cull_against_frustum(frustum_, bbv[node_slot_aggregate.node_id_]);
+                uint32_t node_culling_result = _renderer->getScmCamera()->cull_against_frustum(frustum, bbv[node_slot_aggregate.node_id_]);
                 if (node_culling_result != 1) {
-                    std::map<uint32_t, LamureRenderer::Resource> bvh_res = _renderer->getBvhResource();
-                    const std::vector<float>& corners_ = bvh_res[model_id].corners_[node_slot_aggregate.node_id_];
-                    glBindBuffer(GL_ARRAY_BUFFER, _renderer->getBoxResource().vbo_);
-                    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * corners_.size(), corners_.data());
-                    glDrawElements(GL_LINES, 24, GL_UNSIGNED_SHORT, nullptr);
+                    glDrawElementsBaseVertex(GL_LINES, _renderer->getBoxResource().idx.size(), GL_UNSIGNED_SHORT, nullptr, node_offsets[node_slot_aggregate.node_id_]);
                     rendered_bounding_boxes++;
                 }
             }
         }
-        _plugin->getRenderInfo().rendered_bounding_boxes_ = rendered_bounding_boxes;
-        glPopAttrib();
+        _plugin->getRenderInfo().rendered_bounding_boxes = rendered_bounding_boxes;
         before.restore();
     };
-    osg::ref_ptr<osg::StateSet> _stateset;
     Lamure* _plugin;
     LamureRenderer* _renderer;
 };
 
 struct BoundingBoxGeometry : public osg::Geometry
 {
-    BoundingBoxGeometry(osg::ref_ptr<osg::StateSet> stateset, Lamure* plugin)
+    BoundingBoxGeometry(Lamure* plugin)
     {
         if (plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] BoundingBoxGeometry()" << std::endl; }
         setUseDisplayList(false);
         setUseVertexBufferObjects(true);
         setUseVertexArrayObject(false);
-        setDrawCallback(new BoundingBoxDrawCallback(stateset, plugin));
+        setDrawCallback(new BoundingBoxDrawCallback(plugin));
     }
 };
 
 struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 {
-    PointsDrawCallback(osg::ref_ptr<osg::StateSet> pointcloud_stateset, Lamure* plugin)
-        : _stateset(pointcloud_stateset),
-        _plugin(plugin),
-        _initialized(false)
+    PointsDrawCallback(Lamure* plugin)
+        : _plugin(plugin), _initialized(false)
     { 
         if (_plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] PointsDrawCallback()" << std::endl; } 
         _renderer = _plugin->getRenderer();
@@ -488,8 +459,8 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
     virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
     {
-        if (_plugin->rendering_) { return; }
-        _plugin->rendering_ = true;
+        if (_renderer->getRendering()) { return; }
+        _renderer->setRendering(true);
 
         GLState before = GLState::capture();
         glDisable(GL_CULL_FACE);
@@ -497,9 +468,8 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
         osg::State* state = renderInfo.getState();
         state->setCheckForGLErrors(osg::State::CheckForGLErrors::ONCE_PER_ATTRIBUTE);
 
-        scm::math::mat4 view_matrix_ = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
-        scm::math::mat4 projection_matrix_ = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
-        scm::math::mat4 osg_scale = LamureUtil::matConv4F(opencover::cover->getObjectsScale()->getMatrix());
+        scm::math::mat4 view_matrix = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getModelViewMatrix()));
+        scm::math::mat4 projection_matrix = LamureUtil::matConv4F(osg::Matrix(renderInfo.getState()->getProjectionMatrix()));
 
         lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
         lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
@@ -515,28 +485,28 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
         for (lamure::model_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
             lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
-            cuts->send_transform(context_id, m_id, scm::math::mat4(_plugin->getModelInfo().model_transformations_[m_id]));
-            cuts->send_threshold(context_id, m_id, _plugin->getSettings().lod_error_);
+            cuts->send_transform(context_id, m_id, scm::math::mat4(_plugin->getModelInfo().model_transformations[m_id]));
+            cuts->send_threshold(context_id, m_id, _plugin->getSettings().lod_error);
             cuts->send_rendered(context_id, m_id);
-            database->get_model(m_id)->set_transform(scm::math::mat4(_plugin->getModelInfo().model_transformations_[m_id]));
+            database->get_model(m_id)->set_transform(scm::math::mat4(_plugin->getModelInfo().model_transformations[m_id]));
         }
         cuts->send_camera(context_id, view_id, *(_renderer->getScmCamera()));
         std::vector<scm::math::vec3d> corner_values = _renderer->getScmCamera()->get_frustum_corners();
         double top_minus_bottom = scm::math::length((corner_values[2]) - (corner_values[0]));
-        float height_divided_by_top_minus_bottom_ = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height / top_minus_bottom;
-        cuts->send_height_divided_by_top_minus_bottom(context_id, view_id, height_divided_by_top_minus_bottom_);
+        float height_divided_by_top_minus_bottom = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height / top_minus_bottom;
+        cuts->send_height_divided_by_top_minus_bottom(context_id, view_id, height_divided_by_top_minus_bottom);
 
-        if (_plugin->getSettings().use_pvs_) {
+        if (_plugin->getSettings().use_pvs) {
             scm::math::vec3d cam_pos = _renderer->getScmCamera()->get_cam_pos();
             pvs->set_viewer_position(cam_pos);
         }
-        if (_plugin->getSettings().lod_update_) {
+        if (_plugin->getSettings().lod_update) {
             if (lamure::ren::policy::get_instance()->size_of_provenance() > 0)
             { controller->dispatch(context_id, _renderer->getDevice(), _plugin->getDataProvenance()); }
             else { controller->dispatch(context_id, _renderer->getDevice()); }
         }
 
-        if (_initialized) { glBindVertexArray(_renderer->getPclResource().vao_); }
+        if (_initialized) { glBindVertexArray(_renderer->getPclResource().vao); }
         _renderer->getContext()->apply_vertex_input();
         if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
             _renderer->getContext()->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, _renderer->getDevice(), _plugin->getDataProvenance()));
@@ -545,30 +515,30 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
         const scm::math::mat4d viewport_scale = scm::math::make_scale(opencover::coVRConfig::instance()->windows[0].context->getTraits()->width * 0.5, opencover::coVRConfig::instance()->windows[0].context->getTraits()->height * 0.5, 0.5);
         const scm::math::mat4d viewport_translate = scm::math::make_translation(1.0, 1.0, 1.0);
-        const scm::math::mat4 model_to_screen_matrix_ = scm::math::mat4(viewport_scale * viewport_translate);
-        scm::math::vec3 eye_ = scm::math::vec3f(_renderer->getScmCamera()->get_cam_pos());
-        scm::math::vec2 viewport_ = scm::math::vec2f(opencover::coVRConfig::instance()->windows[0].context->getTraits()->width, opencover::coVRConfig::instance()->windows[0].context->getTraits()->height);
+        const scm::math::mat4 model_to_screen_matrix = scm::math::mat4(viewport_scale * viewport_translate);
+        scm::math::vec3 eye = scm::math::vec3f(_renderer->getScmCamera()->get_cam_pos());
+        scm::math::vec2 viewport = scm::math::vec2f(opencover::coVRConfig::instance()->windows[0].context->getTraits()->width, opencover::coVRConfig::instance()->windows[0].context->getTraits()->height);
 
-        if (!_plugin->getSettings().surfel_shader_ && !_plugin->getSettings().provenance_) {
+        if (!_plugin->getSettings().surfel_shader && !_plugin->getSettings().provenance) {
             glUseProgram(_renderer->getPointShader().program);
             glEnable(GL_POINT_SMOOTH);
             glEnable(GL_PROGRAM_POINT_SIZE);
-            glUniform1f(_renderer->getPointShader().max_radius_loc, _plugin->getSettings().max_radius_);
-            glUniform1f(_renderer->getPointShader().scale_radius_loc, _plugin->getSettings().scale_radius_);
-            glUniform1f(_renderer->getPointShader().point_size_factor_loc,  _plugin->getSettings().point_size_factor_ * opencover::cover->getScale());
-            glUniform1f(_renderer->getPointShader().proj_scale_loc, viewport_.y * 0.5f * projection_matrix_.data_array[5]);
+            glUniform1f(_renderer->getPointShader().max_radius_loc, _plugin->getSettings().max_radius);
+            glUniform1f(_renderer->getPointShader().scale_radius_loc, _plugin->getSettings().scale_radius);
+            glUniform1f(_renderer->getPointShader().point_size_factor_loc,  _plugin->getSettings().point_size_factor * opencover::cover->getScale());
+            glUniform1f(_renderer->getPointShader().proj_scale_loc, viewport.y * 0.5f * projection_matrix.data_array[5]);
         }
-        else if (_plugin->getSettings().surfel_shader_ && !_plugin->getSettings().provenance_) {
+        else if (_plugin->getSettings().surfel_shader && !_plugin->getSettings().provenance) {
             glUseProgram(_renderer->getSurfelShader().program);
-            glUniform1f(_renderer->getSurfelShader().max_radius_loc, _plugin->getSettings().max_radius_);
-            glUniform1f(_renderer->getSurfelShader().scale_radius_loc,_plugin->getSettings().scale_radius_);
-            glUniform1f(_renderer->getSurfelShader().surfel_size_factor_loc,_plugin->getSettings().surfel_size_factor_);
-            glUniform1f(_renderer->getSurfelShader().proj_scale_loc, viewport_.y * 0.5f * projection_matrix_.data_array[5]);
-            glUniform2f(_renderer->getSurfelShader().viewport_loc, viewport_.x, viewport_.y);
+            glUniform1f(_renderer->getSurfelShader().max_radius_loc, _plugin->getSettings().max_radius);
+            glUniform1f(_renderer->getSurfelShader().scale_radius_loc,_plugin->getSettings().scale_radius);
+            glUniform1f(_renderer->getSurfelShader().surfel_size_factor_loc,_plugin->getSettings().surfel_size_factor);
+            glUniform1f(_renderer->getSurfelShader().proj_scale_loc, viewport.y * 0.5f * projection_matrix.data_array[5]);
+            glUniform2f(_renderer->getSurfelShader().viewport_loc, viewport.x, viewport.y);
         }
 
-        uint64_t rendered_splats_ = 0;
-        uint64_t rendered_nodes_ = 0;
+        uint64_t rendered_splats = 0;
+        uint64_t rendered_nodes = 0;
 
         for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
             if (!_plugin->getUI()->getModelVisibility()[model_id]) { continue; }
@@ -577,38 +547,38 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             const lamure::ren::bvh* bvh = database->get_model(model_id)->get_bvh();
             std::vector<scm::gl::boxf>const& bounding_box_vector = bvh->get_bounding_boxes();
 
-            scm::math::mat4 model_matrix_ = scm::math::mat4(_plugin->getModelInfo().model_transformations_[model_id]);
-            scm::math::mat4 model_view_matrix_ = view_matrix_ * model_matrix_;
-            scm::math::mat4 mvp_matrix_ = projection_matrix_ * model_view_matrix_;
-            scm::gl::frustum frustum_ = _renderer->getScmCamera()->get_frustum_by_model(model_matrix_);
+            scm::math::mat4 model_matrix = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
+            scm::math::mat4 model_view_matrix = view_matrix * model_matrix;
+            scm::math::mat4 mvp_matrix = projection_matrix * model_view_matrix;
+            scm::gl::frustum frustum = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
 
-            if (!_plugin->getSettings().surfel_shader_ && !_plugin->getSettings().provenance_) {
-                glUniformMatrix4fv(_renderer->getPointShader().mvp_matrix_loc, 1, GL_FALSE, mvp_matrix_.data_array);
+            if (!_plugin->getSettings().surfel_shader && !_plugin->getSettings().provenance) {
+                glUniformMatrix4fv(_renderer->getPointShader().mvp_matrix_loc, 1, GL_FALSE, mvp_matrix.data_array);
             }
-            else if (_plugin->getSettings().surfel_shader_ && !_plugin->getSettings().provenance_) {
-                glUniformMatrix4fv(_renderer->getSurfelShader().model_view_matrix_loc,     1, GL_FALSE, model_view_matrix_.data_array);
-                glUniformMatrix4fv(_renderer->getSurfelShader().mvp_matrix_loc, 1, GL_FALSE, mvp_matrix_.data_array);
+            else if (_plugin->getSettings().surfel_shader && !_plugin->getSettings().provenance) {
+                glUniformMatrix4fv(_renderer->getSurfelShader().model_view_matrix_loc,     1, GL_FALSE, model_view_matrix.data_array);
+                glUniformMatrix4fv(_renderer->getSurfelShader().mvp_matrix_loc, 1, GL_FALSE, mvp_matrix.data_array);
             }
 
             for (auto const& node_slot_aggregate : renderable) {
-                if (_renderer->getScmCamera()->cull_against_frustum(frustum_, bounding_box_vector[node_slot_aggregate.node_id_]) != 1) {
+                if (_renderer->getScmCamera()->cull_against_frustum(frustum, bounding_box_vector[node_slot_aggregate.node_id_]) != 1) {
                     glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
-                    rendered_splats_ += surfels_per_node;
-                    ++rendered_nodes_;
+                    rendered_splats += surfels_per_node;
+                    ++rendered_nodes;
                 }
             }
         }
 
-        _plugin->getRenderInfo().rendered_splats_ = rendered_splats_;
-        _plugin->getRenderInfo().rendered_nodes_ = rendered_nodes_;
-        _plugin->rendering_ = false;
+        _plugin->getRenderInfo().rendered_splats = rendered_splats;
+        _plugin->getRenderInfo().rendered_nodes = rendered_nodes;
+        _renderer->setRendering(false);
 
         if (!_initialized) {
             GLState after = GLState::capture();
             if (after.getVertexArrayBinding()
                 != before.getVertexArrayBinding())
             {
-                _renderer->getPclResource().vao_ = after.getVertexArrayBinding();
+                _renderer->getPclResource().vao = after.getVertexArrayBinding();
                 _initialized = true;
             }
         }
@@ -619,7 +589,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             GLState::compare(before, after, "[Notify] PointsDrawCallback::drawImplementation()");
         }
     }
-    osg::ref_ptr<osg::StateSet> _stateset;
     Lamure* _plugin;
     LamureRenderer* _renderer;
     mutable bool _initialized;
@@ -627,14 +596,13 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
 struct PointsGeometry : public osg::Geometry
 {
-    PointsGeometry(osg::ref_ptr<osg::StateSet> stateset, Lamure* plugin) :
-        _plugin(plugin)
+    PointsGeometry(Lamure* plugin) : _plugin(plugin)
     {
         if (_plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] PointsGeometry()" << std::endl; }
         setUseDisplayList(false);
         setUseVertexBufferObjects(true);
         setUseVertexArrayObject(false);
-        setDrawCallback(new PointsDrawCallback(stateset, _plugin));
+        setDrawCallback(new PointsDrawCallback(_plugin));
 
         osg::Vec3 minPt = LamureUtil::vecConv3F(_plugin->getModelInfo().models_min);
         osg::Vec3 maxPt = LamureUtil::vecConv3F(_plugin->getModelInfo().models_max);
@@ -655,7 +623,6 @@ void LamureRenderer::init()
 {
     std::cout << "LamureRenderer::init()" << std::endl;
     initCamera();
-    std::cout << "LamureRenderer::initCamera() end" << std::endl;
 
     m_init_geode         = new osg::Geode();
     m_pointcloud_geode   = new osg::Geode();
@@ -674,13 +641,13 @@ void LamureRenderer::init()
     m_text_stateset->setRenderBinDetails(10, "RenderBin");
     auto ui = m_plugin->getUI();
 
-    ui->getPointcloudButton()->setState(   m_plugin->getSettings().pointcloud_state );
-    ui->getBoundingboxButton()->setState(  m_plugin->getSettings().boundingbox_state );
-    ui->getFrustumButton()->setState(      m_plugin->getSettings().frustum_state );
-    ui->getCoordButton()->setState(        m_plugin->getSettings().coord_state );
-    ui->getTextButton()->setState(         m_plugin->getSettings().text_state );
-    ui->getSyncButton()->setState(         m_plugin->getSettings().sync_state );
-    ui->getNotifyButton()->setState(       m_plugin->getSettings().notify_state );
+    ui->getPointcloudButton()->setState(   m_plugin->getSettings().show_pointcloud );
+    ui->getBoundingboxButton()->setState(  m_plugin->getSettings().show_boundingbox );
+    ui->getFrustumButton()->setState(      m_plugin->getSettings().show_frustum );
+    ui->getCoordButton()->setState(        m_plugin->getSettings().show_coord );
+    ui->getTextButton()->setState(         m_plugin->getSettings().show_text );
+    ui->getSyncButton()->setState(         m_plugin->getSettings().show_sync );
+    ui->getNotifyButton()->setState(       m_plugin->getSettings().show_notify );
 
     m_pointcloud_geode->setNodeMask(0);
     m_boundingbox_geode->setNodeMask(0);
@@ -688,8 +655,15 @@ void LamureRenderer::init()
     m_coord_geode->setNodeMask(0);
     m_text_geode->setNodeMask(0);
 
-    ui->getPointcloudButton()->setCallback([this](bool state) { m_pointcloud_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0); });
-    ui->getBoundingboxButton()->setCallback([this](bool state) { m_boundingbox_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0); });
+    ui->getPointcloudButton()->setCallback([this](bool state) { 
+        m_pointcloud_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0); 
+        if (!state) m_plugin->getRenderInfo().rendered_splats = 0;
+        if (!state) m_plugin->getRenderInfo().rendered_nodes = 0;
+        });
+    ui->getBoundingboxButton()->setCallback([this](bool state) { 
+        m_boundingbox_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0); 
+        if (!state) m_plugin->getRenderInfo().rendered_bounding_boxes = 0;
+        });
     ui->getFrustumButton()->setCallback([this](bool state) { m_frustum_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0); });
     ui->getCoordButton()->setCallback([this](bool state) { m_coord_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0); });
     ui->getTextButton()->setCallback([this](bool state) { m_text_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0); });
@@ -712,11 +686,11 @@ void LamureRenderer::init()
     m_group->addChild(m_init_geode);
     m_hud_camera->addChild(m_text_geode.get());
 
-    m_init_geometry = new InitGeometry(m_init_stateset, m_plugin);
-    m_pointcloud_geometry = new PointsGeometry(m_pointcloud_stateset, m_plugin);
-    m_boundingbox_geometry = new BoundingBoxGeometry(m_boundingbox_stateset, m_plugin);
-    m_frustum_geometry = new FrustumGeometry(m_frustum_stateset, m_plugin);
-    m_coord_geometry = new CoordGeometry(m_coord_stateset, m_plugin);
+    m_init_geometry = new InitGeometry(m_plugin);
+    m_pointcloud_geometry = new PointsGeometry(m_plugin);
+    m_boundingbox_geometry = new BoundingBoxGeometry(m_plugin);
+    m_frustum_geometry = new FrustumGeometry(m_plugin);
+    m_coord_geometry = new CoordGeometry(m_plugin);
 
     m_init_geode->addDrawable(m_init_geometry);
     m_pointcloud_geode->addDrawable(m_pointcloud_geometry);
@@ -726,10 +700,10 @@ void LamureRenderer::init()
 
     if (covise::coCoviseConfig::isOn("COVER.showRotationPoint", false)) {
         opencover::coVRNavigationManager::instance()->setRotationPointVisible(true);
-        m_plugin->getTrackball().initial_pos_ = opencover::coVRNavigationManager::instance()->getRotationPoint();
-        m_plugin->getTrackball().pos_ = opencover::coVRNavigationManager::instance()->getRotationPoint();
-        m_plugin->getTrackball().size_ = covise::coCoviseConfig::getFloat("COVER.rotationPointSize", 1.0f);
-        m_plugin->getTrackball().dist_ = (m_plugin->getTrackball().initial_pos_ - m_osg_camera->getViewMatrix().getTrans()).length();
+        m_plugin->getTrackball().initial_pos = opencover::coVRNavigationManager::instance()->getRotationPoint();
+        m_plugin->getTrackball().pos = opencover::coVRNavigationManager::instance()->getRotationPoint();
+        m_plugin->getTrackball().size = covise::coCoviseConfig::getFloat("COVER.rotationPointSize", 1.0f);
+        m_plugin->getTrackball().dist = (m_plugin->getTrackball().initial_pos - m_osg_camera->getViewMatrix().getTrans()).length();
     }
 
 }
@@ -797,9 +771,9 @@ void LamureRenderer::initCamera()
 
         auto root_bb = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh()->get_bounding_boxes()[0];
 
-        m_plugin->getModelInfo().root_bb_min.push_back(scm::math::mat4f(m_plugin->getModelInfo().model_transformations_[model_id]) * scm::math::vec4f(root_bb.min_vertex()[0], root_bb.min_vertex()[1], root_bb.min_vertex()[2], 1));
-        m_plugin->getModelInfo().root_bb_max.push_back(scm::math::mat4f(m_plugin->getModelInfo().model_transformations_[model_id]) * scm::math::vec4f(root_bb.max_vertex()[0], root_bb.max_vertex()[1], root_bb.max_vertex()[2], 1));
-        m_plugin->getModelInfo().root_center.push_back(scm::math::mat4f(m_plugin->getModelInfo().model_transformations_[model_id]) * scm::math::vec4f(root_bb.center()[0], root_bb.center()[1], root_bb.center()[2], 1));
+        m_plugin->getModelInfo().root_bb_min.push_back(scm::math::mat4f(m_plugin->getModelInfo().model_transformations[model_id]) * scm::math::vec4f(root_bb.min_vertex()[0], root_bb.min_vertex()[1], root_bb.min_vertex()[2], 1));
+        m_plugin->getModelInfo().root_bb_max.push_back(scm::math::mat4f(m_plugin->getModelInfo().model_transformations[model_id]) * scm::math::vec4f(root_bb.max_vertex()[0], root_bb.max_vertex()[1], root_bb.max_vertex()[2], 1));
+        m_plugin->getModelInfo().root_center.push_back(scm::math::mat4f(m_plugin->getModelInfo().model_transformations[model_id]) * scm::math::vec4f(root_bb.center()[0], root_bb.center()[1], root_bb.center()[2], 1));
 
         temp_center += m_plugin->getModelInfo().root_center.back();
         if (m_plugin->getModelInfo().root_bb_min[model_id][0] < root_min_temp[0])
@@ -835,20 +809,21 @@ void LamureRenderer::initCamera()
 void LamureRenderer::initFramebuffer()
 {
     if (m_plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] initFramebuffer() " << std::endl; }
-    fbo_.reset();
-    fbo_color_buffer_.reset();
-    fbo_depth_buffer_.reset();
+    fbo.reset();
+    fbo_color_buffer.reset();
+    fbo_depth_buffer.reset();
     auto traits = opencover::coVRConfig::instance()->windows[0].context->getTraits();
 
-    fbo_ = m_device->create_frame_buffer();
-    fbo_color_buffer_ = m_device->create_texture_2d(scm::math::vec2ui(traits->width, traits->height), scm::gl::FORMAT_RGBA_32F, 1, 1, 1);
-    fbo_depth_buffer_ = m_device->create_texture_2d(scm::math::vec2ui(traits->width, traits->height), scm::gl::FORMAT_D24, 1, 1, 1);
-    fbo_->attach_color_buffer(0, fbo_color_buffer_);
-    fbo_->attach_depth_stencil_buffer(fbo_depth_buffer_);
+    fbo = m_device->create_frame_buffer();
+    fbo_color_buffer = m_device->create_texture_2d(scm::math::vec2ui(traits->width, traits->height), scm::gl::FORMAT_RGBA_32F, 1, 1, 1);
+    fbo_depth_buffer = m_device->create_texture_2d(scm::math::vec2ui(traits->width, traits->height), scm::gl::FORMAT_D24, 1, 1, 1);
+    fbo->attach_color_buffer(0, fbo_color_buffer);
+    fbo->attach_depth_stencil_buffer(fbo_depth_buffer);
 }
 
 
-void LamureRenderer::initUniforms() {
+void LamureRenderer::initUniforms() 
+{
     cout << "[Notify] initUniforms()" << endl;
 
     glUseProgram(m_point_shader.program);
@@ -1032,7 +1007,6 @@ GLuint LamureRenderer::compileAndLinkShaders(std::string vs_source, std::string 
     return program;
 }
 
-
 void LamureRenderer::initFrustumResources() {
     if (m_plugin->getUI()->getNotifyButton()->state()) {
         std::cout << "[Notify] create_frustum_resources() " << std::endl;
@@ -1040,26 +1014,26 @@ void LamureRenderer::initFrustumResources() {
     std::vector<scm::math::vec3d> corner_values = m_renderer->getScmCamera()->get_frustum_corners();
     for (size_t i = 0; i < corner_values.size(); ++i) {
         auto vv = scm::math::vec3f(corner_values[i]);
-        m_frustum_resource.vertices_[i * 3 + 0] = vv.x;
-        m_frustum_resource.vertices_[i * 3 + 1] = vv.y;
-        m_frustum_resource.vertices_[i * 3 + 2] = vv.z;
+        m_frustum_resource.vertices[i * 3 + 0] = vv.x;
+        m_frustum_resource.vertices[i * 3 + 1] = vv.y;
+        m_frustum_resource.vertices[i * 3 + 2] = vv.z;
     }
-    GLuint vao_;
-    glGenVertexArrays(1, &vao_);
-    glBindVertexArray(vao_);
-    GLuint ibo_;
-    glGenBuffers(1, &ibo_);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_frustum_resource.idx_.size() * sizeof(unsigned short), m_frustum_resource.idx_.data(), GL_STATIC_DRAW);
-    GLuint vbo_;
-    glGenBuffers(1, &vbo_);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * m_frustum_resource.vertices_.size(), m_frustum_resource.vertices_.data(), GL_STATIC_DRAW);
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    GLuint ibo;
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_frustum_resource.idx.size() * sizeof(unsigned short), m_frustum_resource.idx.data(), GL_STATIC_DRAW);
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * m_frustum_resource.vertices.size(), m_frustum_resource.vertices.data(), GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    m_frustum_resource.vao_ = vao_;
-    m_frustum_resource.vbo_ = vbo_;
-    m_frustum_resource.ibo_ = ibo_;
+    m_frustum_resource.vao = vao;
+    m_frustum_resource.vbo = vbo;
+    m_frustum_resource.ibo = ibo;
     glBindVertexArray(0);
 }
 
@@ -1067,53 +1041,68 @@ void LamureRenderer::initCoordResources() {
     if (m_plugin->getUI()->getNotifyButton()->state()) { 
         std::cout << "[Notify] init_coord_resources() " << std::endl;
     }
-    GLuint vao_;
-    glGenVertexArrays(1, &vao_);
-    glBindVertexArray(vao_);
-    GLuint ibo_;
-    glGenBuffers(1, &ibo_);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_coord_resource.idx_.size() * sizeof(unsigned short), m_coord_resource.idx_.data(), GL_STATIC_DRAW);
-    GLuint vbo_;
-    glGenBuffers(1, &vbo_);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * m_coord_resource.vertices_.size(), m_coord_resource.vertices_.data(), GL_STATIC_DRAW);
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    GLuint ibo;
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_coord_resource.idx.size() * sizeof(unsigned short), m_coord_resource.idx.data(), GL_STATIC_DRAW);
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * m_coord_resource.vertices.size(), m_coord_resource.vertices.data(), GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    m_coord_resource.vao_ = vao_;
-    m_coord_resource.vbo_ = vbo_;
-    m_coord_resource.ibo_ = ibo_;
+    m_coord_resource.vao = vao;
+    m_coord_resource.vbo = vbo;
+    m_coord_resource.ibo = ibo;
     glBindVertexArray(0);
 }
 
 void LamureRenderer::initBoxResources() {
     if (m_plugin->getUI()->getNotifyButton()->state()) { std::cout << "[Notify] init_box_resources() " << std::endl; }
 
+    std::vector<float> all_box_vertices;
+    m_bvh_node_vertex_offsets.clear(); // Vorherige Offsets löschen
+
     for (uint32_t model_id = 0; model_id < m_plugin->getSettings().num_models; ++model_id) {
-        std::vector<vector<float>> corners_;
-        const auto& bvh_ = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh();
-        const auto& bounding_boxes = bvh_->get_bounding_boxes();
+        const auto& bvh = lamure::ren::model_database::get_instance()->get_model(model_id)->get_bvh();
+        const auto& bounding_boxes = bvh->get_bounding_boxes();
+
+        std::vector<uint32_t> current_model_offsets;
         for (uint64_t node_id = 0; node_id < bounding_boxes.size(); ++node_id) {
-            corners_.push_back(LamureUtil::getBoxCorners(bounding_boxes[node_id]));
+            // Speichere den Start-Offset für diese Bounding Box (in Vertices, nicht Bytes)
+            current_model_offsets.push_back(all_box_vertices.size() / 3); // Jede Vertex hat 3 Floats (x,y,z)
+
+            // Hole die Eckpunkte und füge sie zum globalen Vertex-Buffer hinzu
+            std::vector<float> corners = LamureUtil::getBoxCorners(bounding_boxes[node_id]);
+            all_box_vertices.insert(all_box_vertices.end(), corners.begin(), corners.end());
         }
-        m_bvh_resource[model_id].corners_ = corners_;
+        m_bvh_node_vertex_offsets[model_id] = current_model_offsets;
     }
-    vector<float> vertices_ = LamureUtil::getBoxCorners(lamure::ren::model_database::get_instance()->get_model(0)->get_bvh()->get_bounding_boxes()[0]);
-    GLuint vao_;
-    glGenVertexArrays(1, &vao_);
-    glBindVertexArray(vao_);
-    GLuint ibo_;
-    glGenBuffers(1, &ibo_);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_box_resource.idx_.size() * sizeof(unsigned short), m_box_resource.idx_.data(), GL_STATIC_DRAW);
-    GLuint vbo_;
-    glGenBuffers(1, &vbo_);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertices_.size(), vertices_.data(), GL_STREAM_DRAW);
+
+    // Generiere und binde VAO, VBO, IBO
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    GLuint ibo;
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_box_resource.idx.size() * sizeof(unsigned short), m_box_resource.idx.data(), GL_STATIC_DRAW);
+
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, all_box_vertices.size() * sizeof(float), all_box_vertices.data(), GL_STATIC_DRAW);
+
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    m_box_resource.vao_ = vao_;
-    m_box_resource.vbo_ = vbo_;
-    m_box_resource.ibo_ = ibo_;
-    glBindVertexArray(0);
+
+    m_box_resource.vao = vao;
+    m_box_resource.vbo = vbo;
+    m_box_resource.ibo = ibo;
+
+    glBindVertexArray(0); // VAO unbinden
 }

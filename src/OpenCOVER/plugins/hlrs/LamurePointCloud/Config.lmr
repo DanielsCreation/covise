@@ -10,13 +10,14 @@ max_radius : 0.1
 scale_radius : 1.0
 lod_error : 7.5
 provenance : 0
-pointcloud_state : 1
-boundingbox_state : 0
-frustum_state : 0
-coord_state : 0
-text_state : 0
-sync_state : 1
-notify_state : 0
+
+show_pointcloud : 1
+show_boundingbox : 0
+show_frustum : 0
+show_coord : 0
+show_text : 0
+show_sync : 1
+show_notify : 0
 
 
 # \Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_012\naturkundemuseum_School012.bvh
