@@ -239,8 +239,14 @@ void camera::set_projection_matrix(scm::math::mat4d& in_proj) {
 }
 
 
-void camera::set_view_matrix(scm::math::mat4d const &in_view) {
-    switch(cam_state_)
+void camera::set_projection_matrix(const scm::math::mat4d& in_proj) {
+
+    projection_matrix_ = in_proj;
+    frustum_.update(scm::math::mat4f(projection_matrix_ * view_matrix_));
+}
+
+void camera::set_view_matrix(scm::math::mat4d& in_view) {
+    switch (cam_state_)
     {
     case CAM_STATE_LAMURE:
         trackball_.set_transform(in_view);
@@ -255,9 +261,8 @@ void camera::set_view_matrix(scm::math::mat4d const &in_view) {
     }
 }
 
-
-void camera::set_view_matrix(scm::math::mat4d& in_view) {
-    switch (cam_state_)
+void camera::set_view_matrix(const scm::math::mat4d &in_view) {
+    switch(cam_state_)
     {
     case CAM_STATE_LAMURE:
         trackball_.set_transform(in_view);

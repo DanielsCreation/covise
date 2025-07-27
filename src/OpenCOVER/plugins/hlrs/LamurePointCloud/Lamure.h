@@ -23,6 +23,7 @@
 #include "LamureUI.h"
 #include "util.h"
 #include "measurement.h"
+
 #include <lamure/ren/data_provenance.h>
 #include <lamure/prov/prov_aux.h>
 
@@ -39,7 +40,6 @@ namespace opencover
 class LamurePointCloudInteractor;
 class Measurement;
 
-
 class Lamure : public opencover::coVRPlugin, public opencover::ui::Owner
 {
 public:
@@ -53,7 +53,6 @@ public:
         bool provenance{1};
         bool create_aux_resources{1};
         bool gamma_correction{0};
-        bool surfel_shader{1};
         bool face_eye{0};
         int32_t gui{1};
         int32_t travel{2};
@@ -61,10 +60,9 @@ public:
         int32_t max_brush_size{4096};
         bool lod_update{1};
         float lod_error{1.0f};
+        LamureRenderer::ShaderType shader_type {LamureRenderer::ShaderType::Point};
         bool use_pvs{0};
         bool pvs_culling{0};
-        float point_size_factor{1.0f};
-        float surfel_size_factor{1.0f};
         float aux_point_size{1.0f};
         float aux_point_distance{0.5f};
         float aux_point_scale{1.0f};
@@ -103,6 +101,7 @@ public:
         std::map<uint32_t, std::shared_ptr<lamure::prov::octree>> octrees;
         std::map<uint32_t, std::vector<lamure::prov::aux::view>> views;
         std::map<uint32_t, std::string> aux;
+        float min_radius{0.0f};
         float max_radius{std::min(std::numeric_limits<float>::max(), 0.1f)};
         float scale_radius{1.5f};
         std::vector<float> bvh_color{1.0f, 1.0f, 0.0f, 1.0f};

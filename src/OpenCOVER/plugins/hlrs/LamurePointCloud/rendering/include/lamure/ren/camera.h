@@ -75,9 +75,9 @@ class camera
 
     void set_trackball_matrix(scm::math::mat4d const& tb_matrix) { trackball_.set_transform(tb_matrix); }
 
-    void set_view_matrix(scm::math::mat4d const& in_view);
+    void set_view_matrix(const scm::math::mat4d &in_view);
     void set_view_matrix(scm::math::mat4d& in_view);
-    void set_projection_matrix(scm::math::mat4d const& in_proj);
+    void set_projection_matrix(const scm::math::mat4d &in_proj);
     void set_projection_matrix(scm::math::mat4d& in_proj);
 
     void set_projection_matrix(float opening_angle, float aspect_ratio, float near_, float far_);

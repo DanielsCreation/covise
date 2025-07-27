@@ -1,15 +1,12 @@
 #D:\Forschungsarbeit\Data
 C:\Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_bin
 
-initial_selection : 0,1
+initial_selection : 0, 1
 show_pvs : 0
-surfel_shader : 0
-point_size_factor : 1.0
-surfel_size_factor : 1.0
+min_radius : 0.0
 max_radius : 0.1
 scale_radius : 1.0
 lod_error : 7.5
-provenance : 0
 
 show_pointcloud : 1
 show_boundingbox : 0

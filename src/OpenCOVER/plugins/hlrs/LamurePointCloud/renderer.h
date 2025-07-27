@@ -6,6 +6,7 @@
 #include <GL/glew.h>
 #endif
 
+
 #include <scm/core/math.h>
 #include <osg/Geometry>
 #include <osg/StateSet>
@@ -15,17 +16,12 @@
 #include <osgViewer/Viewer>
 #include <osgViewer/Renderer>
 #include <osgText/Text>
-#include <lamure/ren/camera.h>
-
 #include <scm/core/pointer_types.h>
+#include <lamure/ren/bvh.h>
+#include <lamure/ren/camera.h>
 
 class Lamure;
 class LamureRenderer {
-
-public:
-
-    std::map<uint32_t, std::vector<uint32_t>> m_bvh_node_vertex_offsets;
-
 
 
 private:
@@ -46,10 +42,6 @@ private:
     unsigned int createShader(const std::string& vertexShader, const std::string& fragmentShader, uint8_t ctxId);
     unsigned int compileShader(unsigned int type, const std::string& source, uint8_t ctxId);
 
-    void setPointUniforms();
-    void setSurfelUniforms();
-    void setLamureUniforms(scm::gl::program_ptr shader);
-
     // Resource structs
     struct pcl_resource;
     struct box_resource;
@@ -59,67 +51,108 @@ private:
     struct frustum_resource;
     struct text_resource;
 
-
     struct PointShader {
-        GLuint program;
-        GLint mvp_matrix_loc;
-        GLint max_radius_loc;
-        GLint scale_radius_loc;
-        GLint point_size_factor_loc;
-        GLint proj_scale_loc;
+        GLuint program{0};
+        GLint  mvp_matrix_loc{-1};
+        GLint  max_radius_loc{-1};
+        GLint  min_radius_loc{-1};
+        GLint  scale_radius_loc{-1};
+        GLint  scale_projection_loc{-1};
     };
     PointShader m_point_shader;
 
-    struct SurfelShader {
-        GLuint program;
-        GLint max_radius_loc;
-        GLint scale_radius_loc;
-        GLint surfel_size_factor_loc;
-        GLint mvp_matrix_loc;
-        GLint model_view_matrix_loc;  // Neue Uniform Location
-        GLint proj_scale_loc;
-        GLint viewport_loc; 
+    struct PointColorShader {
+        GLuint program{0};
+        GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
+        GLint max_radius_loc            {-1}; // float max_radius
+        GLint min_radius_loc            {-1}; // float min_radius
+        GLint scale_radius_loc          {-1}; // float scale_radius
+        GLint scale_projection_loc      {-1}; // float scale_projection
+        GLint show_normals_loc          {-1}; // bool  show_normals
+        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
+        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
+        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
+        GLint accuracy_loc              {-1}; // float accuracy
+        GLint average_radius_loc        {-1}; // float average_radius
     };
-    SurfelShader m_surfel_shader;
+    PointColorShader m_point_color_shader;
 
     struct PointProvShader {
-        GLuint program;
-        // Core-Matrizen
-        GLint mvp_matrix_loc;
-        GLint view_matrix_loc;
-        GLint projection_matrix_loc;
-        GLint model_matrix_loc;
-        GLint model_view_matrix_loc;
-        GLint inverse_mv_matrix_loc;
-        GLint model_to_screen_matrix_loc;
-        GLint viewport_loc;
-        GLint height_divided_by_top_minus_bottom_loc;
-        // Point-Cloud-Parameter
-        GLint scale_radius_loc;
-        GLint max_radius_loc;
-        GLint window_size_loc;
-        GLint near_plane_loc;
-        GLint far_plane_loc;
-        GLint point_size_factor_loc;
-        // Anzeige-Flags
-        GLint show_normals_loc;
-        GLint show_accuracy_loc;
-        GLint show_output_sensitivity_loc;
+        GLuint program{0};
+        GLint  mvp_matrix_loc           {-1};
+        GLint  max_radius_loc           {-1};
+        GLint  min_radius_loc           {-1};
+        GLint  scale_radius_loc         {-1};
+        GLint  scale_projection_loc     {-1};
+        GLint show_normals_loc          {-1}; // bool  show_normals
+        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
+        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
+        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
+        GLint accuracy_loc              {-1}; // float accuracy
+        GLint average_radius_loc        {-1}; // float average_radius
         GLint channel_loc;
-        GLint heatmap_enabled_loc;
-        // Heatmap-Bereiche
+        GLint heatmap_loc;
         GLint heatmap_min_loc;
         GLint heatmap_max_loc;
         GLint heatmap_min_color_loc;
         GLint heatmap_max_color_loc;
         // Beleuchtung
-        GLint use_material_color_loc;
-        GLint material_diffuse_loc;
-        GLint material_specular_loc;
-        GLint ambient_light_color_loc;
-        GLint point_light_color_loc;
+        //GLint use_material_color_loc;
+        //GLint material_diffuse_loc;
+        //GLint material_specular_loc;
+        //GLint ambient_light_color_loc;
+        //GLint point_light_color_loc;
     };
     PointProvShader m_point_prov_shader;
+
+
+    struct SurfelShader {
+        GLuint program{0};
+        GLint  mvp_matrix_loc{-1};
+        GLint  max_radius_loc{-1};
+        GLint  min_radius_loc{-1};
+        GLint  scale_radius_loc{-1};
+    };
+    SurfelShader m_surfel_shader;
+
+    struct SurfelColorShader {
+        GLuint program{0};
+        GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
+        GLint max_radius_loc            {-1}; // float max_radius
+        GLint min_radius_loc            {-1}; // float min_radius
+        GLint scale_radius_loc          {-1}; // float scale_radius
+        GLint viewport_loc              {-1};
+        GLint show_normals_loc          {-1}; // bool  show_normals
+        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
+        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
+        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
+        GLint accuracy_loc              {-1}; // float accuracy
+        GLint average_radius_loc        {-1}; // float average_radius
+    };
+    SurfelColorShader m_surfel_color_shader;
+
+    struct SurfelProvShader {
+        GLuint program{0};
+        GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
+        GLint max_radius_loc            {-1}; // float max_radius
+        GLint min_radius_loc            {-1}; // float min_radius
+        GLint scale_radius_loc          {-1}; // float scale_radius
+        GLint viewport_loc              {-1};
+        GLint show_normals_loc          {-1}; // bool  show_normals
+        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
+        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
+        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
+        GLint accuracy_loc              {-1}; // float accuracy
+        GLint average_radius_loc        {-1}; // float average_radius
+        GLint channel_loc               {-1}; // int   channel
+        GLint heatmap_loc               {-1}; // bool  heatmap
+        GLint heatmap_min_loc           {-1}; // float heatmap_min
+        GLint heatmap_max_loc           {-1}; // float heatmap_max
+        GLint heatmap_min_color_loc     {-1}; // vec3  heatmap_min_color
+        GLint heatmap_max_color_loc     {-1}; // vec3  heatmap_max_color
+    };
+    SurfelProvShader m_surfel_prov_shader;
+
 
     struct LineShader {
         GLuint program;
@@ -128,11 +161,11 @@ private:
     };
     LineShader m_line_shader;
 
+
     struct PclResource {
         GLuint program;
         GLuint vao;
     };
-
 
     struct BoxResource {
         GLuint vbo = 0;
@@ -156,23 +189,6 @@ private:
         };
     };
 
-    struct CoordRecourse {
-        GLuint vao = 0;
-        GLuint vbo = 0;
-        GLuint ibo = 0;
-        GLuint program = 0;
-        std::array<float, 12> vertices = {
-            0.f,   0.f,   0.f,
-            50.f,   0.f,   0.f,  // X-Achse
-            0.f,  50.f,   0.f,  // Y-Achse
-            0.f,   0.f,   50.f  // Z-Achse
-        };
-        std::array<unsigned short, 6> idx = {
-            0, 1,
-            0, 2,
-            0, 3,
-        };
-    };
 
     struct FrustumResource {
         GLuint vao = 0;
@@ -200,11 +216,8 @@ private:
     PclResource m_pcl_resource;
     BoxResource m_box_resource;
     PlaneResource m_plane_resource;
-    CoordRecourse m_coord_resource;
     FrustumResource m_frustum_resource;
     TextResource m_text_resource;
-
-    
 
     // Matrizen
     scm::math::mat4d m_modelview_matrix;
@@ -224,7 +237,6 @@ private:
     osg::ref_ptr<osg::Geode> m_pointcloud_geode;
     osg::ref_ptr<osg::Geode> m_boundingbox_geode;
     osg::ref_ptr<osg::Geode> m_frustum_geode;
-    osg::ref_ptr<osg::Geode> m_coord_geode;
     osg::ref_ptr<osg::Geode> m_text_geode;
 
     // Stateset
@@ -232,7 +244,6 @@ private:
     osg::ref_ptr<osg::StateSet> m_pointcloud_stateset;
     osg::ref_ptr<osg::StateSet> m_boundingbox_stateset;
     osg::ref_ptr<osg::StateSet> m_frustum_stateset;
-    osg::ref_ptr<osg::StateSet> m_coord_stateset;
     osg::ref_ptr<osg::StateSet> m_text_stateset;
 
     // Geometry
@@ -240,7 +251,6 @@ private:
     osg::ref_ptr<osg::Geometry> m_pointcloud_geometry;
     osg::ref_ptr<osg::Geometry> m_boundingbox_geometry;
     osg::ref_ptr<osg::Geometry> m_frustum_geometry;
-    osg::ref_ptr<osg::Geometry> m_coord_geometry;
 
     // Framebuffers
     scm::gl::frame_buffer_ptr fbo;
@@ -271,16 +281,19 @@ private:
     // Shader sources
     std::string vis_point_vs_source;
     std::string vis_point_fs_source;
+    std::string vis_point_color_vs_source;
+    std::string vis_point_color_fs_source;
     std::string vis_point_prov_vs_source;
     std::string vis_point_prov_fs_source;
     std::string vis_surfel_vs_source;
     std::string vis_surfel_gs_source;
     std::string vis_surfel_fs_source;
+    std::string vis_surfel_color_vs_source;
+    std::string vis_surfel_color_gs_source;
+    std::string vis_surfel_color_fs_source;
     std::string vis_surfel_prov_vs_source;
+    std::string vis_surfel_prov_gs_source;
     std::string vis_surfel_prov_fs_source;
-
-    std::string vis_line_bb_vs_source;
-    std::string vis_line_bb_fs_source;
     std::string vis_quad_vs_source;
     std::string vis_quad_fs_source;
     std::string vis_line_vs_source;
@@ -310,7 +323,6 @@ private:
     std::string vis_box_vs_source;
     std::string vis_box_gs_source;
     std::string vis_box_fs_source;
-
     std::string vis_xyz_vs_lighting_source;
     std::string vis_xyz_gs_lighting_source;
     std::string vis_xyz_fs_lighting_source;
@@ -328,8 +340,9 @@ public:
 
     osg::ref_ptr<osg::Group> getGroup() { return m_group; }
 
+    std::map<uint32_t, std::vector<uint32_t>> m_bvh_node_vertex_offsets;
+
     void initBoxResources();
-    void initCoordResources();
     void initFrustumResources();
     void initLamureShader();
     void initSchismObjects();
@@ -344,28 +357,61 @@ public:
     osg::ref_ptr<osg::Camera> getOsgCamera() { return m_osg_camera; }
 
     scm::math::mat4d getModelviewMatrix() { return m_modelview_matrix; }
-    scm::math::mat4d getProjextionMatrix() { return m_projection_matrix; }
+    scm::math::mat4d getProjectionMatrix() { return m_projection_matrix; }
+
     void setModelviewMatrix(scm::math::mat4d model_view_matrix) { m_modelview_matrix = model_view_matrix; }
     void setProjectionMatrix(scm::math::mat4d projection_matrix) { m_projection_matrix = projection_matrix; }
 
     osg::ref_ptr<osg::Geode> getPointcloudGeode() { return m_pointcloud_geode; }
     osg::ref_ptr<osg::Geode> getBoundingboxGeode() { return m_boundingbox_geode; }
     osg::ref_ptr<osg::Geode> getFrustumGeode() { return m_frustum_geode; }
-    osg::ref_ptr<osg::Geode> getCoordGeode() { return m_coord_geode; }
     osg::ref_ptr<osg::Geode> getTextGeode() { return m_text_geode; }
 
     scm::gl::render_device_ptr getDevice() { return m_device; }
     scm::gl::render_context_ptr getContext() { return m_context; }
 
-    const PointShader&      getPointShader()      const { return m_point_shader; }
-    const SurfelShader&     getSurfelShader()     const { return m_surfel_shader; }
-    const PointProvShader&  getPointProvShader()  const { return m_point_prov_shader; }
-    const LineShader&       getLineShader()       const { return m_line_shader; }
+    enum class ShaderType {
+        Point,
+        PointColor,
+        PointProv,
+        Surfel,
+        SurfelColor,
+        SurfelProv
+    };
+
+    struct LamureRenderer::ShaderInfo {
+        ShaderType type;
+        std::string name;
+    };
+
+    const std::vector<ShaderInfo> pcl_shader = {
+        {ShaderType::Point,       "Point"},
+        {ShaderType::PointColor,  "Point Color"},
+        {ShaderType::PointProv,   "Point Prov"},
+        {ShaderType::Surfel,      "Surfel"},
+        {ShaderType::SurfelColor, "Surfel Color"},
+        {ShaderType::SurfelProv,  "Surfel Prov"}
+    };
+
+    ShaderType m_active_shader_type = ShaderType::SurfelColor;
+
+    const std::vector<ShaderInfo>& getPclShader() const { return pcl_shader; }
+
+    void setFrameUniforms(const scm::math::mat4& projection_matrix, const scm::math::vec2& viewport);
+    void setModelUniforms(const scm::math::mat4& mvp_matrix);
+    void setNodeUniforms(const lamure::ren::bvh* bvh, uint32_t node_id);
+
+    const PointShader&          getPointShader()        const { return m_point_shader; }
+    const PointColorShader&     getPointColorShader()    const { return m_point_color_shader; }
+    const PointProvShader&      getPointProvShader()    const { return m_point_prov_shader; }
+    const SurfelShader&         getSurfelShader()       const { return m_surfel_shader; }
+    const SurfelColorShader&    getSurfelColorShader()   const { return m_surfel_color_shader; }
+    const SurfelProvShader&     getSurfelProvShader()   const { return m_surfel_prov_shader; }
+    const LineShader&           getLineShader()         const { return m_line_shader; }
 
     PclResource&      getPclResource()      { return m_pcl_resource; }
     BoxResource&      getBoxResource()      { return m_box_resource; }
     PlaneResource&    getPlaneResource()    { return m_plane_resource; }
-    CoordRecourse&    getCoordResource()    { return m_coord_resource; }
     FrustumResource&  getFrustumResource()  { return m_frustum_resource; }
     TextResource&     getTextResource()     { return m_text_resource; }
 

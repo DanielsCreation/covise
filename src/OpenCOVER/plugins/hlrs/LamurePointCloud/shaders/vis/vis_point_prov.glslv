@@ -1,57 +1,61 @@
+// vis_point_prov.glslv (Vertex Shader)
 #version 420 core
 
+// --- Inputs ---
 layout(location = 0) in vec3  in_position;
 layout(location = 1) in float in_r;
 layout(location = 2) in float in_g;
 layout(location = 3) in float in_b;
-layout(location = 4) in float empty;      // (Placeholder, wird hier nicht verwendet)
-layout(location = 5) in float in_radius;  // Welt-Radius für jeden Punkt
+layout(location = 4) in float empty;
+layout(location = 5) in float in_radius;
 layout(location = 6) in vec3  in_normal;
 
-layout(location = 7)  in float prov1;
-layout(location = 8)  in float prov2;
-layout(location = 9)  in float prov3;
-layout(location = 10) in float prov4;
-layout(location = 11) in float prov5;
-layout(location = 12) in float prov6;
+// Provenance-Inputs
+layout(location = 7)  in float in_prov1;
+layout(location = 8)  in float in_prov2;
+layout(location = 9)  in float in_prov3;
+layout(location = 10) in float in_prov4;
+layout(location = 11) in float in_prov5;
+layout(location = 12) in float in_prov6;
 
-out vec3 point_color;
+// --- Uniforms (gleiche Skalierung wie Original) ---
+uniform mat4  mvp_matrix;
+uniform float max_radius;
+uniform float min_radius;
+uniform float scale_radius;
+uniform float scale_projection;
 
-uniform mat4 model_matrix;        
-uniform mat4 model_view_matrix;   // (wird hier aktuell nicht direkt verwendet)
-uniform mat4 projection_matrix;   // **nur** reine Projektionsmatrix (ohne View/Model!)
-uniform mat4 mvp_matrix;          // ganzes Model-View-Proj
-uniform mat4 inv_mv_matrix;
-uniform mat4 model_to_screen_matrix;
+// --- Outputs an Fragment Shader ---
+out VertexData {
+    vec3  pass_point_color;  // entspricht in_r/g/b
+    vec3  pass_world_pos;   // Position in Welt
+    vec3  pass_normal_ws;   // Normale im World-Space
+    float pass_radius_ws;   // Radius nach clamp
+    float pass_screen_size;  // finale PointSize
+    float pass_prov1;       // Provenance-Kanäle
+    float pass_prov2;
+    float pass_prov3;
+    float pass_prov4;
+    float pass_prov5;
+    float pass_prov6;
+} VertexOut;
 
-uniform vec2 viewport;            // = vec2(windowWidth, windowHeight)
-
-uniform bool face_eye;            // falls du „Facing‐Camera“ machst
-uniform vec3 eye;                 // Blickrichtung der Kamera, falls benötigt
-
-uniform float max_radius;         
-uniform float point_size_factor;  
-uniform float model_radius_scale; 
-
-INCLUDE vis_color.glsl
-
-void main()
-{
-    float radius_clamped = min(in_radius, max_radius);
-    vec3 normal = in_normal;
-    if (face_eye) {
-        normal = normalize(eye - (model_matrix * vec4(in_position,1.0)).xyz);
-    }
-
-    point_color = get_color(in_position, normal, vec3(in_r, in_g, in_b), radius_clamped);
+void main() {
     vec4 clipPos = mvp_matrix * vec4(in_position, 1.0);
     gl_Position = clipPos;
-    float rw = model_radius_scale * radius_clamped * point_size_factor;
-    float f = projection_matrix[1][1];
-    float pixelRadius = rw * (viewport.y * 0.5) * f / abs(clipPos.w);
-    float minSize = 1.0;   // z. B. 1 Pixel Mindestgröße
-    float maxSize = 256.0; // z. B. Maximal 256 Pixel
-    gl_PointSize = clamp(pixelRadius, minSize, maxSize);
+
+    float r = clamp(in_radius * scale_radius, min_radius, max_radius);
+    gl_PointSize = r * scale_projection / abs(clipPos.w);
+
+    VertexOut.pass_point_color = vec3(in_r, in_g, in_b);
+    VertexOut.pass_world_pos  = in_position;
+    VertexOut.pass_normal_ws  = normalize(in_normal);
+    VertexOut.pass_radius_ws  = r;
+    VertexOut.pass_screen_size = gl_PointSize;
+    VertexOut.pass_prov1 = in_prov1;
+    VertexOut.pass_prov2 = in_prov2;
+    VertexOut.pass_prov3 = in_prov3;
+    VertexOut.pass_prov4 = in_prov4;
+    VertexOut.pass_prov5 = in_prov5;
+    VertexOut.pass_prov6 = in_prov6;
 }
-
-

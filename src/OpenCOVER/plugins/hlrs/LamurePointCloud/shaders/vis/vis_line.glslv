@@ -1,17 +1,15 @@
-// Copyright (c) 2014-2018 Bauhaus-Universitaet Weimar
-// This Software is distributed under the Modified BSD License, see license.txt.
-//
-// Virtual Reality and Visualization Research Group 
-// Faculty of Media, Bauhaus-Universitaet Weimar
-// http://www.uni-weimar.de/medien/vr
-
 #version 420 core
 
-uniform mat4 projection_matrix;
-uniform mat4 view_matrix;
+uniform mat4 mvp_matrix;
+uniform vec4 in_color;
 
 layout(location = 0) in vec3 in_position;
 
+out VertexData {
+    vec4 pass_color;
+} VertexOut;
+
 void main() {
-  gl_Position = projection_matrix * view_matrix * vec4(in_position, 1.0);
+    VertexOut.pass_color = in_color;
+    gl_Position = mvp_matrix * vec4(in_position, 1.0);
 }

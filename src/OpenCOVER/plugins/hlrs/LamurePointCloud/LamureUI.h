@@ -8,6 +8,7 @@
 #include <cover/ui/Group.h>
 #include <cover/ui/Button.h>
 #include <cover/ui/Slider.h>
+#include <cover/ui/SelectionList.h>
 
 class Lamure;
 
@@ -20,7 +21,6 @@ public:
     opencover::ui::Button* getPointcloudButton() { return m_pointcloud_button; }
     opencover::ui::Button* getBoundingboxButton() { return m_boundingbox_button; }
     opencover::ui::Button* getFrustumButton() { return m_frustum_button; }
-    opencover::ui::Button* getCoordButton() { return m_coord_button; }
     opencover::ui::Button* getSyncButton() { return m_sync_button; }
     opencover::ui::Button* getTextButton() { return m_text_button; }
     opencover::ui::Button* getDumpButton() { return m_dump_button; }
@@ -36,11 +36,19 @@ private:
     std::vector<opencover::ui::Button*> m_model_buttons;
     std::vector<bool>                   m_model_visible;
 
+    opencover::ui::SelectionList *m_mode_choice = nullptr;
+    opencover::ui::SelectionList *m_shader_choice = nullptr;
+
+    // Buttons / Slider / Choice für neue Settings
+    opencover::ui::Button *m_accuracy_btn      = nullptr;
+    opencover::ui::Button *m_heatmap_btn            = nullptr;
+    opencover::ui::Slider *m_heatmap_min_slider     = nullptr;
+    opencover::ui::Slider *m_heatmap_max_slider     = nullptr;
+
     // Haupt-Buttons
     opencover::ui::Button* m_pointcloud_button   = nullptr;
     opencover::ui::Button* m_boundingbox_button  = nullptr;
     opencover::ui::Button* m_frustum_button      = nullptr;
-    opencover::ui::Button* m_coord_button        = nullptr;
     opencover::ui::Button* m_sync_button         = nullptr;
     opencover::ui::Button* m_notify_button       = nullptr;
     opencover::ui::Button* m_text_button         = nullptr;
@@ -54,9 +62,14 @@ private:
     opencover::ui::Group*  m_selection_group    = nullptr;
     opencover::ui::Group*  m_model_group        = nullptr;
     opencover::ui::Group*  m_adaption_group     = nullptr;
+    opencover::ui::Group*  m_prov_group         = nullptr;
+    opencover::ui::Group*  m_color_group        = nullptr;
     opencover::ui::Group*  m_rendering_group    = nullptr;
+    opencover::ui::Group*  m_shader_group       = nullptr;
+    opencover::ui::Group*  m_measure_group      = nullptr;
 
     // Slider
+    opencover::ui::Slider* m_min_radius_slider         = nullptr;
     opencover::ui::Slider* m_max_radius_slider         = nullptr;
     opencover::ui::Slider* m_scale_radius_slider       = nullptr;
     opencover::ui::Slider* m_lod_error_slider          = nullptr;

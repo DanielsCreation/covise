@@ -8,13 +8,10 @@ layout(location = 4) in float empty;
 layout(location = 5) in float in_radius;
 layout(location = 6) in vec3  in_normal;
 
+uniform mat4  mvp_matrix;
 uniform float max_radius;
+uniform float min_radius;
 uniform float scale_radius;
-uniform float surfel_size_factor;
-uniform mat4 mvp_matrix;
-uniform mat4 model_view_matrix;
-uniform float proj_scale;
-uniform vec2 viewport;
 
 out VertexData {
     vec3 pass_ms_u;
@@ -43,13 +40,13 @@ void main() {
     vec3 v = normalize(cross(n, u));
     
     // Radius-Skalierung mit Begrenzung
-    float scaledRadius = min(in_radius * scale_radius * surfel_size_factor, max_radius);
+    float r_world = clamp(in_radius * scale_radius, min_radius, max_radius);
     
     // Ausgabe der skalierten Tangentenvektoren
-    VertexOut.pass_ms_u = u * scaledRadius / 2;
-    VertexOut.pass_ms_v = v * scaledRadius / 2;
+    VertexOut.pass_ms_u        = u * (r_world * 0.5);
+    VertexOut.pass_ms_v        = v * (r_world * 0.5);
     VertexOut.pass_point_color = vec3(in_r, in_g, in_b);
     VertexOut.pass_world_pos = in_position;
     
-    gl_Position = mvp_matrix * vec4(in_position, 1.0);;
+    gl_Position = mvp_matrix * vec4(in_position, 1.0);
 }

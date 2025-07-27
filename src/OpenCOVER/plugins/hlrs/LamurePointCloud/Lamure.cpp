@@ -1,6 +1,6 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 //local
-#include "Lamure.h"
+#include "Lamure.h" 
 #include "gl_state.h"
 #include "osg_util.h"
 #include "LamurePointCloudInteractor.h"
@@ -133,7 +133,6 @@ void Lamure::loadSettings(const std::string& filename) {
     std::unordered_map<std::string, SettingHandler> setting_handlers;
     auto& s = plugin->m_settings;
 
-    setting_handlers["surfel_shader"]       = [&](const auto& v) { s.surfel_shader = (std::atoi(v.c_str()) != 0); };
     setting_handlers["frame_div"]           = [&](const auto& v) { s.frame_div = std::max(std::atoi(v.c_str()), 1); };
     setting_handlers["vram"]                = [&](const auto& v) { s.vram = std::max(std::atoi(v.c_str()), 8); };
     setting_handlers["ram"]                 = [&](const auto& v) { s.ram = std::max(std::atoi(v.c_str()), 8); };
@@ -142,8 +141,6 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["gamma_correction"]    = [&](const auto& v) { s.gamma_correction = (std::atoi(v.c_str()) != 0); };
     setting_handlers["pvs_culling"]         = [&](const auto& v) { s.pvs_culling = (std::atoi(v.c_str()) != 0); };
     setting_handlers["use_pvs"]             = [&](const auto& v) { s.use_pvs = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["point_size_factor"]   = [&](const auto& v) { s.point_size_factor = std::stof(v.c_str()); };
-    setting_handlers["surfel_size_factor"]  = [&](const auto& v) { s.surfel_size_factor = std::stof(v.c_str()); };
     setting_handlers["aux_point_size"]      = [&](const auto& v) { s.aux_point_size = std::clamp(std::stof(v.c_str()), 0.00001f, 1.0f); };
     setting_handlers["aux_point_distance"]  = [&](const auto& v) { s.aux_point_distance = std::clamp(std::stof(v.c_str()), 0.00001f, 1.0f); };
     setting_handlers["aux_focal_length"]    = [&](const auto& v) { s.aux_focal_length = std::clamp(std::stof(v.c_str()), 0.001f, 10.0f); };
@@ -192,6 +189,7 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["heatmap_max_b"]       = [&](const auto& v) { s.heatmap_color_max.z = parse_color(v); };
     setting_handlers["pvs"]                 = [&](const auto& v) { s.pvs = v; };
     setting_handlers["background_image"]    = [&](const auto& v) { s.background_image = v; };
+    setting_handlers["min_radius"]          = [&](const auto& v) { s.min_radius = std::max(std::stof(v.c_str()), 0.0f); };
     setting_handlers["max_radius"]          = [&](const auto& v) { s.max_radius = std::max(std::stof(v.c_str()), 0.1f); };
     setting_handlers["scale_radius"]        = [&](const auto& v) { s.scale_radius = std::max(std::stof(v.c_str()), 0.1f); };
     setting_handlers["show_pointcloud"]    = [&](const auto& v) { s.show_pointcloud = (std::atoi(v.c_str()) != 0); };
@@ -268,7 +266,7 @@ void Lamure::loadSettings(const std::string& filename) {
         }
     }
     
-    setting_handlers["provenance"] = [&](const auto& v) { s.provenance = (std::atoi(v.c_str()) != 0) && prov_valid; };
+    s.provenance = prov_valid;
     setting_handlers["json"] = [&](const auto& v) { s.json = !v.empty() ? v : (!first_json.empty() ? first_json : s.json); };
     setting_handlers["initial_selection"] = [&](const auto& v) { s.initial_selection = parseIndices(v, s.models.size()); };
 
@@ -315,18 +313,22 @@ int Lamure::loadLMR(const char* filename, osg::Group* parent, const char* covise
 	std::string lmr_file = std::string(filename);
 	plugin->loadSettings(lmr_file);
 
-	    if (plugin->m_settings.provenance && plugin->m_settings.json != "") {
+    if (plugin->m_settings.provenance && plugin->m_settings.json != "") {
         std::cout << "json: " << plugin->m_settings.json << std::endl;
-        plugin->m_data_provenance = lamure::ren::Data_Provenance::parse_json(plugin->m_settings.json);
-        std::cout << "size of provenance: " << plugin->m_data_provenance.get_size_in_bytes() << std::endl;
+        if (plugin->m_settings.provenance && !plugin->m_settings.json.empty()) {
+            std::cout << "Provenance data is valid. Loading from: " << plugin->m_settings.json << std::endl;
+            plugin->m_data_provenance = lamure::ren::Data_Provenance::parse_json(plugin->m_settings.json);
+            std::cout << "size of provenance: " << plugin->m_data_provenance.get_size_in_bytes() << std::endl;
+        }
+        else { std::cout << "Provenance data not found or incomplete. Disabling provenance-based shaders." << std::endl; }
     }
 
 	const osg::GraphicsContext::Traits *traits = opencover::coVRConfig::instance()->windows[0].context->getTraits();
-	    uint32_t render_width = traits->width / plugin->m_settings.frame_div;
+	uint32_t render_width = traits->width / plugin->m_settings.frame_div;
     uint32_t render_height = traits->height / plugin->m_settings.frame_div;
 
 	lamure::ren::policy* policy = lamure::ren::policy::get_instance();
-	    policy->set_max_upload_budget_in_mb(plugin->m_settings.upload);
+	policy->set_max_upload_budget_in_mb(plugin->m_settings.upload);
     policy->set_render_budget_in_mb(plugin->m_settings.vram);
     policy->set_out_of_core_budget_in_mb(plugin->m_settings.ram);
     policy->set_window_width(render_width);
@@ -347,6 +349,7 @@ int Lamure::loadLMR(const char* filename, osg::Group* parent, const char* covise
 	
 	return 1;
 }
+
 
 bool Lamure::init2() {
 	std::cout << "init2()" << std::endl;
