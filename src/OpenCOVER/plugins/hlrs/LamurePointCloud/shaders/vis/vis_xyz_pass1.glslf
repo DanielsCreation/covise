@@ -20,8 +20,6 @@ void main() {
   if( dot(uv_coords, uv_coords) >  1 )
     discard;
 
-  vec2 mappedPointCoord = gl_PointCoord*2 + vec2(-1.0, -1.0);
-
   gl_FragDepth = gl_FragCoord.z + (VertexIn.pass_es_shift / far_plane);
   
 }

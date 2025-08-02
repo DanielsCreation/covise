@@ -12,9 +12,7 @@ void main() {
     
     // Kreisförmige Maske
     float dist = length(uv_coords);
-    if (dist > 1.0) {
-        discard;
-    }
+    if (dist > 1.0) { discard; }
 
     // Elliptiche Maske
     //float ellipse = (uv_coords.x * uv_coords.x) / (a * a) + (uv_coords.y * uv_coords.y) / (b * b);

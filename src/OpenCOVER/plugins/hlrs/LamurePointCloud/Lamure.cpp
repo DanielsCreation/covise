@@ -158,7 +158,6 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["show_bvhs"]           = [&](const auto& v) { s.show_bvhs = (std::atoi(v.c_str()) != 0); };
     setting_handlers["show_pvs"]            = [&](const auto& v) { s.show_pvs = (std::atoi(v.c_str()) != 0); };
     setting_handlers["channel"]             = [&](const auto& v) { s.channel = std::max(std::atoi(v.c_str()), 0); };
-    setting_handlers["enable_lighting"]     = [&](const auto& v) { s.enable_lighting = (std::clamp(std::atoi(v.c_str()), 0, 1) != 0); };
     setting_handlers["use_material_color"]  = [&](const auto& v) { s.use_material_color = (std::clamp(std::atoi(v.c_str()), 0, 1) != 0); };
     setting_handlers["material_diffuse_r"]  = [&](const auto& v) { s.material_diffuse.x = std::max(std::stof(v.c_str()), 0.0f); };
     setting_handlers["material_diffuse_g"]  = [&](const auto& v) { s.material_diffuse.y = std::max(std::stof(v.c_str()), 0.0f); };
@@ -174,6 +173,9 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["point_light_color_g"] = [&](const auto& v) { s.point_light_color.g = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
     setting_handlers["point_light_color_b"] = [&](const auto& v) { s.point_light_color.b = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
     setting_handlers["point_light_intensity"]= [&](const auto& v) { s.point_light_color.w = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
+    setting_handlers["point_light_pos_x"]     = [&](const auto& v) { s.point_light_pos.x = std::stof(v.c_str()); };
+    setting_handlers["point_light_pos_y"]     = [&](const auto& v) { s.point_light_pos.y = std::stof(v.c_str()); };
+    setting_handlers["point_light_pos_z"]     = [&](const auto& v) { s.point_light_pos.z = std::stof(v.c_str()); };
     auto parse_color = [&](const std::string& v) { return std::min(std::max(std::atoi(v.c_str()), 0), 255) / 255.0f; };
     setting_handlers["background_color_r"]  = [&](const auto& v) { s.background_color.x = parse_color(v); };
     setting_handlers["background_color_g"]  = [&](const auto& v) { s.background_color.y = parse_color(v); };

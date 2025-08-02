@@ -79,12 +79,12 @@ public:
         bool show_bvhs{0};
         bool show_pvs{0};
         int32_t channel{0};
-        bool enable_lighting{0};
-        bool use_material_color{1};
+        bool use_material_color{0};
         scm::math::vec3f material_diffuse{0.6f, 0.6f, 0.6f};
-        scm::math::vec4f material_specular{0.4f, 0.4f, 0.4f, 1000.0f};
-        scm::math::vec3f ambient_light_color{0.1f, 0.1f, 0.1f};
+        scm::math::vec4f material_specular{0.4f, 0.4f, 0.4f, 1.0f};
+        scm::math::vec3f ambient_light_color{0.6f, 0.6f, 0.6f};
         scm::math::vec4f point_light_color{1.0f, 1.0f, 1.0f, 1.2f};
+        scm::math::vec3f point_light_pos{0.0f, 1000.0f, 0.0f};
         bool heatmap{0};
         float heatmap_min{0.0f};
         float heatmap_max{0.05f};

@@ -1,4 +1,4 @@
-#include "util.h"
+﻿#include "util.h"
 #include <iostream>
 #include <scm/gl_core/primitives/box.h>
 #include <config/CoviseConfig.h>
@@ -70,6 +70,34 @@ scm::math::mat4d matConv4D(const osg::Matrixd& m) {
 	scm::math::mat4d mat_scm = scm::math::mat4d(m(0, 0), m(0, 1), m(0, 2), m(0, 3), m(1, 0), m(1, 1), m(1, 2), m(1, 3), m(2, 0), m(2, 1), m(2, 2), m(2, 3), m(3, 0), m(3, 1), m(3, 2), m(3, 3));
 	return mat_scm;
 }
+
+scm::math::mat3f matConv4to3F(scm::math::mat4f& m) {
+	const auto& d = m.data_array;
+	return scm::math::mat3f(
+		d[0], d[1], d[2],
+		d[4], d[5], d[6],
+		d[8], d[9], d[10]
+	);
+}
+scm::math::mat3d matConv4to3D(scm::math::mat4d& m) {
+	const auto& d = m.data_array;
+	return scm::math::mat3d(
+		d[0], d[1], d[2],
+		d[4], d[5], d[6],
+		d[8], d[9], d[10]
+	);
+}
+
+scm::math::mat3f matConv4to3F(scm::math::mat4d& m) {
+	const auto& d = scm::math::mat4f(m).data_array;
+	return scm::math::mat3f(
+		d[0], d[1], d[2],
+		d[4], d[5], d[6],
+		d[8], d[9], d[10]
+	);
+}
+
+
 std::string LamureUtil::getConfigEntry(std::string scope) {
 	std::cout << "getConfigEntry(scope): ";
 	covise::coCoviseConfig::ScopeEntries entries = covise::coCoviseConfig::getScopeEntries(scope);

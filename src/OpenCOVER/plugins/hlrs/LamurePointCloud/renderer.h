@@ -77,13 +77,37 @@ private:
     };
     PointColorShader m_point_color_shader;
 
+    struct PointColorLightingShader {
+        GLuint program{0};
+        GLint mvp_matrix_loc            {-1};
+        GLint view_matrix_loc           {-1};
+        GLint view_normal_matrix_loc    {-1};
+        GLint max_radius_loc            {-1};
+        GLint min_radius_loc            {-1};
+        GLint scale_radius_loc          {-1};
+        GLint scale_projection_loc      {-1};
+        GLint use_material_color_loc    {-1};
+        GLint material_diffuse_loc      {-1};
+        GLint material_specular_loc     {-1};
+        GLint ambient_light_color_loc   {-1};
+        GLint point_light_color_loc     {-1};
+        GLint point_light_pos_loc       {-1};
+        GLint show_normals_loc          {-1};
+        GLint show_accuracy_loc         {-1};
+        GLint show_radius_dev_loc       {-1};
+        GLint show_output_sens_loc      {-1};
+        GLint accuracy_loc              {-1};
+        GLint average_radius_loc        {-1};
+    };
+    PointColorLightingShader m_point_color_lighting_shader;
+
     struct PointProvShader {
         GLuint program{0};
-        GLint  mvp_matrix_loc           {-1};
-        GLint  max_radius_loc           {-1};
-        GLint  min_radius_loc           {-1};
-        GLint  scale_radius_loc         {-1};
-        GLint  scale_projection_loc     {-1};
+        GLint mvp_matrix_loc            {-1};
+        GLint max_radius_loc            {-1};
+        GLint min_radius_loc            {-1};
+        GLint scale_radius_loc          {-1};
+        GLint scale_projection_loc      {-1};
         GLint show_normals_loc          {-1}; // bool  show_normals
         GLint show_accuracy_loc         {-1}; // bool  show_accuracy
         GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
@@ -96,12 +120,6 @@ private:
         GLint heatmap_max_loc;
         GLint heatmap_min_color_loc;
         GLint heatmap_max_color_loc;
-        // Beleuchtung
-        //GLint use_material_color_loc;
-        //GLint material_diffuse_loc;
-        //GLint material_specular_loc;
-        //GLint ambient_light_color_loc;
-        //GLint point_light_color_loc;
     };
     PointProvShader m_point_prov_shader;
 
@@ -131,6 +149,30 @@ private:
     };
     SurfelColorShader m_surfel_color_shader;
 
+    struct SurfelColorLightingShader {
+        GLuint program{0};
+        GLint mvp_matrix_loc            {-1}; // mat4 mvp_matrix
+        GLint max_radius_loc            {-1}; // float max_radius
+        GLint min_radius_loc            {-1}; // float min_radius
+        GLint scale_radius_loc          {-1}; // float scale_radius
+        GLint viewport_loc              {-1}; // vec2 viewport
+        GLint view_matrix_loc           {-1}; // mat4 view_matrix
+        GLint view_normal_matrix_loc    {-1}; // mat3 view_normal_matrix
+        GLint show_normals_loc          {-1}; // bool  show_normals
+        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
+        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
+        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
+        GLint accuracy_loc              {-1}; // float accuracy
+        GLint average_radius_loc        {-1}; // float average_radius
+        GLint use_material_color_loc    {-1}; // int use_material_color
+        GLint material_diffuse_loc      {-1}; // vec3 material_diffuse
+        GLint material_specular_loc     {-1}; // vec4 material_specular
+        GLint ambient_light_color_loc   {-1}; // vec3 ambient_light_color
+        GLint point_light_color_loc     {-1}; // vec4 point_light_color
+        GLint point_light_pos_loc       {-1}; // vec3 point_light_pos
+    };
+    SurfelColorLightingShader m_surfel_color_lighting_shader;
+
     struct SurfelProvShader {
         GLuint program{0};
         GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
@@ -145,13 +187,94 @@ private:
         GLint accuracy_loc              {-1}; // float accuracy
         GLint average_radius_loc        {-1}; // float average_radius
         GLint channel_loc               {-1}; // int   channel
-        GLint heatmap_loc               {-1}; // bool  heatmap
-        GLint heatmap_min_loc           {-1}; // float heatmap_min
-        GLint heatmap_max_loc           {-1}; // float heatmap_max
-        GLint heatmap_min_color_loc     {-1}; // vec3  heatmap_min_color
-        GLint heatmap_max_color_loc     {-1}; // vec3  heatmap_max_color
+        GLint heatmap_loc;
+        GLint heatmap_min_loc;
+        GLint heatmap_max_loc;
+        GLint heatmap_min_color_loc;
+        GLint heatmap_max_color_loc;
     };
     SurfelProvShader m_surfel_prov_shader;
+
+    // Pass 1: Depth-only pass to establish a clean depth buffer and prevent Z-fighting.
+    struct SurfelPass1Shader {
+        GLuint program{0};
+        GLint mvp_matrix_loc{-1};           // mat4 mvp_matrix
+        GLint model_view_matrix_loc{-1};    // mat4 model_view_matrix
+        GLint model_matrix_loc{-1};         // mat4 model_matrix
+        GLint far_plane_loc{-1};            // float far_plane
+        // Custom scaling uniforms
+        GLint max_radius_loc{-1};           // float max_radius
+        GLint min_radius_loc{-1};           // float min_radius
+        GLint scale_radius_loc{-1};         // float scale_radius
+    };
+    SurfelPass1Shader m_surfel_pass1_shader;
+
+    // Pass 2: Accumulation pass to gather color, normal, and position data in off-screen buffers.
+    struct SurfelPass2Shader {
+        GLuint program{0};
+        // Matrix uniforms (from VS/GS, same as pass 1)
+        GLint mvp_matrix_loc{-1};
+        GLint model_view_matrix_loc{-1};
+        GLint model_matrix_loc{-1};
+        GLint inv_mv_matrix_loc{-1};
+        GLint model_to_screen_matrix_loc{-1};
+        GLint far_plane_loc{-1};
+        GLint near_plane_loc{-1};
+        // Scaling uniforms (from VS)
+        GLint max_radius_loc{-1};
+        GLint min_radius_loc{-1};
+        GLint scale_radius_loc{-1};
+        // Visualization uniforms (from vis_color.glsl)
+        GLint show_normals_loc{-1};
+        GLint show_accuracy_loc{-1};
+        GLint show_radius_dev_loc{-1};
+        GLint show_output_sens_loc{-1};
+        GLint accuracy_loc{-1};
+        GLint average_radius_loc{-1};
+        // Provenance/Channel uniforms (from vis_color.glsl)
+        GLint channel_loc{-1};
+        GLint heatmap_loc{-1};
+        GLint heatmap_min_loc{-1};
+        GLint heatmap_max_loc{-1};
+        GLint heatmap_min_color_loc{-1};
+        GLint heatmap_max_color_loc{-1};
+        // Fragment shader specific
+        GLint win_size_loc{-1};
+    };
+    SurfelPass2Shader m_surfel_pass2_shader;
+
+    // Pass 3: Resolve pass to combine accumulated data, apply lighting, and render the final image.
+    struct SurfelPass3Shader {
+        GLuint program{0};
+        // Input textures from FBO
+        GLint in_color_texture_loc{-1};
+        GLint in_normal_texture_loc{-1};
+        GLint in_vs_position_texture_loc{-1};
+        // Background
+        GLint background_color_loc{-1};
+        // Lighting uniforms (for Blinn-Phong shading)
+        GLint view_matrix_loc{-1};
+        GLint view_normal_matrix_loc{-1};
+        GLint use_material_color_loc{-1};
+        GLint material_diffuse_loc{-1};
+        GLint material_specular_loc{-1};
+        GLint ambient_light_color_loc{-1};
+        GLint point_light_color_loc{-1};
+        GLint point_light_pos_loc{-1};
+    };
+    SurfelPass3Shader m_surfel_pass3_shader;
+
+    struct DebugShader {
+        GLuint program{0};
+        GLint debug_mode_loc{-1};
+        GLint texture_depth_loc{-1};
+        GLint texture_color_loc{-1};
+        GLint texture_normal_loc{-1};
+        GLint texture_position_loc{-1};
+        GLint near_plane_loc{-1};
+        GLint far_plane_loc{-1};
+    };
+    DebugShader m_debug_shader;
 
 
     struct LineShader {
@@ -163,9 +286,24 @@ private:
 
 
     struct PclResource {
-        GLuint program;
         GLuint vao;
+        // FBO f�r das Multi-Pass-Rendering
+        GLuint fbo = 0;
+        // Texturen, die an das FBO angeh�ngt werden
+        GLuint texture_color = 0;    // Attachment 0: Akkumulierte Farben (RGB) und Gewicht (A)
+        GLuint texture_normal = 0;   // Attachment 1: Akkumulierte Normalen
+        GLuint texture_position = 0; // Attachment 2: Akkumulierte View-Space Positionen
+        GLuint depth_texture = 0;    // Tiefen-Textur f�r den Z-Buffer
+        // VAO/VBO f�r das bildschirmf�llende Viereck in Pass 3
+        GLuint screen_quad_vao = 0;
+        GLuint screen_quad_vbo = 0;
+        std::array<float, 18> screen_quad_vertex= {
+            -1.0f,  1.0f, 0.0f,  -1.0f, -1.0f, 0.0f,   1.0f, -1.0f, 0.0f,
+            -1.0f,  1.0f, 0.0f,   1.0f, -1.0f, 0.0f,   1.0f,  1.0f, 0.0f
+        };
     };
+    PclResource m_pcl_resource;
+
 
     struct BoxResource {
         GLuint vbo = 0;
@@ -178,16 +316,18 @@ private:
             0, 4, 1, 5, 2, 6, 3, 7,
         };
     };
+    BoxResource m_box_resource;
 
-    struct PlaneResource {
-        GLuint vbo{ 0 };
-        GLuint ibo{ 0 };
-        GLuint vao{ 0 };
-        GLuint program{ 0 };
-        std::array<unsigned short, 6> idx = {
-            1,3,7,5,1,7
-        };
-    };
+    //struct PlaneResource {
+    //    GLuint vbo{ 0 };
+    //    GLuint ibo{ 0 };
+    //    GLuint vao{ 0 };
+    //    GLuint program{ 0 };
+    //    std::array<unsigned short, 6> idx = {
+    //        1,3,7,5,1,7
+    //    };
+    //};
+    //PlaneResource m_plane_resource;
 
 
     struct FrustumResource {
@@ -202,6 +342,7 @@ private:
             0, 4, 1, 5, 2, 6, 3, 7,
         };
     };
+    FrustumResource m_frustum_resource;
 
     struct TextResource {
         GLuint vao{ 0 };
@@ -211,12 +352,6 @@ private:
         std::string text;
         size_t num_vertices{ 0 };
     };
-
-    // Resources
-    PclResource m_pcl_resource;
-    BoxResource m_box_resource;
-    PlaneResource m_plane_resource;
-    FrustumResource m_frustum_resource;
     TextResource m_text_resource;
 
     // Matrizen
@@ -285,9 +420,14 @@ private:
     std::string vis_point_color_fs_source;
     std::string vis_point_prov_vs_source;
     std::string vis_point_prov_fs_source;
+    std::string vis_point_color_lighting_vs_source;
+    std::string vis_point_color_lighting_fs_source;
     std::string vis_surfel_vs_source;
     std::string vis_surfel_gs_source;
     std::string vis_surfel_fs_source;
+    std::string vis_surfel_color_lighting_vs_source;
+    std::string vis_surfel_color_lighting_gs_source;
+    std::string vis_surfel_color_lighting_fs_source;
     std::string vis_surfel_color_vs_source;
     std::string vis_surfel_color_gs_source;
     std::string vis_surfel_color_fs_source;
@@ -309,14 +449,16 @@ private:
     std::string vis_xyz_vs_source;
     std::string vis_xyz_gs_source;
     std::string vis_xyz_fs_source;
-    std::string vis_xyz_pass1_vs_source;
-    std::string vis_xyz_pass1_gs_source;
-    std::string vis_xyz_pass1_fs_source;
-    std::string vis_xyz_pass2_vs_source;
-    std::string vis_xyz_pass2_gs_source;
-    std::string vis_xyz_pass2_fs_source;
-    std::string vis_xyz_pass3_vs_source;
-    std::string vis_xyz_pass3_fs_source;
+    std::string vis_surfel_pass1_vs_source;
+    std::string vis_surfel_pass1_gs_source;
+    std::string vis_surfel_pass1_fs_source;
+    std::string vis_surfel_pass2_vs_source;
+    std::string vis_surfel_pass2_gs_source;
+    std::string vis_surfel_pass2_fs_source;
+    std::string vis_surfel_pass3_vs_source;
+    std::string vis_surfel_pass3_fs_source;
+    std::string vis_debug_vs_source;
+    std::string vis_debug_fs_source;
     std::string vis_xyz_qz_vs_source;
     std::string vis_xyz_qz_pass1_vs_source;
     std::string vis_xyz_qz_pass2_vs_source;
@@ -348,6 +490,7 @@ public:
     void initSchismObjects();
     void initUniforms();
     void initFramebuffer();
+    void initPclResources();
 
     bool getRendering() { return m_rendering; };
     void setRendering(bool rendering) { m_rendering = rendering; };
@@ -373,10 +516,13 @@ public:
     enum class ShaderType {
         Point,
         PointColor,
+        PointColorLighting,
         PointProv,
         Surfel,
         SurfelColor,
-        SurfelProv
+        SurfelColorLighting,
+        SurfelProv,
+        SurfelMultipass
     };
 
     struct LamureRenderer::ShaderInfo {
@@ -385,12 +531,15 @@ public:
     };
 
     const std::vector<ShaderInfo> pcl_shader = {
-        {ShaderType::Point,       "Point"},
-        {ShaderType::PointColor,  "Point Color"},
-        {ShaderType::PointProv,   "Point Prov"},
-        {ShaderType::Surfel,      "Surfel"},
-        {ShaderType::SurfelColor, "Surfel Color"},
-        {ShaderType::SurfelProv,  "Surfel Prov"}
+        {ShaderType::Point,                 "Point"},
+        {ShaderType::PointColor,            "Point Color"},
+        {ShaderType::PointColorLighting,    "Point Color Lighting"},
+        {ShaderType::PointProv,             "Point Prov"},
+        {ShaderType::Surfel,                "Surfel"},
+        {ShaderType::SurfelColor,           "Surfel Color"},
+        {ShaderType::SurfelColorLighting,   "Surfel Color Lighting"},
+        {ShaderType::SurfelProv,            "Surfel Prov"},
+        {ShaderType::SurfelMultipass,       "Surfel Multipass"}
     };
 
     ShaderType m_active_shader_type = ShaderType::SurfelColor;
@@ -401,17 +550,28 @@ public:
     void setModelUniforms(const scm::math::mat4& mvp_matrix);
     void setNodeUniforms(const lamure::ren::bvh* bvh, uint32_t node_id);
 
-    const PointShader&          getPointShader()        const { return m_point_shader; }
-    const PointColorShader&     getPointColorShader()    const { return m_point_color_shader; }
-    const PointProvShader&      getPointProvShader()    const { return m_point_prov_shader; }
-    const SurfelShader&         getSurfelShader()       const { return m_surfel_shader; }
-    const SurfelColorShader&    getSurfelColorShader()   const { return m_surfel_color_shader; }
-    const SurfelProvShader&     getSurfelProvShader()   const { return m_surfel_prov_shader; }
-    const LineShader&           getLineShader()         const { return m_line_shader; }
+    void print_active_uniforms(GLuint programID, const std::string& shaderName);
+    std::string LamureRenderer::glTypeToString(GLenum type);
+
+    const PointShader&                  getPointShader()                const { return m_point_shader; }
+    const PointColorShader&             getPointColorShader()           const { return m_point_color_shader; }
+    const PointColorLightingShader&     getPointColorLightingShader()   const { return m_point_color_lighting_shader; }
+    const PointProvShader&              getPointProvShader()            const { return m_point_prov_shader; }
+
+    const SurfelShader&                 getSurfelShader()               const { return m_surfel_shader; }
+    const SurfelColorShader&            getSurfelColorShader()          const { return m_surfel_color_shader; }
+    const SurfelColorLightingShader&    getSurfelColorLightingShader()  const { return m_surfel_color_lighting_shader; }
+    const SurfelProvShader&             getSurfelProvShader()           const { return m_surfel_prov_shader; }
+
+    const SurfelPass1Shader&            getSurfelPass1Shader()          const { return m_surfel_pass1_shader; }
+    const SurfelPass2Shader&            getSurfelPass2Shader()          const { return m_surfel_pass2_shader; }
+    const SurfelPass3Shader&            getSurfelPass3Shader()          const { return m_surfel_pass3_shader; }
+    const DebugShader&                  getDebugShader()                const { return m_debug_shader; }
+
+    const LineShader&                   getLineShader()                 const { return m_line_shader; }
 
     PclResource&      getPclResource()      { return m_pcl_resource; }
     BoxResource&      getBoxResource()      { return m_box_resource; }
-    PlaneResource&    getPlaneResource()    { return m_plane_resource; }
     FrustumResource&  getFrustumResource()  { return m_frustum_resource; }
     TextResource&     getTextResource()     { return m_text_resource; }
 

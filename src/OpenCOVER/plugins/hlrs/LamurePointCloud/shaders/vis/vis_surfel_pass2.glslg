@@ -1,0 +1,57 @@
+#version 420 core
+
+uniform mat4 mvp_matrix;
+
+layout (points) in;
+layout (triangle_strip, max_vertices = 4) out;
+
+in VertexData {
+  // Input from Vertex Shader
+  vec3 pass_ms_u;
+  vec3 pass_ms_v;
+  vec3 pass_point_color;
+  vec3 pass_normal;
+  vec3 mv_vertex_position;
+} VertexIn[];
+
+out VertexData {
+  // Output to Fragment Shader
+  vec3 pass_point_color;
+  vec3 pass_normal;
+  vec2 pass_uv_coords;
+  vec3 mv_vertex_position;
+} VertexOut;
+
+void main() {
+  
+  // Pass through data from the vertex shader
+  VertexOut.pass_point_color = VertexIn[0].pass_point_color;
+  VertexOut.pass_normal = VertexIn[0].pass_normal; 
+  VertexOut.mv_vertex_position = VertexIn[0].mv_vertex_position; 
+  
+  vec3 center   = gl_in[0].gl_Position.xyz; // position of surfel in model space
+  vec3 step_u   = VertexIn[0].pass_ms_u;
+  vec3 step_v   = VertexIn[0].pass_ms_v;
+
+  vec3 offs[4] = vec3[4](
+      -step_u - step_v,
+       step_u - step_v,
+      -step_u + step_v,
+       step_u + step_v
+  );
+
+  vec2 uvs[4] = vec2[4](
+      vec2(-1.0, -1.0),
+      vec2( 1.0, -1.0),
+      vec2(-1.0,  1.0),
+      vec2( 1.0,  1.0)
+  );
+
+  for(int i = 0; i < 4; ++i) {
+      VertexOut.pass_uv_coords = uvs[i];
+      gl_Position = mvp_matrix * vec4(center + offs[i], 1.0);
+      EmitVertex();
+  }
+  EndPrimitive();
+  
+}

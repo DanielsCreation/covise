@@ -36,6 +36,10 @@ scm::math::mat4d matConv4D(osg::Matrixd& m);
 scm::math::mat4f matConv4F(const osg::Matrixd& m);
 scm::math::mat4d matConv4D(const osg::Matrixd& m);
 
+scm::math::mat3f matConv4to3F(scm::math::mat4f& m);
+scm::math::mat3f matConv4to3F(scm::math::mat4d& m);
+scm::math::mat3d matConv4to3D(scm::math::mat4d& m);
+
 std::string getConfigEntry(std::string scope, std::string name);
 std::string getConfigEntry(std::string scope);
 

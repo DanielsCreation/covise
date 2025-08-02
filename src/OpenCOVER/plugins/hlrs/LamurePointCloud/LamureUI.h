@@ -39,11 +39,14 @@ private:
     opencover::ui::SelectionList *m_mode_choice = nullptr;
     opencover::ui::SelectionList *m_shader_choice = nullptr;
 
-    // Buttons / Slider / Choice für neue Settings
-    opencover::ui::Button *m_accuracy_btn      = nullptr;
-    opencover::ui::Button *m_heatmap_btn            = nullptr;
-    opencover::ui::Slider *m_heatmap_min_slider     = nullptr;
-    opencover::ui::Slider *m_heatmap_max_slider     = nullptr;
+    // Gruppe für Beleuchtungseinstellungen (dynamisch sichtbar)
+    opencover::ui::Group* m_lighting_group = nullptr;
+    opencover::ui::Slider* m_material_diffuse_slider = nullptr;
+    opencover::ui::Slider* m_material_specular_slider = nullptr;
+    opencover::ui::Slider* m_shininess_slider = nullptr;
+    opencover::ui::Slider* m_ambient_light_slider = nullptr;
+    opencover::ui::Slider* m_light_color_slider = nullptr;
+    opencover::ui::Slider* m_light_intensity_slider = nullptr;
 
     // Haupt-Buttons
     opencover::ui::Button* m_pointcloud_button   = nullptr;
@@ -60,6 +63,7 @@ private:
     // Gruppen und Men�
     opencover::ui::Menu*   m_lamure_menu        = nullptr;
     opencover::ui::Group*  m_selection_group    = nullptr;
+    opencover::ui::Group*  m_misc_group         = nullptr;
     opencover::ui::Group*  m_model_group        = nullptr;
     opencover::ui::Group*  m_adaption_group     = nullptr;
     opencover::ui::Group*  m_prov_group         = nullptr;
@@ -75,6 +79,17 @@ private:
     opencover::ui::Slider* m_lod_error_slider          = nullptr;
     opencover::ui::Slider* m_upload_budget_slider      = nullptr;
     opencover::ui::Slider* m_video_memory_budget_slider= nullptr;
+
+    opencover::ui::Menu *m_model_menu;
+    opencover::ui::Menu *m_lighting_menu;
+    opencover::ui::Menu *m_point_size_menu;
+    opencover::ui::Menu *m_lod_menu;
+
+
+    opencover::ui::Slider* m_light_pos_x_slider         = nullptr;
+    opencover::ui::Slider* m_light_pos_y_slider         = nullptr;
+    opencover::ui::Slider* m_light_pos_z_slider         = nullptr;
+
 
     // Shader Button
     opencover::ui::Button* m_surfel_button = nullptr;

@@ -49,9 +49,7 @@ vec3 shade_blinn_phong(
 
 
 void main() {
-    if (length(fsIn.pass_uv_coords) > 1.0) {
-        discard;
-    }
+    if (length(fsIn.pass_uv_coords) > 1.0) { discard; }
 
     vec3 modeColor = get_color(
         fsIn.pass_world_pos,
@@ -63,15 +61,13 @@ void main() {
 
     vec3 finalColor;
 
-    if (show_normals || show_radius_deviation ||
-        show_output_sensitivity || show_accuracy) {
+    if (show_normals || show_radius_deviation || show_output_sensitivity || show_accuracy) {
         finalColor = modeColor;
     } else {
-        vec3 vs_light_pos = point_light_color.xyz;
         finalColor = shade_blinn_phong(
             fsIn.pass_vs_pos,
             fsIn.pass_vs_normal,
-            vs_light_pos,
+            point_light_pos,
             modeColor
         );
     }

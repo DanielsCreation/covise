@@ -7,6 +7,11 @@
 
 #include <vector>
 #include <string>
+#include <set>
+#include <iostream>
+#include <algorithm>
+#include <windows.h>
+#include <sstream>
 
 // -----------------------------------------------------------------------------
 //  Einzelner Buffer‑Zustand
@@ -32,11 +37,35 @@ struct GLVertexAttribInfo {
     GLint     divisor;      // Instancing‑Divisor
 };
 
+
+
+// Struktur für ein Attachment
+struct GLFBOAttachmentInfo {
+    GLenum attachmentPoint;       // z.B. GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT, …
+    std::string objectType;       // "NONE", "TEXTURE", "RENDERBUFFER"
+    GLuint      objectName;       // Objekt-ID
+    GLenum      internalFormat;   // nur für TEXTURE, sonst 0
+};
+
+// Gesamt-Info zum Framebuffer
+struct GLFramebufferInfo {
+    GLuint                          fboBinding;
+    std::string                     completeness;   // z.B. "COMPLETE", "INCOMPLETE_ATTACHMENT", …
+    GLenum                          readBuffer;
+    std::vector<GLenum>             drawBuffers;
+    std::vector<GLFBOAttachmentInfo> attachments;
+};
+
 // -----------------------------------------------------------------------------
 //  Snapshot aller relevanten OpenGL‑Zustände
 // -----------------------------------------------------------------------------
 class GLState {
 public:
+    std::set<GLuint> enumerateAllBufferIDs(GLuint maxID);
+    static std::string fboStatusToString(GLenum status);
+    static std::vector<GLVertexAttribInfo> captureVertexAttribState();
+    static GLFramebufferInfo queryCurrentFramebuffer(GLint maxColorAttachments = 8);
+    static void printFramebufferInfo(const GLFramebufferInfo& info);
     //--------------------------------------------------------------------------
     // 1) Erstelle ein "Snapshot" aller States
     //--------------------------------------------------------------------------

@@ -1,11 +1,7 @@
 ﻿#include "gl_state.h"
-#include <iostream>
-#include <algorithm>
-#include <set>
-#include <windows.h>
 
 // Hilfsfunktion: Alle existierenden Buffer-IDs bis maxID ermitteln
-static std::set<GLuint> enumerateAllBufferIDs(GLuint maxID = 100) {
+std::set<GLuint> GLState::enumerateAllBufferIDs(GLuint maxID = 100) {
     std::set<GLuint> buffers;
     for (GLuint id = 1; id <= maxID; ++id) {
         if (glIsBuffer(id))
@@ -35,7 +31,7 @@ static GLBufferInfo queryBufferInfo(GLuint id, GLenum target) {
 }
 
 // Hilfsfunktion: Zustand aller Vertex-Attribs erfassen
-static std::vector<GLVertexAttribInfo> captureVertexAttribState() {
+std::vector<GLVertexAttribInfo> GLState::captureVertexAttribState() {
     std::vector<GLVertexAttribInfo> attribs;
     GLint maxAttribs = 0;
     glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maxAttribs);
@@ -54,6 +50,122 @@ static std::vector<GLVertexAttribInfo> captureVertexAttribState() {
         attribs.push_back(a);
     }
     return attribs;
+}
+
+// Hilfsfunktion: Status-String aus glCheckFramebufferStatus
+std::string GLState::fboStatusToString(GLenum status) {
+    switch (status) {
+    case GL_FRAMEBUFFER_COMPLETE:                      return "COMPLETE";
+    case GL_FRAMEBUFFER_UNDEFINED:                     return "UNDEFINED";
+    case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:         return "INCOMPLETE_ATTACHMENT";
+    case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: return "MISSING_ATTACHMENT";
+    case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:        return "INCOMPLETE_DRAW_BUFFER";
+    case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:        return "INCOMPLETE_READ_BUFFER";
+    case GL_FRAMEBUFFER_UNSUPPORTED:                   return "UNSUPPORTED";
+    default: {
+        std::ostringstream ss;
+        ss << "UNKNOWN(0x" << std::hex << status << std::dec << ")";
+        return ss.str();
+    }
+    }
+}
+
+// Die Hauptfunktion: FBO-Zustand abfragen
+GLFramebufferInfo GLState::queryCurrentFramebuffer(GLint maxColorAttachments) {
+    GLFramebufferInfo info;
+
+    // 1) Welches FBO ist gebunden?
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, reinterpret_cast<GLint*>(&info.fboBinding));
+
+    // 2) Vollständigkeits-Status
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    info.completeness = fboStatusToString(status);
+
+    // 3) Read-Buffer
+    glGetIntegerv(GL_READ_BUFFER, reinterpret_cast<GLint*>(&info.readBuffer));
+
+    // 4) Draw-Buffers
+    GLint maxDraw = 0;
+    glGetIntegerv(GL_MAX_DRAW_BUFFERS, &maxDraw);
+    maxDraw = std::min<GLint>(maxDraw, maxColorAttachments);
+    info.drawBuffers.resize(maxDraw);
+    for (GLint i = 0; i < maxDraw; ++i) {
+        glGetIntegerv(GL_DRAW_BUFFER0 + i, reinterpret_cast<GLint*>(&info.drawBuffers[i]));
+    }
+
+    // 5) Attachments abfragen: Color0…ColorN, Depth, Stencil
+    auto queryAttachment = [&](GLenum attachmentPoint){
+        GLFBOAttachmentInfo ai;
+        ai.attachmentPoint = attachmentPoint;
+        ai.internalFormat = 0;
+
+        GLint objType = 0, objName = 0;
+        glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER,
+            attachmentPoint,
+            GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE,
+            &objType);
+        glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER,
+            attachmentPoint,
+            GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME,
+            &objName);
+
+        if (objType == GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE) {
+            ai.objectType = "NONE";
+        }
+        else if (objType == GL_TEXTURE) {
+            ai.objectType = "TEXTURE";
+            ai.objectName = objName;
+            // internen Format auslesen
+            GLenum prevTex = 0;
+            glGetIntegerv(GL_TEXTURE_BINDING_2D, reinterpret_cast<GLint*>(&prevTex));
+            glBindTexture(GL_TEXTURE_2D, objName);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0,
+                GL_TEXTURE_INTERNAL_FORMAT,
+                reinterpret_cast<GLint*>(&ai.internalFormat));
+            glBindTexture(GL_TEXTURE_2D, prevTex);
+        }
+        else if (objType == GL_RENDERBUFFER) {
+            ai.objectType = "RENDERBUFFER";
+            ai.objectName = objName;
+        }
+        else {
+            ai.objectType = "UNKNOWN";
+            ai.objectName = objName;
+        }
+
+        return ai;
+        };
+
+    // Color-Anhänge
+    for (GLint i = 0; i < maxColorAttachments; ++i) {
+        info.attachments.push_back(
+            queryAttachment(GL_COLOR_ATTACHMENT0 + i));
+    }
+    // Depth- und Stencil-Anhang
+    info.attachments.push_back(queryAttachment(GL_DEPTH_ATTACHMENT));
+    info.attachments.push_back(queryAttachment(GL_STENCIL_ATTACHMENT));
+
+    return info;
+}
+
+// Debug-Ausgabe
+void GLState::printFramebufferInfo(const GLFramebufferInfo &info) {
+    std::cout << "=== Framebuffer ID: " << info.fboBinding << " ===\n";
+    std::cout << "Status: " << info.completeness << "\n";
+    std::cout << "Read Buffer: 0x" << std::hex << info.readBuffer << std::dec << "\n";
+    for (size_t i = 0; i < info.drawBuffers.size(); ++i) {
+        std::cout << "DrawBuffer["<<i<<"]: 0x" << std::hex << info.drawBuffers[i] << std::dec << "\n";
+    }
+    for (auto &a : info.attachments) {
+        std::cout << "Attachment 0x" << std::hex << a.attachmentPoint << std::dec
+            << " Type=" << a.objectType
+            << " Name=" << a.objectName;
+        if (a.internalFormat != 0) {
+            std::cout << " InternalFormat=0x" << std::hex << a.internalFormat << std::dec;
+        }
+        std::cout << "\n";
+    }
+    std::cout << "===============================\n";
 }
 
 // ----- 1) Capture aller GL-States -----
