@@ -12,7 +12,7 @@ const float gaussian[32] = float[](
 
 in VertexData {
   vec3 pass_point_color;
-  vec3 pass_normal;
+  vec3 pass_vs_normal;
   vec2 pass_uv_coords;
   vec3 mv_vertex_position;
 } VertexIn;
@@ -23,23 +23,29 @@ layout(location = 1) out vec3 accumulated_normals;
 layout(location = 2) out vec3 accumulated_vs_positions;
 
 uniform vec2 win_size;
+uniform sampler2D depth_texture;
 
 void main() {
+
   // Discard fragments outside the circular surfel area
   if ( dot(VertexIn.pass_uv_coords, VertexIn.pass_uv_coords) > 1.0 )
     discard;
 
-  // Calculate weight based on distance from surfel center using Gaussian table
-  float weight = gaussian[int(round(length(VertexIn.pass_uv_coords) * 31.0 ))];
-
-  // Accumulate weighted color and the weight itself in the alpha channel
-  accumulated_colors = vec4(VertexIn.pass_point_color * weight, weight);
 
   // Accumulate weighted normals and positions for deferred shading
-  vec3 adjustedNormal = VertexIn.pass_normal;
-  if (adjustedNormal.z < 0.0) {
-    adjustedNormal *= -1.0;
-  }
-  accumulated_normals = adjustedNormal * weight;
-  accumulated_vs_positions = VertexIn.mv_vertex_position * weight;
+  //vec3 adjustedNormal = VertexIn.pass_normal;
+  //if (adjustedNormal.z < 0.0) {
+  //  adjustedNormal *= -1.0;
+  //}
+  //accumulated_normals = adjustedNormal * weight;
+  //accumulated_vs_positions = VertexIn.mv_vertex_position * weight;
+
+  int idx = int(clamp(length(VertexIn.pass_uv_coords) * 31.0, 0.0, 31.0));
+  float weight = gaussian[idx];
+
+  vec3 surfelColor = VertexIn.pass_point_color;
+  accumulated_colors = vec4(surfelColor * weight, weight);
+
+  accumulated_normals       = VertexIn.pass_vs_normal * weight;
+  accumulated_vs_positions  = VertexIn.mv_vertex_position * weight;
 }

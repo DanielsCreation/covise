@@ -38,11 +38,35 @@ scm::math::vec3d vecConv3D(osg::Vec3d& v) {
 	scm::math::vec3d vec_scm = scm::math::vec3d(v[0], v[1], v[2]);
 	return vec_scm;
 }
+scm::math::vec3f vecConv3F(const osg::Vec3f& v) {
+	scm::math::vec3f vec_scm = scm::math::vec3f(v[0], v[1], v[2]);
+	return vec_scm;
+}
+scm::math::vec3d vecConv3D(const osg::Vec3d& v) {
+	scm::math::vec3d vec_scm = scm::math::vec3d(v[0], v[1], v[2]);
+	return vec_scm;
+}
+scm::math::vec3f vecConv3F(const osg::Vec4f& v) {
+	scm::math::vec4f vec_scm = scm::math::vec4f(v[0], v[1], v[2]);
+	return vec_scm;
+}
+scm::math::vec3d vecConv3D(const osg::Vec4d& v) {
+	scm::math::vec4d vec_scm = scm::math::vec4d(v[0], v[1], v[2]);
+	return vec_scm;
+}
 scm::math::vec4f vecConv4F(osg::Vec4f& v) {
 	scm::math::vec4f vec_scm = scm::math::vec4f(v[0], v[1], v[2], v[3]);
 	return vec_scm;
 }
 scm::math::vec4d vecConv4D(osg::Vec4d& v) {
+	scm::math::vec4d vec_scm = scm::math::vec4d(v[0], v[1], v[2], v[3]);
+	return vec_scm;
+}
+scm::math::vec4f vecConv4F(const osg::Vec4f& v) {
+	scm::math::vec4f vec_scm = scm::math::vec4f(v[0], v[1], v[2], v[3]);
+	return vec_scm;
+}
+scm::math::vec4d vecConv4D(const osg::Vec4d& v) {
 	scm::math::vec4d vec_scm = scm::math::vec4d(v[0], v[1], v[2], v[3]);
 	return vec_scm;
 }

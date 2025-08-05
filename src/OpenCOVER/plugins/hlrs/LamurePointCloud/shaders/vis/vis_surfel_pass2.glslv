@@ -14,6 +14,7 @@ uniform mat4 model_matrix;
 uniform mat4 model_view_matrix;
 //uniform mat4 inv_mv_matrix;
 uniform mat4 model_to_screen_matrix;
+uniform mat3 normal_matrix;
 uniform float near_plane;
 uniform float max_radius;
 uniform float min_radius;
@@ -51,7 +52,7 @@ out VertexData {
   vec3 pass_ms_u;
   vec3 pass_ms_v;
   vec3 pass_point_color;
-  vec3 pass_normal;
+  vec3 pass_vs_normal;
   vec3 mv_vertex_position;
 } VertexOut;
 
@@ -142,10 +143,8 @@ void main() {
 
     VertexOut.pass_ms_u = tangent;
     VertexOut.pass_ms_v = bitangent;
-    VertexOut.pass_normal = normal;
+    VertexOut.pass_vs_normal = normalize(normal_matrix * normal);
 
-    //vec3 final_color = get_final_color(in_position, normal, vec3(in_r, in_g, in_b), world_radius, tangent, bitangent);
-    //VertexOut.pass_point_color = final_color;
     VertexOut.pass_point_color = vec3(in_r, in_g, in_b);
 
     gl_Position = vec4(in_position, 1.0);

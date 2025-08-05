@@ -8,10 +8,11 @@ layout(location = 4) in float empty;
 layout(location = 5) in float in_radius;
 layout(location = 6) in vec3  in_normal;
 
-uniform mat4  mvp_matrix;
+
 uniform float max_radius;
 uniform float min_radius;
 uniform float scale_radius;
+uniform float mvp_matrix;
 
 out VertexData {
     vec3 pass_ms_u;
@@ -48,5 +49,5 @@ void main() {
     VertexOut.pass_point_color = vec3(in_r, in_g, in_b);
     VertexOut.pass_world_pos = in_position;
     
-    gl_Position = mvp_matrix * vec4(in_position, 1.0);
+    gl_Position = vec4(in_position, 1.0);
 }

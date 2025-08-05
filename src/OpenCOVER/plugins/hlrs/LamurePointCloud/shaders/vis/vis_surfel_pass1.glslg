@@ -1,8 +1,7 @@
 #version 420 core
 
 uniform mat4 mvp_matrix;
-//uniform mat4 model_view_matrix;
-//uniform float far_plane; 
+uniform mat4 model_view_matrix;
 
 layout (points) in;
 layout (triangle_strip, max_vertices = 4) out;
@@ -14,11 +13,12 @@ in VertexData {
 
 out VertexData {
     vec2 pass_uv_coords;
+    vec3 pass_vs_pos; 
 } VertexOut;
 
 void main() {
 
-    vec3 center   = gl_in[0].gl_Position.xyz; //pos of surfel in model space
+    vec3 center   = gl_in[0].gl_Position.xyz;
     vec3 step_u   = VertexIn[0].pass_ms_u;
     vec3 step_v   = VertexIn[0].pass_ms_v;
 
@@ -38,7 +38,13 @@ void main() {
 
     for(int i = 0; i < 4; ++i) {
         VertexOut.pass_uv_coords = uvs[i];
-        gl_Position = mvp_matrix * vec4(center + offs[i], 1.0);
+        
+        vec4 pos = vec4(center + offs[i], 1.0);
+        
+        VertexOut.pass_vs_pos = (model_view_matrix * pos).xyz;
+        
+        gl_Position = mvp_matrix * pos;
+
         EmitVertex();
     }
     EndPrimitive();

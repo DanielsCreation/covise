@@ -13,6 +13,5 @@ out vec2 pos;
 void main()
 {
      gl_Position = vec4(in_position, 1.0);
-
      pos = in_position.xy;
 }

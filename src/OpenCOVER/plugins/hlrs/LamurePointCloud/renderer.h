@@ -90,7 +90,7 @@ private:
         GLint material_diffuse_loc      {-1};
         GLint material_specular_loc     {-1};
         GLint ambient_light_color_loc   {-1};
-        GLint point_light_color_loc     {-1};
+        GLint point_light_intensity_loc {-1};
         GLint point_light_pos_loc       {-1};
         GLint show_normals_loc          {-1};
         GLint show_accuracy_loc         {-1};
@@ -168,7 +168,7 @@ private:
         GLint material_diffuse_loc      {-1}; // vec3 material_diffuse
         GLint material_specular_loc     {-1}; // vec4 material_specular
         GLint ambient_light_color_loc   {-1}; // vec3 ambient_light_color
-        GLint point_light_color_loc     {-1}; // vec4 point_light_color
+        GLint point_light_intensity_loc {-1}; // vec4 point_light_color
         GLint point_light_pos_loc       {-1}; // vec3 point_light_pos
     };
     SurfelColorLightingShader m_surfel_color_lighting_shader;
@@ -199,10 +199,12 @@ private:
     struct SurfelPass1Shader {
         GLuint program{0};
         GLint mvp_matrix_loc{-1};           // mat4 mvp_matrix
-        GLint model_view_matrix_loc{-1};    // mat4 model_view_matrix
+        GLint model_view_matrix_loc{-1};
+        GLint normal_matrix_loc{-1};    // mat4 model_view_matrix
         GLint model_matrix_loc{-1};         // mat4 model_matrix
+        GLint near_plane_loc{-1};           // float near_plane
         GLint far_plane_loc{-1};            // float far_plane
-        // Custom scaling uniforms
+
         GLint max_radius_loc{-1};           // float max_radius
         GLint min_radius_loc{-1};           // float min_radius
         GLint scale_radius_loc{-1};         // float scale_radius
@@ -215,9 +217,11 @@ private:
         // Matrix uniforms (from VS/GS, same as pass 1)
         GLint mvp_matrix_loc{-1};
         GLint model_view_matrix_loc{-1};
+        GLint normal_matrix_loc{-1};
         GLint model_matrix_loc{-1};
         GLint inv_mv_matrix_loc{-1};
         GLint model_to_screen_matrix_loc{-1};
+        GLint depth_texture_loc{-1};
         GLint far_plane_loc{-1};
         GLint near_plane_loc{-1};
         // Scaling uniforms (from VS)
@@ -259,7 +263,7 @@ private:
         GLint material_diffuse_loc{-1};
         GLint material_specular_loc{-1};
         GLint ambient_light_color_loc{-1};
-        GLint point_light_color_loc{-1};
+        GLint point_light_intensity_loc{-1};
         GLint point_light_pos_loc{-1};
     };
     SurfelPass3Shader m_surfel_pass3_shader;
@@ -499,10 +503,10 @@ public:
     lamure::ren::camera* getScmCamera() { return m_scm_camera; }
     osg::ref_ptr<osg::Camera> getOsgCamera() { return m_osg_camera; }
 
-    scm::math::mat4d getModelviewMatrix() { return m_modelview_matrix; }
+    scm::math::mat4d getModelViewMatrix() { return m_modelview_matrix; }
     scm::math::mat4d getProjectionMatrix() { return m_projection_matrix; }
 
-    void setModelviewMatrix(scm::math::mat4d model_view_matrix) { m_modelview_matrix = model_view_matrix; }
+    void setModelViewMatrix(scm::math::mat4d model_view_matrix) { m_modelview_matrix = model_view_matrix; }
     void setProjectionMatrix(scm::math::mat4d projection_matrix) { m_projection_matrix = projection_matrix; }
 
     osg::ref_ptr<osg::Geode> getPointcloudGeode() { return m_pointcloud_geode; }

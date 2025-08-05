@@ -1,7 +1,7 @@
 #D:\Forschungsarbeit\Data
 C:\Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_bin
 
-initial_selection : 0, 1
+initial_selection : 1
 show_pvs : 0
 min_radius : 0.0
 max_radius : 0.1
@@ -16,6 +16,13 @@ show_text : 0
 show_sync : 1
 show_notify : 0
 
+point_light_intensity : 1.0;
+
+point_light_pos_x : 300.0;
+point_light_pos_y : 300.0;
+point_light_pos_z : 1000.0;
+
+
 
 # \Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_012\naturkundemuseum_School012.bvh
 # width : 64
@@ -23,9 +30,6 @@ show_notify : 0
 # frame_div : 64
 # vram : 64
 # ram : 64
-# near : 64
-# far : 64
-# fov : 64
 # splatting : 0
 # gamma_correction : 0
 # speed : 300

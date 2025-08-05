@@ -26,8 +26,17 @@ osg::Vec4d vecConv4D(scm::math::vec4d& v);
 
 scm::math::vec3f vecConv3F(osg::Vec3f& v);
 scm::math::vec3d vecConv3D(osg::Vec3d& v);
+scm::math::vec3f vecConv3F(const osg::Vec3f& v);
+scm::math::vec3d vecConv3D(const osg::Vec3d& v);
+
+
+scm::math::vec3f vecConv3F(const osg::Vec4f& v);
+scm::math::vec3d vecConv3D(const osg::Vec4d& v);
+
 scm::math::vec4f vecConv4F(osg::Vec4f& v);
 scm::math::vec4d vecConv4D(osg::Vec4d& v);
+scm::math::vec4f vecConv4F(const osg::Vec4f& v);
+scm::math::vec4d vecConv4D(const osg::Vec4d& v);
 
 osg::Matrixf matConv4F(scm::math::mat4f& m);
 osg::Matrixd matConv4D(scm::math::mat4d& m);

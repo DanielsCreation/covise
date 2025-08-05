@@ -159,27 +159,18 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["show_pvs"]            = [&](const auto& v) { s.show_pvs = (std::atoi(v.c_str()) != 0); };
     setting_handlers["channel"]             = [&](const auto& v) { s.channel = std::max(std::atoi(v.c_str()), 0); };
     setting_handlers["use_material_color"]  = [&](const auto& v) { s.use_material_color = (std::clamp(std::atoi(v.c_str()), 0, 1) != 0); };
-    setting_handlers["material_diffuse_r"]  = [&](const auto& v) { s.material_diffuse.x = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_diffuse_g"]  = [&](const auto& v) { s.material_diffuse.y = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_diffuse_b"]  = [&](const auto& v) { s.material_diffuse.z = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular_r"] = [&](const auto& v) { s.material_specular.x = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular_g"] = [&](const auto& v) { s.material_specular.y = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular_b"] = [&](const auto& v) { s.material_specular.z = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular_exponent"] = [&](const auto& v) { s.material_specular.w = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
-    setting_handlers["ambient_light_color_r"]= [&](const auto& v) { s.ambient_light_color.r = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["ambient_light_color_g"]= [&](const auto& v) { s.ambient_light_color.g = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["ambient_light_color_b"]= [&](const auto& v) { s.ambient_light_color.b = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["point_light_color_r"] = [&](const auto& v) { s.point_light_color.r = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["point_light_color_g"] = [&](const auto& v) { s.point_light_color.g = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["point_light_color_b"] = [&](const auto& v) { s.point_light_color.b = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
-    setting_handlers["point_light_intensity"]= [&](const auto& v) { s.point_light_color.w = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
+    setting_handlers["material_diffuse"]    = [&](const auto& v) { s.material_diffuse = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["material_specular"]   = [&](const auto& v) { s.material_specular = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["material_specular_exponent"] = [&](const auto& v) { s.material_specular = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
+    setting_handlers["ambient_light_color"] = [&](const auto& v) { s.ambient_light_color = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
+    setting_handlers["point_light_intensity"] = [&](const auto& v) { s.point_light_intensity = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
     setting_handlers["point_light_pos_x"]     = [&](const auto& v) { s.point_light_pos.x = std::stof(v.c_str()); };
     setting_handlers["point_light_pos_y"]     = [&](const auto& v) { s.point_light_pos.y = std::stof(v.c_str()); };
     setting_handlers["point_light_pos_z"]     = [&](const auto& v) { s.point_light_pos.z = std::stof(v.c_str()); };
     auto parse_color = [&](const std::string& v) { return std::min(std::max(std::atoi(v.c_str()), 0), 255) / 255.0f; };
-    setting_handlers["background_color_r"]  = [&](const auto& v) { s.background_color.x = parse_color(v); };
-    setting_handlers["background_color_g"]  = [&](const auto& v) { s.background_color.y = parse_color(v); };
-    setting_handlers["background_color_b"]  = [&](const auto& v) { s.background_color.z = parse_color(v); };
+    setting_handlers["background_color_r"]  = [&](const auto& v) { s.background_color.x = std::stof(v.c_str()); };
+    setting_handlers["background_color_g"]  = [&](const auto& v) { s.background_color.y = std::stof(v.c_str()); };
+    setting_handlers["background_color_b"]  = [&](const auto& v) { s.background_color.z = std::stof(v.c_str()); };
     setting_handlers["heatmap"]             = [&](const auto& v) { s.heatmap = (std::atoi(v.c_str()) != 0); };
     setting_handlers["heatmap_min"]         = [&](const auto& v) { s.heatmap_min = std::max(std::stof(v.c_str()), 0.0f); };
     setting_handlers["heatmap_max"]         = [&](const auto& v) { s.heatmap_max = std::max(std::stof(v.c_str()), 0.0f); };
@@ -201,6 +192,10 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["show_text"]          = [&](const auto& v) { s.show_text = (std::atoi(v.c_str()) != 0); };
     setting_handlers["show_sync"]          = [&](const auto& v) { s.show_sync = (std::atoi(v.c_str()) != 0); };
     setting_handlers["show_notify"]        = [&](const auto& v) { s.show_notify = (std::atoi(v.c_str()) != 0); };
+
+    s.background_color = scm::math::vec3(covise::coCoviseConfig::getFloat("r", "COVER.Background", 0.0f), 
+                                         covise::coCoviseConfig::getFloat("g", "COVER.Background", 0.0f), 
+                                         covise::coCoviseConfig::getFloat("b", "COVER.Background", 0.0f));
 
     std::ifstream file(filename);
     if (!file.is_open()) {

@@ -202,7 +202,7 @@ void LamureUI::setupUi() {
 
     m_shininess_slider = new opencover::ui::Slider(m_lighting_menu, "shininess");
     m_shininess_slider->setText("Shininess");
-    m_shininess_slider->setBounds(0.0, 100.0);
+    m_shininess_slider->setBounds(1.0, 10.0);
     m_shininess_slider->setValue(m_plugin->getSettings().material_specular[3]);
     m_shininess_slider->setShared(true);
     m_shininess_slider->setCallback([this](double value, bool) {

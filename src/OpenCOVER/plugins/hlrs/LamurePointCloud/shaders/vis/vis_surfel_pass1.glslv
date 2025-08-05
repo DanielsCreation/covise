@@ -10,7 +10,6 @@ out VertexData {
 uniform float max_radius;
 uniform float min_radius;
 uniform float scale_radius;
-uniform mat4 mvp_matrix;
 
 
 layout(location = 0) in vec3 in_position;

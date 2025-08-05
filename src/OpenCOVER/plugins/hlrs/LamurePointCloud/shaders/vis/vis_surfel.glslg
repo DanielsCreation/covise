@@ -21,7 +21,7 @@ uniform mat4 mvp_matrix;
 void main() {
     VertexOut.pass_point_color = VertexIn[0].pass_point_color;
     
-    vec3 center = VertexIn[0].pass_world_pos;
+    vec3 center = gl_in[0].gl_Position.xyz;
     vec3 step_u = VertexIn[0].pass_ms_u;
     vec3 step_v = VertexIn[0].pass_ms_v;
     
