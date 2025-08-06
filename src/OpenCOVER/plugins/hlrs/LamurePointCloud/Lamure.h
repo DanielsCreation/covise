@@ -19,10 +19,10 @@
 #include <map>
 #include <limits>
 
-#include "renderer.h"
+#include "LamureRenderer.h"
 #include "LamureUI.h"
-#include "util.h"
-#include "measurement.h"
+#include "LamureUtil.h"
+#include "LamureMeasurement.h"
 
 #include <lamure/ren/data_provenance.h>
 #include <lamure/prov/prov_aux.h>
@@ -79,12 +79,13 @@ public:
         bool show_bvhs{0};
         bool show_pvs{0};
         int32_t channel{0};
-        bool use_material_color{0};
-        float material_diffuse{0.6f};
-        float material_specular{0.4f};
-        float ambient_light_color{0.6f};
-        float point_light_intensity{1.2f};
         scm::math::vec3f point_light_pos{0.0f, 1000.0f, 0.0f};
+        float point_light_intensity{1.2f};
+        float ambient_intensity{0.6f};
+        float specular_intensity{0.1f};
+        float shininess{1};
+        float gamma{1};
+        bool use_tone_mapping{0};
         bool heatmap{0};
         float heatmap_min{0.0f};
         float heatmap_max{0.05f};
@@ -114,6 +115,7 @@ public:
         bool show_text{ false };
         bool show_sync{ true };
         bool show_notify{ true };
+
     };
 
     struct ModelInfo

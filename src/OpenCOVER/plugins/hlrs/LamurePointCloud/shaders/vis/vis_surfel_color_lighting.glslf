@@ -12,41 +12,8 @@ in FS_IN {
 
 layout(location = 0) out vec4 out_color;
 
-uniform int   use_material_color;
-uniform vec3  material_diffuse;
-uniform vec4  material_specular;
-uniform vec3  ambient_light_color;
-uniform vec4  point_light_color;
-uniform vec3  point_light_pos;
-
-
+INCLUDE ../common/shading/lighting.glsl
 INCLUDE vis_color_no_prov.glsl
-
-vec3 shade_blinn_phong(
-    in vec3 vs_pos,
-    in vec3 vs_normal,
-    in vec3 vs_light_pos,
-    in vec3 vs_color) 
-{
-    vec3 normal     = normalize(vs_normal);
-    vec3 view_dir   = normalize(-vs_pos);
-    vec3 light_dir  = normalize(vs_light_pos - vs_pos);
-    vec3 half_dir   = normalize(light_dir + view_dir);
-
-    float NdotL   = max(dot(normal, light_dir), 0.0);
-    float NdotH = max(dot(normal, half_dir), 0.0);
-
-    vec3 albedo = (use_material_color == 1) ? material_diffuse : vs_color;
-    float shininess = material_specular.a;
-    float light_intensity = point_light_color.a;
-
-    vec3 ambient = ambient_light_color * albedo;
-    vec3 diffuse = point_light_color.rgb * albedo * NdotL * light_intensity;
-    vec3 specular = point_light_color.rgb * material_specular.rgb * pow(NdotH, shininess) * light_intensity;
-
-    return ambient + diffuse + specular;
-}
-
 
 void main() {
     if (length(fsIn.pass_uv_coords) > 1.0) { discard; }
@@ -67,7 +34,6 @@ void main() {
         finalColor = shade_blinn_phong(
             fsIn.pass_vs_pos,
             fsIn.pass_vs_normal,
-            point_light_pos,
             modeColor
         );
     }

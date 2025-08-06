@@ -158,12 +158,12 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["show_bvhs"]           = [&](const auto& v) { s.show_bvhs = (std::atoi(v.c_str()) != 0); };
     setting_handlers["show_pvs"]            = [&](const auto& v) { s.show_pvs = (std::atoi(v.c_str()) != 0); };
     setting_handlers["channel"]             = [&](const auto& v) { s.channel = std::max(std::atoi(v.c_str()), 0); };
-    setting_handlers["use_material_color"]  = [&](const auto& v) { s.use_material_color = (std::clamp(std::atoi(v.c_str()), 0, 1) != 0); };
-    setting_handlers["material_diffuse"]    = [&](const auto& v) { s.material_diffuse = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular"]   = [&](const auto& v) { s.material_specular = std::max(std::stof(v.c_str()), 0.0f); };
-    setting_handlers["material_specular_exponent"] = [&](const auto& v) { s.material_specular = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
-    setting_handlers["ambient_light_color"] = [&](const auto& v) { s.ambient_light_color = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
     setting_handlers["point_light_intensity"] = [&](const auto& v) { s.point_light_intensity = std::clamp(std::stof(v.c_str()), 0.0f, 10000.0f); };
+    setting_handlers["ambient_intensity"] = [&](const auto& v) { s.ambient_intensity = std::clamp(std::stof(v.c_str()), 0.0f, 1.0f); };
+    setting_handlers["specular_intensity"]   = [&](const auto& v) { s.specular_intensity = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["shininess"]               = [&](const auto& v) { s.shininess = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["gamma"]               = [&](const auto& v) { s.gamma = std::max(std::stof(v.c_str()), 0.0f); };
+    setting_handlers["use_tone_mapping"]      = [&](const auto& v) { s.use_tone_mapping = (std::atoi(v.c_str()) != 0); };
     setting_handlers["point_light_pos_x"]     = [&](const auto& v) { s.point_light_pos.x = std::stof(v.c_str()); };
     setting_handlers["point_light_pos_y"]     = [&](const auto& v) { s.point_light_pos.y = std::stof(v.c_str()); };
     setting_handlers["point_light_pos_z"]     = [&](const auto& v) { s.point_light_pos.z = std::stof(v.c_str()); };

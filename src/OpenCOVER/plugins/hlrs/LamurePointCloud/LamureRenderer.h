@@ -86,12 +86,15 @@ private:
         GLint min_radius_loc            {-1};
         GLint scale_radius_loc          {-1};
         GLint scale_projection_loc      {-1};
-        GLint use_material_color_loc    {-1};
-        GLint material_diffuse_loc      {-1};
-        GLint material_specular_loc     {-1};
-        GLint ambient_light_color_loc   {-1};
+        // --- Unified float-based lighting uniforms ---
+        GLint use_tone_mapping_loc      {-1};
+        GLint ambient_intensity_loc     {-1};
+        GLint diffuse_intensity_loc     {-1};
+        GLint specular_intensity_loc    {-1};
+        GLint shininess_loc             {-1};
         GLint point_light_intensity_loc {-1};
-        GLint point_light_pos_loc       {-1};
+        GLint point_light_pos_vs_loc    {-1};
+        GLint gamma_loc                 {-1};
         GLint show_normals_loc          {-1};
         GLint show_accuracy_loc         {-1};
         GLint show_radius_dev_loc       {-1};
@@ -164,12 +167,15 @@ private:
         GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
         GLint accuracy_loc              {-1}; // float accuracy
         GLint average_radius_loc        {-1}; // float average_radius
-        GLint use_material_color_loc    {-1}; // int use_material_color
-        GLint material_diffuse_loc      {-1}; // vec3 material_diffuse
-        GLint material_specular_loc     {-1}; // vec4 material_specular
-        GLint ambient_light_color_loc   {-1}; // vec3 ambient_light_color
-        GLint point_light_intensity_loc {-1}; // vec4 point_light_color
-        GLint point_light_pos_loc       {-1}; // vec3 point_light_pos
+        // --- Unified float-based lighting uniforms ---
+        GLint use_tone_mapping_loc      {-1};
+        GLint ambient_intensity_loc     {-1};
+        GLint diffuse_intensity_loc     {-1};
+        GLint specular_intensity_loc    {-1};
+        GLint shininess_loc             {-1};
+        GLint point_light_intensity_loc {-1};
+        GLint point_light_pos_vs_loc    {-1};
+        GLint gamma_loc                 {-1};
     };
     SurfelColorLightingShader m_surfel_color_lighting_shader;
 
@@ -259,12 +265,14 @@ private:
         // Lighting uniforms (for Blinn-Phong shading)
         GLint view_matrix_loc{-1};
         GLint view_normal_matrix_loc{-1};
-        GLint use_material_color_loc{-1};
-        GLint material_diffuse_loc{-1};
-        GLint material_specular_loc{-1};
-        GLint ambient_light_color_loc{-1};
-        GLint point_light_intensity_loc{-1};
-        GLint point_light_pos_loc{-1};
+        // --- Unified float-based lighting uniforms ---
+        GLint point_light_pos_vs_loc    {-1};
+        GLint point_light_intensity_loc {-1};
+        GLint ambient_intensity_loc     {-1};
+        GLint specular_intensity_loc    {-1};
+        GLint shininess_loc             {-1};
+        GLint use_tone_mapping_loc      {-1};
+        GLint gamma_loc                 {-1};
     };
     SurfelPass3Shader m_surfel_pass3_shader;
 

@@ -1,5 +1,5 @@
 ﻿// measurement.cpp
-#include "measurement.h"
+#include "LamureMeasurement.h"
 #include <fstream>
 #include <iostream>
 #include <cmath>
@@ -122,7 +122,6 @@ void Measurement::drawIncrement(bool preDraw)
 
 void Measurement::updateCamera(const osg::Vec3& tra, const osg::Vec3& rot)
 {
-
     double rx = osg::DegreesToRadians(rot.x());
     double ry = osg::DegreesToRadians(rot.y());
     double rz = osg::DegreesToRadians(rot.z());

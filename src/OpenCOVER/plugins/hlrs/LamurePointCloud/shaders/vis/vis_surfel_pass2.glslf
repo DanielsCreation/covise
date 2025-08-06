@@ -27,18 +27,8 @@ uniform sampler2D depth_texture;
 
 void main() {
 
-  // Discard fragments outside the circular surfel area
   if ( dot(VertexIn.pass_uv_coords, VertexIn.pass_uv_coords) > 1.0 )
     discard;
-
-
-  // Accumulate weighted normals and positions for deferred shading
-  //vec3 adjustedNormal = VertexIn.pass_normal;
-  //if (adjustedNormal.z < 0.0) {
-  //  adjustedNormal *= -1.0;
-  //}
-  //accumulated_normals = adjustedNormal * weight;
-  //accumulated_vs_positions = VertexIn.mv_vertex_position * weight;
 
   int idx = int(clamp(length(VertexIn.pass_uv_coords) * 31.0, 0.0, 31.0));
   float weight = gaussian[idx];

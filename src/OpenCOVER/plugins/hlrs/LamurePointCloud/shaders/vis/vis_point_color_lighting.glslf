@@ -20,43 +20,17 @@ uniform vec3  ambient_light_color;
 uniform vec4  point_light_color;
 uniform vec3  point_light_pos;
 
-// Include for debug/visualization modes
+
 INCLUDE vis_color_no_prov.glsl
+INCLUDE ../common/shading/lighting.glsl
 
-// Blinn-Phong lighting function (from Surfel-Shader)
-vec3 shade_blinn_phong(
-    in vec3 vs_pos,
-    in vec3 vs_normal,
-    in vec3 vs_light_pos,
-    in vec3 albedo_base) 
-{
-    vec3 normal     = normalize(vs_normal);
-    vec3 light_dir  = normalize(vs_light_pos - vs_pos);
-    vec3 view_dir   = normalize(-vs_pos);
-    vec3 half_dir   = normalize(light_dir + view_dir);
-
-    float NdotL   = max(dot(normal, light_dir), 0.0);
-    float NdotH   = max(dot(normal, half_dir), 0.0);
-
-    vec3 albedo = (use_material_color == 1) ? material_diffuse : albedo_base;
-    float shininess = material_specular.a;
-    float light_intensity = point_light_color.a;
-
-    vec3 ambient = ambient_light_color * albedo;
-    vec3 diffuse = point_light_color.rgb * albedo * NdotL * light_intensity;
-    vec3 specular = point_light_color.rgb * material_specular.rgb * pow(NdotH, shininess) * light_intensity;
-
-    return ambient + diffuse + specular;
-}
 
 
 void main() {
-
-
     // Get the base color from the visualization mode (e.g., pure color, normals, etc.)
     vec3 modeColor = get_color(
         fsIn.pass_world_pos,
-        fsIn.pass_vs_normal, // Pass view-space normal
+        fsIn.pass_vs_normal,
         fsIn.pass_point_color,
         fsIn.pass_radius_ws,
         fsIn.pass_screen_size
@@ -73,7 +47,6 @@ void main() {
         finalColor = shade_blinn_phong(
             fsIn.pass_vs_pos,
             fsIn.pass_vs_normal,
-            point_light_pos,
             modeColor
         );
     }

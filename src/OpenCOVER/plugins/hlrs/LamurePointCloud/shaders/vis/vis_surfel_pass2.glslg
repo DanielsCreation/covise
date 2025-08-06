@@ -24,12 +24,10 @@ out VertexData {
 } VertexOut;
 
 void main() {
-  
-  // Pass through data from the vertex shader
   VertexOut.pass_point_color = VertexIn[0].pass_point_color;
   VertexOut.pass_vs_normal = VertexIn[0].pass_vs_normal; 
   
-  vec3 center   = gl_in[0].gl_Position.xyz; // position of surfel in model space
+  vec3 center   = gl_in[0].gl_Position.xyz;
   vec3 step_u   = VertexIn[0].pass_ms_u;
   vec3 step_v   = VertexIn[0].pass_ms_v;
 

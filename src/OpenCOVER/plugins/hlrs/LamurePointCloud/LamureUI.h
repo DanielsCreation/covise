@@ -41,12 +41,12 @@ private:
 
     // Gruppe für Beleuchtungseinstellungen (dynamisch sichtbar)
     opencover::ui::Group* m_lighting_group = nullptr;
-    opencover::ui::Slider* m_material_diffuse_slider = nullptr;
-    opencover::ui::Slider* m_material_specular_slider = nullptr;
-    opencover::ui::Slider* m_shininess_slider = nullptr;
-    opencover::ui::Slider* m_ambient_light_slider = nullptr;
     opencover::ui::Slider* m_light_color_slider = nullptr;
     opencover::ui::Slider* m_light_intensity_slider = nullptr;
+    opencover::ui::Slider* m_ambient_light_slider = nullptr;
+    opencover::ui::Slider* m_specular_intenity_slider = nullptr;
+    opencover::ui::Slider* m_shininess_slider = nullptr;
+    opencover::ui::Slider* m_gamma_slider = nullptr;
 
     // Haupt-Buttons
     opencover::ui::Button* m_pointcloud_button   = nullptr;
@@ -59,6 +59,9 @@ private:
     opencover::ui::Button* m_prov_button         = nullptr;
     opencover::ui::Button* m_measure_button      = nullptr;
     opencover::ui::Button* m_lod_button          = nullptr;
+    opencover::ui::Button* m_tone_mapping_button = nullptr;
+
+    
 
     // Gruppen und Men�
     opencover::ui::Menu*   m_lamure_menu        = nullptr;

@@ -108,9 +108,10 @@ void LamureUI::setupUi() {
 
     m_scale_radius_slider = new opencover::ui::Slider(m_point_size_menu, "scale_radius");
     m_scale_radius_slider->setText("Scale Radius");
-    m_scale_radius_slider->setBounds(0.0001, m_plugin->getSettings().scale_radius * 5.0f);
+    //m_scale_radius_slider->setBounds(0.0001, m_plugin->getSettings().scale_radius * 5.0f);
+    //m_scale_radius_slider->setScale(opencover::ui::Slider::Logarithmic);
+    m_scale_radius_slider->setBounds(0.0, 8.0f);
     m_scale_radius_slider->setValue(m_plugin->getSettings().scale_radius);
-    m_scale_radius_slider->setScale(opencover::ui::Slider::Logarithmic);
     m_scale_radius_slider->setShared(true);
     m_scale_radius_slider->setCallback([this](double value, bool released)
         { m_plugin->getSettings().scale_radius = static_cast<float>(value); });
@@ -173,40 +174,57 @@ void LamureUI::setupUi() {
 
     m_lighting_menu = new opencover::ui::Menu(m_lamure_menu, "Lighting");
 
-    m_ambient_light_slider = new opencover::ui::Slider(m_lighting_menu, "ambient_light");
+    m_ambient_light_slider = new opencover::ui::Slider(m_lighting_menu, "ambient_intensity");
     m_ambient_light_slider->setText("Ambient Light");
     m_ambient_light_slider->setBounds(0.0, 1.0);
-    m_ambient_light_slider->setValue(m_plugin->getSettings().ambient_light_color.x);
+    m_ambient_light_slider->setValue(m_plugin->getSettings().ambient_intensity);
     m_ambient_light_slider->setShared(true);
     m_ambient_light_slider->setCallback([this](double value, bool) {
-        m_plugin->getSettings().ambient_light_color = scm::math::vec3f(static_cast<float>(value));
+        m_plugin->getSettings().ambient_intensity = (float)value;
         });
 
     m_light_intensity_slider = new opencover::ui::Slider(m_lighting_menu, "point_light_intensity");
     m_light_intensity_slider->setText("Point Light Intensity");
     m_light_intensity_slider->setBounds(0, 1.0);
-    m_light_intensity_slider->setValue(m_plugin->getSettings().point_light_color.x);
+    m_light_intensity_slider->setValue(m_plugin->getSettings().point_light_intensity);
     m_light_intensity_slider->setShared(true);
-    m_light_intensity_slider->setCallback([this](double v, bool) { m_plugin->getSettings().point_light_color.a = (float)v; });
+    m_light_intensity_slider->setCallback([this](double value, bool) { 
+        m_plugin->getSettings().point_light_intensity = (float)value; 
+        });
 
-    m_material_specular_slider = new opencover::ui::Slider(m_lighting_menu, "specular_intensity");
-    m_material_specular_slider->setText("Specular Intensity");
-    m_material_specular_slider->setBounds(0.0, 10.0);
-    m_material_specular_slider->setValue(m_plugin->getSettings().material_specular.x);
-    m_material_specular_slider->setShared(true);
-    m_material_specular_slider->setCallback([this](double v, bool) {
-        m_plugin->getSettings().material_specular.x = (float)v;
-        m_plugin->getSettings().material_specular.y = (float)v;
-        m_plugin->getSettings().material_specular.z = (float)v;
+    m_specular_intenity_slider = new opencover::ui::Slider(m_lighting_menu, "specular_intensity");
+    m_specular_intenity_slider->setText("Specular Intensity");
+    m_specular_intenity_slider->setBounds(0.0, 10.0);
+    m_specular_intenity_slider->setValue(m_plugin->getSettings().specular_intensity);
+    m_specular_intenity_slider->setShared(true);
+    m_specular_intenity_slider->setCallback([this](double value, bool) {
+        m_plugin->getSettings().specular_intensity = (float)value;
         });
 
     m_shininess_slider = new opencover::ui::Slider(m_lighting_menu, "shininess");
     m_shininess_slider->setText("Shininess");
     m_shininess_slider->setBounds(1.0, 10.0);
-    m_shininess_slider->setValue(m_plugin->getSettings().material_specular[3]);
+    m_shininess_slider->setValue(m_plugin->getSettings().shininess);
     m_shininess_slider->setShared(true);
     m_shininess_slider->setCallback([this](double value, bool) {
-        m_plugin->getSettings().material_specular[3] = static_cast<float>(value);
+        m_plugin->getSettings().shininess = static_cast<float>(value);
+        });
+
+    m_gamma_slider = new opencover::ui::Slider(m_lighting_menu, "gamma");
+    m_gamma_slider->setText("Gamma");
+    m_gamma_slider->setBounds(0.0, 3.0);
+    m_gamma_slider->setValue(m_plugin->getSettings().gamma);
+    m_gamma_slider->setShared(true);
+    m_gamma_slider->setCallback([this](double value, bool) {
+        m_plugin->getSettings().gamma = static_cast<float>(value);
+        });
+
+    m_tone_mapping_button = new opencover::ui::Button(m_lighting_menu, "tone_mapping");
+    m_tone_mapping_button->setText("Tone Mapping");
+    m_tone_mapping_button->setShared(true);
+    m_tone_mapping_button->setState(m_plugin->getSettings().use_tone_mapping);
+    m_tone_mapping_button->setCallback([this](bool state) {
+        m_plugin->getSettings().use_tone_mapping = state;
         });
 
     // Light Position Sliders
@@ -246,8 +264,7 @@ void LamureUI::setupUi() {
         "Normals",
         "Accuracy",
         "Radius Deviation",
-        "Output Sensitivity",
-        "Material Color"
+        "Output Sensitivity"
     };
     if (prov_available) {
         for (int i = 1; i <= 6; ++i) {
@@ -266,8 +283,6 @@ void LamureUI::setupUi() {
         initial_mode_idx = 3;
     } else if (s.show_output_sensitivity) {
         initial_mode_idx = 4;
-    } else if (s.use_material_color) {
-        initial_mode_idx = 5;
     } else if (s.channel >= 1 && s.channel <= 6) {
         if (prov_available) {
             initial_mode_idx = 5 + s.channel;
@@ -280,7 +295,6 @@ void LamureUI::setupUi() {
         st.show_accuracy           = false;
         st.show_radius_deviation   = false;
         st.show_output_sensitivity = false;
-        st.use_material_color     = false;
         st.channel                 = 0;
         switch (idx) {
         case 0: /* Color */                        break;
@@ -288,9 +302,8 @@ void LamureUI::setupUi() {
         case 2: st.show_accuracy           = true; break;
         case 3: st.show_radius_deviation   = true; break;
         case 4: st.show_output_sensitivity = true; break;
-        case 5: st.use_material_color     = true; break;
         default:
-            st.channel = idx - 5;
+            st.channel = idx - 4;
             break;
         }
         });

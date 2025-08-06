@@ -61,11 +61,11 @@ SET(HEADERS
   #LamureDrawable.h
   gl_state.h
   osg_util.h
-  measurement.h
   Lamure.h
+  LamureRenderer.h
   LamureUI.h
-  renderer.h
-  util.h
+  LamureUtil.h
+  LamureMeasurement.h
 )
 
 SET(SOURCES 
@@ -76,11 +76,11 @@ SET(SOURCES
   #LamureDrawable.cpp
   gl_state.cpp
   osg_util.cpp
-  measurement.cpp
   Lamure.cpp
+  LamureRenderer.cpp
   LamureUI.cpp
-  renderer.cpp
-  util.cpp
+  LamureUtil.cpp
+  LamureMeasurement.cpp
 )
 
 set(SCHISM_INCLUDE_DIRS

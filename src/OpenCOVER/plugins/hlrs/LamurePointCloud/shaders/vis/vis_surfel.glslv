@@ -44,8 +44,8 @@ void main() {
     float r_world = clamp(in_radius * scale_radius, min_radius, max_radius);
     
     // Ausgabe der skalierten Tangentenvektoren
-    VertexOut.pass_ms_u        = u * (r_world * 0.5);
-    VertexOut.pass_ms_v        = v * (r_world * 0.5);
+    VertexOut.pass_ms_u        = u * r_world;
+    VertexOut.pass_ms_v        = v * r_world;
     VertexOut.pass_point_color = vec3(in_r, in_g, in_b);
     VertexOut.pass_world_pos = in_position;
     

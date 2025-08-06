@@ -1,6 +1,6 @@
-#include "renderer.h"
+#include "LamureRenderer.h"
 #include "Lamure.h"
-#include "util.h"
+#include "LamureUtil.h"
 
 #include <cover/coVRConfig.h>
 #include <cover/VRViewer.h>
@@ -559,16 +559,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 scm::math::mat4 mvp_matrix = projection_matrix * model_view_matrix;
                 scm::gl::frustum frustum = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
 
-                const float* mm  = model_matrix.data_array;
-                const float* vm  = view_matrix.data_array;
-                const float* pm  = projection_matrix.data_array;
-                const float* mvp = (projection_matrix * view_matrix).data_array;
-
-                //print_mat4_flat(mm,  "Model-Matrix");
-                //print_mat4_flat(vm,  "View-Matrix");
-                //print_mat4_flat(pm,  "Projection-Matrix");
-                //print_mat4_flat(mvp, "MVP-Matrix");
-
                 glUniformMatrix4fv(_renderer->getSurfelPass1Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
                 glUniformMatrix4fv(_renderer->getSurfelPass1Shader().model_matrix_loc, 1, GL_FALSE, model_matrix.data_array);
 
@@ -581,50 +571,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 }
             }
 
-            //std::vector<float> depthBuffer(width * height);
-            //glReadPixels(0, 0, width, height,GL_DEPTH_COMPONENT,GL_FLOAT,depthBuffer.data());
-            //const int chunk_w = 5, chunk_h = 5;
-            //int start_x = width  / 2 - chunk_w / 2 + 50;
-            //int start_y = height / 2 - chunk_h / 2 + 50;
-            //start_x = std::clamp(start_x, 0, width  - chunk_w);
-            //start_y = std::clamp(start_y, 0, height - chunk_h);
-            //std::map<float, int> freq;
-            //for (int y = 0; y < chunk_h; ++y) {
-            //    for (int x = 0; x < chunk_w; ++x) {
-            //        float d = depthBuffer[(start_y + y) * width + (start_x + x)];
-            //        freq[d]++;
-            //    }
-            //}
-            //std::cout << "Unique depths in chunk (" << start_x << "," << start_y << ") size " << chunk_w << "×" << chunk_h << ":\n";
-            //for (auto const& [value, count] : freq) {
-            //    std::cout << std::fixed << std::setprecision(4) << value << ": " << count << "\n";
-            //}
-            //std::cout << std::endl;
-
-            // --- Debug Visualisierung von Pass 1 ---
-            //glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
-            //glViewport(prev_viewport[0], prev_viewport[1], prev_viewport[2], prev_viewport[3]);
-            //glDisable(GL_DEPTH_TEST);
-            //glDepthMask(GL_FALSE);
-            //glClear(GL_COLOR_BUFFER_BIT);
-
-            //glUseProgram(_renderer->getDebugShader().program);
-            //glActiveTexture(GL_TEXTURE0);
-            //glBindTexture(GL_TEXTURE_2D, res.depth_texture);
-            //glUniform1i(_renderer->getDebugShader().texture_color_loc, 0);
-            //glUniform1i(_renderer->getDebugShader().debug_mode_loc, 0);
-            //glUniform1f(_renderer->getDebugShader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
-            //glUniform1f(_renderer->getDebugShader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
-            //glBindVertexArray(res.screen_quad_vao);
-            //glDrawArrays(GL_TRIANGLES, 0, 6);
-            //glBindVertexArray(0);
-            //glActiveTexture(GL_TEXTURE0);
-
-            // Restore state and exit early for debugging
-            //_renderer->setRendering(false);
-            //before.restore();
-            //return;
-            
 
             // --- PASS 2: Accumulation Pass ---
             GLenum accumBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
@@ -693,90 +639,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 }
             }
 
-            //std::vector<scm::math::vec4> posBuffer(width * height);
-            //glReadBuffer(GL_COLOR_ATTACHMENT2);
-            //glReadPixels(
-            //    0, 0, width, height,
-            //    GL_RGBA, GL_FLOAT,
-            //    reinterpret_cast<float*>(posBuffer.data())
-            //);
-            //const int chunk_w = 5, chunk_h = 5;
-            //int start_x = width  / 2 - chunk_w / 2;
-            //int start_y = height / 2 - chunk_h / 2;
-            //start_x = std::clamp(start_x, 0, width  - chunk_w);
-            //start_y = std::clamp(start_y, 0, height - chunk_h);
-            //std::map<scm::math::vec4, int,
-            //    bool(*)(scm::math::vec4 const&, scm::math::vec4 const&)> freq(
-            //        [](scm::math::vec4 const& a, scm::math::vec4 const& b){
-            //            if (a.x != b.x) return a.x < b.x;
-            //            if (a.y != b.y) return a.y < b.y;
-            //            if (a.z != b.z) return a.z < b.z;
-            //            return a.w < b.w;
-            //        }
-            //    );
-            //for (int y = 0; y < chunk_h; ++y) {
-            //    for (int x = 0; x < chunk_w; ++x) {
-            //        scm::math::vec4 p = posBuffer[(start_y + y) * width + (start_x + x)];
-            //        if (p.w != 0.0f) {
-            //            p.x /= p.w;
-            //            p.y /= p.w;
-            //            p.z /= p.w;
-            //        }
-            //        freq[p]++;
-            //    }
-            //}
-            //std::cout << "Unique positions in chunk ("
-            //    << start_x << "," << start_y << "), size "
-            //    << chunk_w << "x" << chunk_h << ":\n";
-            //for (auto const& [pos, count] : freq) {
-            //    std::cout << std::fixed << std::setprecision(3)
-            //        << "("
-            //        << pos.x << ", "
-            //        << pos.y << ", "
-            //        << pos.z << ")"
-            //        << ": " << count << "\n";
-            //}
-            //std::cout << std::endl;
-
-            // --- Debug Visualisierung von Pass 2 (mit existierendem Shader) ---
-            //glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
-            //glViewport(prev_viewport[0], prev_viewport[1], prev_viewport[2], prev_viewport[3]);
-            //glDisable(GL_DEPTH_TEST);
-            //glDepthMask(GL_FALSE);
-            //glClear(GL_COLOR_BUFFER_BIT);
-            //glUseProgram(_renderer->getDebugShader().program);
-            //int debug_mode = 1;
-            //glUniform1i(_renderer->getDebugShader().debug_mode_loc, debug_mode);
-            //if (debug_mode == 0) {
-            //    glActiveTexture(GL_TEXTURE0);
-            //    glBindTexture(GL_TEXTURE_2D, res.depth_texture);
-            //    glUniform1i(_renderer->getDebugShader().texture_depth_loc, 0);
-            //}
-            //else if (debug_mode == 1) {
-            //    glActiveTexture(GL_TEXTURE0);
-            //    glBindTexture(GL_TEXTURE_2D, res.texture_color);
-            //    glUniform1i(_renderer->getDebugShader().texture_color_loc, 0);
-            //}
-            //else if (debug_mode == 2) {
-            //    glActiveTexture(GL_TEXTURE0);
-            //    glBindTexture(GL_TEXTURE_2D, res.texture_normal);
-            //    glUniform1i(_renderer->getDebugShader().texture_normal_loc, 0);
-            //}
-            //else if (debug_mode == 3) {
-            //    glActiveTexture(GL_TEXTURE0);
-            //    glBindTexture(GL_TEXTURE_2D, res.texture_position);
-            //    glUniform1i(_renderer->getDebugShader().texture_position_loc, 0);
-            //}
-            //glUniform1f(_renderer->getDebugShader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
-            //glUniform1f(_renderer->getDebugShader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
-            //glBindVertexArray(res.screen_quad_vao);
-            //glDrawArrays(GL_TRIANGLES, 0, 6);
-            //glBindVertexArray(0);
-            //glActiveTexture(GL_TEXTURE0);
-            //_renderer->setRendering(false);
-            //before.restore();
-            //return;
-
 
             // --- PASS 3: Resolve / Lighting Pass ---
             glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
@@ -808,12 +670,12 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
             glUniform3fv(prog.background_color_loc, 1, background_color.data_array);
             glUniformMatrix4fv(prog.view_matrix_loc, 1, GL_FALSE, viewMat.data_array);
-            glUniform1i(prog.use_material_color_loc, s.use_material_color ? 1 : 0);
-            glUniform1f(prog.material_diffuse_loc, s.material_diffuse);
-            glUniform1f(prog.material_specular_loc, s.material_specular);
-            glUniform1f(prog.ambient_light_color_loc, s.ambient_light_color);
             glUniform1f(prog.point_light_intensity_loc, s.point_light_intensity);
-            glUniform3fv(prog.point_light_pos_loc, 1, (viewMat3 * s.point_light_pos).data_array);
+            glUniform1f(prog.ambient_intensity_loc,     s.ambient_intensity);
+            glUniform1f(prog.specular_intensity_loc,    s.specular_intensity);
+            glUniform1f(prog.shininess_loc,             s.shininess);
+            glUniform1f(prog.gamma_loc,                 s.gamma);
+            glUniform1i(prog.use_tone_mapping_loc,      s.use_tone_mapping ? 1 : 0);
 
             glBindVertexArray(res.screen_quad_vao);
             glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -1130,7 +992,8 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
 
         auto& prog = m_point_color_lighting_shader;
         glUseProgram(prog.program);
-
+        glUniformMatrix4fv(prog.view_matrix_loc, 1, GL_FALSE, viewMat.data_array);
+        glUniformMatrix3fv(prog.view_normal_matrix_loc, 1, GL_FALSE, normalMat.data_array);
         glUniform1f(prog.min_radius_loc, s.min_radius);
         glUniform1f(prog.max_radius_loc, s.max_radius);
         glUniform1f(prog.scale_radius_loc, s.scale_radius);
@@ -1139,14 +1002,13 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         glUniform1i(prog.show_radius_dev_loc, s.show_radius_deviation);
         glUniform1i(prog.show_output_sens_loc, s.show_output_sensitivity);
         glUniform1i(prog.show_accuracy_loc, s.show_accuracy);
-        glUniformMatrix4fv(prog.view_matrix_loc, 1, GL_FALSE, viewMat.data_array);
-        glUniformMatrix3fv(prog.view_normal_matrix_loc, 1, GL_FALSE, normalMat.data_array);
-        glUniform1i(prog.use_material_color_loc, s.use_material_color ? 1 : 0);
-        glUniform1f(prog.material_diffuse_loc, s.material_diffuse);
-        glUniform1f(prog.material_specular_loc, s.material_specular);
-        glUniform1f(prog.ambient_light_color_loc, s.ambient_light_color);
+        glUniform3fv(prog.point_light_pos_vs_loc,   1, (viewMat3 * s.point_light_pos).data_array);
         glUniform1f(prog.point_light_intensity_loc, s.point_light_intensity);
-        glUniform3fv(prog.point_light_pos_loc,     1, (viewMat3 * s.point_light_pos).data_array);
+        glUniform1f(prog.ambient_intensity_loc,     s.ambient_intensity);
+        glUniform1f(prog.specular_intensity_loc,    s.specular_intensity);
+        glUniform1f(prog.shininess_loc,             s.shininess);
+        glUniform1f(prog.gamma_loc,                 s.gamma);
+        glUniform1i(prog.use_tone_mapping_loc,      s.use_tone_mapping ? 1 : 0);
         break;
     }
     case ShaderType::PointProv: {
@@ -1201,22 +1063,26 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         auto& prog = m_surfel_color_lighting_shader;
         //glEnable(GL_DEPTH_TEST);
         glUseProgram(prog.program);
+        glUniformMatrix4fv(prog.view_matrix_loc,        1, GL_FALSE, viewMat.data_array);
+        glUniformMatrix3fv(prog.view_normal_matrix_loc, 1, GL_FALSE, normalMat.data_array);
+
         glUniform1f(prog.min_radius_loc,   s.min_radius);
         glUniform1f(prog.max_radius_loc,   s.max_radius);
         glUniform1f(prog.scale_radius_loc, s.scale_radius);
-        glUniform2fv(prog.viewport_loc,    1, viewport.data_array);
-        glUniformMatrix4fv(prog.view_matrix_loc,        1, GL_FALSE, viewMat.data_array);
-        glUniformMatrix3fv(prog.view_normal_matrix_loc, 1, GL_FALSE, normalMat.data_array);
-        glUniform1i(prog.use_material_color_loc,   s.use_material_color ? 1 : 0);
-        glUniform1f(prog.material_diffuse_loc, s.material_diffuse);
-        glUniform1f(prog.material_specular_loc, s.material_specular);
-        glUniform1f(prog.ambient_light_color_loc, s.ambient_light_color);
+        glUniform2fv(prog.viewport_loc, 1, viewport.data_array);
+
+        glUniform1i(prog.show_normals_loc,         s.show_normals ? 1 : 0);
+        glUniform1i(prog.show_radius_dev_loc,      s.show_radius_deviation ? 1 : 0);
+        glUniform1i(prog.show_output_sens_loc,     s.show_output_sensitivity ? 1 : 0);
+        glUniform1i(prog.show_accuracy_loc,        s.show_accuracy ? 1 : 0);
+
+        glUniform3fv(prog.point_light_pos_vs_loc,   1, (viewMat3 * s.point_light_pos).data_array);
         glUniform1f(prog.point_light_intensity_loc, s.point_light_intensity);
-        glUniform3fv(prog.point_light_pos_loc,     1, (viewMat3 * s.point_light_pos).data_array);
-        glUniform1i(prog.show_normals_loc,         s.show_normals);
-        glUniform1i(prog.show_radius_dev_loc,   s.show_radius_deviation);
-        glUniform1i(prog.show_output_sens_loc,  s.show_output_sensitivity);
-        glUniform1i(prog.show_accuracy_loc,     s.show_accuracy);
+        glUniform1f(prog.ambient_intensity_loc,     s.ambient_intensity);
+        glUniform1f(prog.specular_intensity_loc,    s.specular_intensity);
+        glUniform1f(prog.shininess_loc,             s.shininess);
+        glUniform1f(prog.gamma_loc,                 s.gamma);
+        glUniform1i(prog.use_tone_mapping_loc,      s.use_tone_mapping ? 1 : 0);
         //print_active_uniforms(prog.program, "SurfelColorLighting");
         break;
     }
@@ -1240,30 +1106,33 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         break;
     }
     case ShaderType::SurfelMultipass: {
-        glUseProgram(m_surfel_pass1_shader.program);
-        glUniform1f(m_surfel_pass1_shader.max_radius_loc, s.max_radius);
-        glUniform1f(m_surfel_pass1_shader.min_radius_loc, s.min_radius);
-        glUniform1f(m_surfel_pass1_shader.scale_radius_loc, s.scale_radius);
-        glUniform1f(m_surfel_pass1_shader.far_plane_loc, m_plugin->getRenderer()->getScmCamera()->far_plane_value());
 
-        // --- Uniforms for Pass 2 ---
-        glUseProgram(m_surfel_pass2_shader.program);
+        auto& prog1 = m_surfel_pass1_shader;
+        glUseProgram(prog1.program);
+        glUniform1f(prog1.max_radius_loc, s.max_radius);
+        glUniform1f(prog1.min_radius_loc, s.min_radius);
+        glUniform1f(prog1.scale_radius_loc, s.scale_radius);
+        glUniform1f(prog1.far_plane_loc, m_plugin->getRenderer()->getScmCamera()->far_plane_value());
+
+
+        auto& prog2 = m_surfel_pass2_shader;
+        glUseProgram(prog2.program);
         //coco->nearClip(), coco->farClip()
-        glUniform1f(m_surfel_pass2_shader.near_plane_loc, m_plugin->getRenderer()->getScmCamera()->near_plane_value());
-        glUniform1f(m_surfel_pass2_shader.max_radius_loc, s.max_radius);
-        glUniform1f(m_surfel_pass2_shader.min_radius_loc, s.min_radius);
-        glUniform1f(m_surfel_pass2_shader.scale_radius_loc, s.scale_radius);
-        glUniform2fv(m_surfel_pass2_shader.win_size_loc, 1, viewport.data_array);
-        glUniform1i(m_surfel_pass2_shader.show_normals_loc, s.show_normals);
-        glUniform1i(m_surfel_pass2_shader.show_radius_dev_loc, s.show_radius_deviation);
-        glUniform1i(m_surfel_pass2_shader.show_output_sens_loc, s.show_output_sensitivity);
-        glUniform1i(m_surfel_pass2_shader.show_accuracy_loc, s.show_accuracy);
-        glUniform1i(m_surfel_pass2_shader.channel_loc, s.channel);
-        glUniform1i(m_surfel_pass2_shader.heatmap_loc, s.heatmap);
-        glUniform1f(m_surfel_pass2_shader.heatmap_min_loc, s.heatmap_min);
-        glUniform1f(m_surfel_pass2_shader.heatmap_max_loc, s.heatmap_max);
-        glUniform3fv(m_surfel_pass2_shader.heatmap_min_color_loc, 1, s.heatmap_color_min.data_array);
-        glUniform3fv(m_surfel_pass2_shader.heatmap_max_color_loc, 1, s.heatmap_color_max.data_array);
+        glUniform1f(prog2.near_plane_loc, m_plugin->getRenderer()->getScmCamera()->near_plane_value());
+        glUniform1f(prog2.max_radius_loc, s.max_radius);
+        glUniform1f(prog2.min_radius_loc, s.min_radius);
+        glUniform1f(prog2.scale_radius_loc, s.scale_radius);
+        glUniform2fv(prog2.win_size_loc, 1, viewport.data_array);
+        glUniform1i(prog2.show_normals_loc, s.show_normals);
+        glUniform1i(prog2.show_radius_dev_loc, s.show_radius_deviation);
+        glUniform1i(prog2.show_output_sens_loc, s.show_output_sensitivity);
+        glUniform1i(prog2.show_accuracy_loc, s.show_accuracy);
+        glUniform1i(prog2.channel_loc, s.channel);
+        glUniform1i(prog2.heatmap_loc, s.heatmap);
+        glUniform1f(prog2.heatmap_min_loc, s.heatmap_min);
+        glUniform1f(prog2.heatmap_max_loc, s.heatmap_max);
+        glUniform3fv(prog2.heatmap_min_color_loc, 1, s.heatmap_color_min.data_array);
+        glUniform3fv(prog2.heatmap_max_color_loc, 1, s.heatmap_color_max.data_array);
         break;
     }
     }
@@ -1416,12 +1285,13 @@ void LamureRenderer::initUniforms()
     m_point_color_lighting_shader.accuracy_loc            = glGetUniformLocation(m_point_color_lighting_shader.program, "accuracy");
     m_point_color_lighting_shader.average_radius_loc      = glGetUniformLocation(m_point_color_lighting_shader.program, "average_radius");
 
-    m_point_color_lighting_shader.use_material_color_loc  = glGetUniformLocation(m_point_color_lighting_shader.program, "use_material_color");
-    m_point_color_lighting_shader.material_diffuse_loc    = glGetUniformLocation(m_point_color_lighting_shader.program, "material_diffuse");
-    m_point_color_lighting_shader.material_specular_loc   = glGetUniformLocation(m_point_color_lighting_shader.program, "material_specular");
-    m_point_color_lighting_shader.ambient_light_color_loc = glGetUniformLocation(m_point_color_lighting_shader.program, "ambient_light_color");
+    m_point_color_lighting_shader.point_light_pos_vs_loc      = glGetUniformLocation(m_point_color_lighting_shader.program, "point_light_pos");
     m_point_color_lighting_shader.point_light_intensity_loc   = glGetUniformLocation(m_point_color_lighting_shader.program, "point_light_intensity");
-    m_point_color_lighting_shader.point_light_pos_loc     = glGetUniformLocation(m_point_color_lighting_shader.program, "point_light_pos");
+    m_point_color_lighting_shader.ambient_intensity_loc       = glGetUniformLocation(m_point_color_lighting_shader.program, "ambient_intensity");
+    m_point_color_lighting_shader.specular_intensity_loc      = glGetUniformLocation(m_point_color_lighting_shader.program, "specular_intensity");
+    m_point_color_lighting_shader.shininess_loc               = glGetUniformLocation(m_point_color_lighting_shader.program, "shininess");
+    m_point_color_lighting_shader.gamma_loc                   = glGetUniformLocation(m_point_color_lighting_shader.program, "gamma");
+    m_point_color_lighting_shader.use_tone_mapping_loc        = glGetUniformLocation(m_point_color_lighting_shader.program, "use_tone_mapping");
     glUseProgram(0);
 
     glUseProgram(m_point_prov_shader.program);
@@ -1485,12 +1355,13 @@ void LamureRenderer::initUniforms()
     m_surfel_color_lighting_shader.accuracy_loc            = glGetUniformLocation(m_surfel_color_lighting_shader.program, "accuracy");
     m_surfel_color_lighting_shader.average_radius_loc      = glGetUniformLocation(m_surfel_color_lighting_shader.program, "average_radius");
 
-    m_surfel_color_lighting_shader.use_material_color_loc  = glGetUniformLocation(m_surfel_color_lighting_shader.program, "use_material_color");
-    m_surfel_color_lighting_shader.material_diffuse_loc    = glGetUniformLocation(m_surfel_color_lighting_shader.program, "material_diffuse");
-    m_surfel_color_lighting_shader.material_specular_loc   = glGetUniformLocation(m_surfel_color_lighting_shader.program, "material_specular");
-    m_surfel_color_lighting_shader.ambient_light_color_loc = glGetUniformLocation(m_surfel_color_lighting_shader.program, "ambient_light_color");
+    m_surfel_color_lighting_shader.point_light_pos_vs_loc      = glGetUniformLocation(m_surfel_color_lighting_shader.program, "point_light_pos");
     m_surfel_color_lighting_shader.point_light_intensity_loc   = glGetUniformLocation(m_surfel_color_lighting_shader.program, "point_light_intensity");
-    m_surfel_color_lighting_shader.point_light_pos_loc     = glGetUniformLocation(m_surfel_color_lighting_shader.program, "point_light_pos");
+    m_surfel_color_lighting_shader.ambient_intensity_loc       = glGetUniformLocation(m_surfel_color_lighting_shader.program, "ambient_intensity");
+    m_surfel_color_lighting_shader.specular_intensity_loc      = glGetUniformLocation(m_surfel_color_lighting_shader.program, "specular_intensity");
+    m_surfel_color_lighting_shader.shininess_loc               = glGetUniformLocation(m_surfel_color_lighting_shader.program, "shininess");
+    m_surfel_color_lighting_shader.gamma_loc                   = glGetUniformLocation(m_surfel_color_lighting_shader.program, "gamma");
+    m_surfel_color_lighting_shader.use_tone_mapping_loc        = glGetUniformLocation(m_surfel_color_lighting_shader.program, "use_tone_mapping");
     glUseProgram(0);
 
     glUseProgram(m_surfel_prov_shader.program);
@@ -1551,22 +1422,22 @@ void LamureRenderer::initUniforms()
     m_surfel_pass2_shader.heatmap_max_loc = glGetUniformLocation(m_surfel_pass2_shader.program, "heatmap_max");
     m_surfel_pass2_shader.heatmap_min_color_loc = glGetUniformLocation(m_surfel_pass2_shader.program, "heatmap_min_color");
     m_surfel_pass2_shader.heatmap_max_color_loc = glGetUniformLocation(m_surfel_pass2_shader.program, "heatmap_max_color");
-    m_surfel_pass2_shader.win_size_loc = glGetUniformLocation(m_surfel_pass2_shader.program, "win_size");
     glUseProgram(0);
 
     glUseProgram(m_surfel_pass3_shader.program);
-    m_surfel_pass3_shader.in_color_texture_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "in_color_texture");
-    m_surfel_pass3_shader.in_normal_texture_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "in_normal_texture");
-    m_surfel_pass3_shader.in_vs_position_texture_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "in_vs_position_texture");
-    m_surfel_pass3_shader.background_color_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "background_color");
-    m_surfel_pass3_shader.view_matrix_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "view_matrix");
-    m_surfel_pass3_shader.view_normal_matrix_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "view_normal_matrix");
-    m_surfel_pass3_shader.use_material_color_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "use_material_color");
-    m_surfel_pass3_shader.material_diffuse_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "material_diffuse");
-    m_surfel_pass3_shader.material_specular_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "material_specular");
-    m_surfel_pass3_shader.ambient_light_color_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "ambient_light_color");
-    m_surfel_pass3_shader.point_light_intensity_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "point_light_intensity");
-    m_surfel_pass3_shader.point_light_pos_loc = glGetUniformLocation(m_surfel_pass3_shader.program, "point_light_pos");
+    m_surfel_pass3_shader.in_color_texture_loc        = glGetUniformLocation(m_surfel_pass3_shader.program, "in_color_texture");
+    m_surfel_pass3_shader.in_normal_texture_loc       = glGetUniformLocation(m_surfel_pass3_shader.program, "in_normal_texture");
+    m_surfel_pass3_shader.in_vs_position_texture_loc  = glGetUniformLocation(m_surfel_pass3_shader.program, "in_vs_position_texture");
+    m_surfel_pass3_shader.background_color_loc        = glGetUniformLocation(m_surfel_pass3_shader.program, "background_color");
+    m_surfel_pass3_shader.view_matrix_loc            = glGetUniformLocation(m_surfel_pass3_shader.program, "view_matrix");
+    m_surfel_pass3_shader.view_normal_matrix_loc     = glGetUniformLocation(m_surfel_pass3_shader.program, "view_normal_matrix");
+    m_surfel_pass3_shader.point_light_pos_vs_loc      = glGetUniformLocation(m_surfel_pass3_shader.program, "point_light_pos");
+    m_surfel_pass3_shader.point_light_intensity_loc   = glGetUniformLocation(m_surfel_pass3_shader.program, "point_light_intensity");
+    m_surfel_pass3_shader.ambient_intensity_loc       = glGetUniformLocation(m_surfel_pass3_shader.program, "ambient_intensity");
+    m_surfel_pass3_shader.specular_intensity_loc      = glGetUniformLocation(m_surfel_pass3_shader.program, "specular_intensity");
+    m_surfel_pass3_shader.shininess_loc               = glGetUniformLocation(m_surfel_pass3_shader.program, "shininess");
+    m_surfel_pass3_shader.gamma_loc                   = glGetUniformLocation(m_surfel_pass3_shader.program, "gamma");
+    m_surfel_pass3_shader.use_tone_mapping_loc        = glGetUniformLocation(m_surfel_pass3_shader.program, "use_tone_mapping");
     glUseProgram(0);
 
     glUseProgram(m_line_shader.program);
@@ -1672,18 +1543,31 @@ void LamureRenderer::initLamureShader()
             std::cout << "error reading shader files" << std::endl;
             exit(1);
         }
+        std::cout << "m_point_shader" << std::endl;
         m_point_shader.program = m_renderer->compileAndLinkShaders(vis_point_vs_source, vis_point_fs_source);
+        std::cout << "m_point_color_shader" << std::endl;
         m_point_color_shader.program = m_renderer->compileAndLinkShaders(vis_point_color_vs_source, vis_point_color_fs_source);
+        std::cout << "m_point_color_lighting_shader" << std::endl;
         m_point_color_lighting_shader.program = m_renderer->compileAndLinkShaders(vis_point_color_lighting_vs_source, vis_point_color_lighting_fs_source);
+        std::cout << "m_point_prov_shader" << std::endl;
         m_point_prov_shader.program = m_renderer->compileAndLinkShaders(vis_point_prov_vs_source, vis_point_prov_fs_source);
+        std::cout << "m_surfel_shader" << std::endl;
         m_surfel_shader.program = m_renderer->compileAndLinkShaders(vis_surfel_vs_source, vis_surfel_gs_source, vis_surfel_fs_source);
+        std::cout << "m_surfel_color_shader" << std::endl;
         m_surfel_color_shader.program = m_renderer->compileAndLinkShaders(vis_surfel_color_vs_source, vis_surfel_color_gs_source, vis_surfel_color_fs_source);
+        std::cout << "m_surfel_color_lighting_shader" << std::endl;
         m_surfel_color_lighting_shader.program = m_renderer->compileAndLinkShaders(vis_surfel_color_lighting_vs_source, vis_surfel_color_lighting_gs_source, vis_surfel_color_lighting_fs_source);
+        std::cout << "m_surfel_prov_shader" << std::endl;
         m_surfel_prov_shader.program = m_renderer->compileAndLinkShaders(vis_surfel_prov_vs_source, vis_surfel_prov_gs_source, vis_surfel_prov_fs_source);
+        std::cout << "m_line_shader" << std::endl;
         m_line_shader.program = m_renderer->compileAndLinkShaders(vis_line_vs_source, vis_line_fs_source);
+        std::cout << "m_surfel_pass1_shader" << std::endl;
         m_surfel_pass1_shader.program = m_renderer->compileAndLinkShaders(vis_surfel_pass1_vs_source, vis_surfel_pass1_gs_source, vis_surfel_pass1_fs_source);
+        std::cout << "m_surfel_pass2_shader" << std::endl;
         m_surfel_pass2_shader.program = m_renderer->compileAndLinkShaders(vis_surfel_pass2_vs_source, vis_surfel_pass2_gs_source, vis_surfel_pass2_fs_source);
+        std::cout << "m_surfel_pass3_shader" << std::endl;
         m_surfel_pass3_shader.program = m_renderer->compileAndLinkShaders(vis_surfel_pass3_vs_source, vis_surfel_pass3_fs_source);
+        std::cout << "m_debug_shader" << std::endl;
         m_debug_shader.program = m_renderer->compileAndLinkShaders(vis_debug_vs_source, vis_debug_fs_source);
     }
     catch (std::exception &e) { std::cout << e.what() << std::endl; }

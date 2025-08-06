@@ -19,10 +19,12 @@ uniform float near_plane;
 uniform float max_radius;
 uniform float min_radius;
 uniform float scale_radius;
+
 uniform bool show_normals;
 uniform bool show_accuracy;
 uniform bool show_radius_deviation;
 uniform bool show_output_sensitivity;
+
 uniform float accuracy;
 uniform float average_radius;
 uniform int channel;
