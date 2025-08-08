@@ -25,30 +25,30 @@ class LamureMeasurement
 public:
 
     struct TimeBlock {
-        unsigned frame = 0;       // Basisframe (pickStableFrame)
-        unsigned src_frame = 0;   // effektives Stats-Frame (frame - used_offset)
-        int camIndex = -1;        // -1 = viewer, sonst Kameraindex
+        unsigned frame     = 0;   // Basisframe (aus pickStableFrame)
+        unsigned src_frame = 0;   // Effektives Stats-Frame (frame - used_offset)
+        int      camIndex  = -1;  // -1 = viewer, sonst Kameraindex
         std::string scope;        // "viewer" | "camera"
         std::string name;         // z.B. "Draw traversal", "GPU draw"
-        double begin_ms = 0.0;    // ms
-        double end_ms   = 0.0;    // ms
-        double taken_ms = 0.0;    // ms
+        double begin_ms = 0.0;    // ms (falls vorhanden)
+        double end_ms   = 0.0;    // ms (falls vorhanden)
+        double taken_ms = 0.0;    // ms (immer, wenn time taken verfügbar)
         unsigned used_offset = 0; // wie viele Frames zurückgegriffen
     };
 
     struct Segment
     {
-        osg::Vec3 tra;     // **neu:** Positionsänderung relativ zum Segment-Anfang
+        osg::Vec3 tra;     // Positionsänderung relativ zum Segment-Anfang
         osg::Vec3 rot;     // Drehwinkel-Delta in Grad (Pitch, Yaw, Roll)
         float     transSpeed;   // Translationstempo in Einheiten/s
-        float     rotSpeed;     // Rotationsgeschwindigkeit in °/s 
+        float     rotSpeed;     // Rotationsgeschwindigkeit in °/s
     };
 
     struct FrameStats {
         unsigned int frame_number   = 0;
         double frame_rate           = 0.0;
         double frame_duration_ms    = 0.0;
-        double rendering_traversals_ms = 0.0;   // NEU
+        double rendering_traversals_ms = 0.0;
 
         uint64_t rendered_splats    = 0;
         uint64_t rendered_nodes     = 0;
@@ -61,7 +61,7 @@ public:
         double gpu_time_ms         = 0.0;
         double sync_time_ms        = 0.0;
         double swap_time_ms        = 0.0;
-        double finish_ms           = 0.0;       // NEU
+        double finish_ms           = 0.0;
 
         double gpu_clock           = 0.0;
         double gpu_mem_clock       = 0.0;
@@ -75,13 +75,21 @@ public:
         osg::Vec3d position;
         osg::Quat  orientation;
 
-        unsigned backoff_cull = 0;              // NEU
-        unsigned backoff_draw = 0;              // NEU
-        unsigned backoff_gpu  = 0;              // NEU
+        unsigned backoff_cull = 0;
+        unsigned backoff_draw = 0;
+        unsigned backoff_gpu  = 0;
 
-
+        // optional (NVML, Windows/NVIDIA), sonst 0
         double gpu_mem_used_mb   = 0.0;
         double gpu_mem_total_mb  = 0.0;
+
+        // --- Derived metrics (pro Frame) ---
+        double cpu_main_ms         = 0.0;  // cpu_update + cpu_cull + cpu_draw + plugin + isect + opencover
+        double cpu_busy_pct_proxy  = 0.0;  // 100 * cpu_main_ms / frame_duration_ms (0..100 geclippt)
+        double gpu_busy_pct_proxy  = 0.0;  // 100 * min(gpu_time_ms, frame_duration_ms)/frame_duration_ms
+        double wait_ms             = 0.0;  // sync + swap + finish
+        double wait_frac_pct       = 0.0;  // 100 * wait_ms / frame_duration_ms
+        std::string boundness;             // "GPU-bound" | "CPU-bound" | "Wait/Sync-bound" | "mixed" | "unknown"
     };
 
     bool collectFrameStats(osgViewer::ViewerBase* viewer,
@@ -90,10 +98,10 @@ public:
         bool debugPrint = false);
 
     LamureMeasurement(
-                Lamure*                      plugin,
-                opencover::VRViewer*         viewer,
-                const std::vector<Segment>&  segments,
-                const std::string&           logfile
+        Lamure*                      plugin,
+        opencover::VRViewer*         viewer,
+        const std::vector<Segment>&  segments,
+        const std::string&           logfile
     );
     ~LamureMeasurement();
 
@@ -101,28 +109,46 @@ public:
     void writeLogAndStop();
     bool isRunning() const { return m_running; }
 
+    // Timeline-Zugriff (nur lesen)
     const std::vector<TimeBlock>& getTimeline() const { return m_timeline; }
 
-    unsigned getTimeBlockFrame(const TimeBlock& tb) const { return tb.frame; }
-    int      getTimeBlockCamIndex(const TimeBlock& tb) const { return tb.camIndex; }
-    const std::string& getTimeBlockScope(const TimeBlock& tb) const { return tb.scope; }
-    const std::string& getTimeBlockName(const TimeBlock& tb) const { return tb.name; }
-    double   getTimeBlockBeginMs(const TimeBlock& tb) const { return tb.begin_ms; }
-    double   getTimeBlockEndMs(const TimeBlock& tb) const { return tb.end_ms; }
-    double   getTimeBlockTakenMs(const TimeBlock& tb) const { return tb.taken_ms; }
-    unsigned getTimeBlockUsedOffset(const TimeBlock& tb) const { return tb.used_offset; }
+    // Optionaler Markdown-Report
+    void setReportMarkdown(const std::string& path);
 
-    
+    // Bequeme Getter für TimeBlock
+    unsigned            getTimeBlockFrame(const TimeBlock& tb) const { return tb.frame; }
+    unsigned            getTimeBlockSrcFrame(const TimeBlock& tb) const { return tb.src_frame; }
+    int                 getTimeBlockCamIndex(const TimeBlock& tb) const { return tb.camIndex; }
+    const std::string&  getTimeBlockScope(const TimeBlock& tb) const { return tb.scope; }
+    const std::string&  getTimeBlockName(const TimeBlock& tb) const { return tb.name; }
+    double              getTimeBlockBeginMs(const TimeBlock& tb) const { return tb.begin_ms; }
+    double              getTimeBlockEndMs(const TimeBlock& tb) const { return tb.end_ms; }
+    double              getTimeBlockTakenMs(const TimeBlock& tb) const { return tb.taken_ms; }
+    unsigned            getTimeBlockUsedOffset(const TimeBlock& tb) const { return tb.used_offset; }
 
 private:
+    // Konsolen-/Export-Optionen
+    bool     m_exportReport   = true;
     bool     m_verbose        = false;   // Konsole drosseln
     unsigned m_logEveryN      = 50;      // nur jedes N-te Frame loggen
     bool     m_dumpAttrs      = false;   // Attribute-Dumps aus
-    double   m_warnTolMs      = 5.0;     // nur für Debug-Warnungen
-    unsigned m_gpuBackSearch  = 16;      // WICHTIG: größerer Backsearch
+    double   m_warnTolMs      = 5.0;     // Debug-Warnschwelle
+    unsigned m_gpuBackSearch  = 16;      // größerer Backsearch (GPU/Timing)
     bool     m_exportTimeline = true;    // Timeline-CSV schreiben
+    std::string m_reportMDPath; // wenn gesetzt, schreibe Markdown-Report am Ende
 
+    std::vector<TimeBlock> m_timeline;
 
+    // interne Helfer
+    bool getAttributeForFrame(osg::Stats* stats,
+        const std::string& attributeName,
+        double& value,
+        unsigned int frameNumber);
+    bool getAttributeForFrame(osg::Stats* stats,
+        const std::string& attributeName,
+        double& value);
+
+    // Backsearch-Helfer: bevorzugt "time taken", fällt auf (end-begin) zurück
     bool getTimeTakenMsBacksearch(osg::Stats* s,
         unsigned baseFrame,
         unsigned backSearch,
@@ -134,6 +160,7 @@ private:
         double* outBeginMs = nullptr,
         double* outEndMs   = nullptr);
 
+    // Timeline-Eintrag erzeugen (TimeBlock), trägt auch in m_timeline ein (wenn aktiv)
     bool tryAddBlock(osg::Stats* stats,
         unsigned int baseFrame,
         unsigned int backsearch,
@@ -143,26 +170,16 @@ private:
         int camIndex,
         std::vector<TimeBlock>& localBlocks);
 
-    std::vector<TimeBlock> m_timeline;
-
-
-    bool getAttributeForFrame(osg::Stats* stats, const std::string& attributeName, double& value, unsigned int frameNumber);
-    void logAndCollectGPUStats(osgViewer::ViewerBase* viewer, const osg::FrameStamp* frameStamp);
-    bool getAttributeForFrame(osg::Stats* stats, const std::string& attributeName, double& value);
-    bool getAveragedAttribute(osg::Stats* stats, const std::string& attributeName, double& value);
-    bool getLatestAttribute(osg::Stats* stats, const std::string& attributeName, double& value);
     void initCallbacks();
-    bool hasStatAttribute(osg::Stats* stats, const std::string& key, unsigned int latestFrameNumber, unsigned int framesToCheck);
-    void logAndCollectGPUStats(osgViewer::ViewerBase* viewer, unsigned int frameNumber);
+
     void drawIncrement(bool preDraw, const osg::FrameStamp* frameStamp);
-    void drawIncrement(bool preDraw);
+
     void updateCamera(const osg::Vec3& pos, const osg::Vec3& rot);
+
+    // Timeline-Export
     void writeTimelineCSV(const std::string& path);
 
-    //void tryAddBlock(osg::Stats* stats, unsigned int baseFrame, unsigned int backsearch, const std::string& statPrefix, const std::string& nameForCSV, const std::string& scope, int camIndex, std::vector<LamureMeasurement::TimeBlock>& localBlocks);
-
     void printDebugStats(unsigned int num);
-
 
     int m_originalStatsType = 0;
 
