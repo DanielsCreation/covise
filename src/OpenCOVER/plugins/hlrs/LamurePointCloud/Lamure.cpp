@@ -3,7 +3,7 @@
 #include "Lamure.h" 
 #include "gl_state.h"
 #include "osg_util.h"
-#include "LamurePointCloudInteractor.h"
+//#include "LamurePointCloudInteractor.h"
 
 #include <lamure/imgui.h>
 #include <lamure/imgui_internal.h>
@@ -84,7 +84,7 @@ Lamure* Lamure::instance()
 Lamure::~Lamure()
 {
 	fprintf(stderr, "LamurePlugin::~LamurePlugin\n");
-	opencover::coVRFileManager::instance()->unregisterFileHandler(&handler);
+	//opencover::coVRFileManager::instance()->unregisterFileHandler(&handler);
 	//opencover::cover->getObjectsRoot()->removeChild(LamureGroup);
 }
 
@@ -370,6 +370,10 @@ bool Lamure::init2() {
 
 
 void Lamure::preFrame() {
+    if (_measurement && !_measurement->isRunning()) {
+        stopMeasurement();
+    }
+
 	float deltaTime = std::clamp(float(opencover::cover->frameDuration()), 1.0f / 60.0f, 1.0f / 15.0f);
 	float moveAmount = 1000.0f * deltaTime;
 	osg::Matrix oldMat = opencover::VRSceneGraph::instance()->getTransform()->getMatrix();
@@ -389,21 +393,27 @@ void Lamure::preFrame() {
 
 void Lamure::startMeasurement() {
 	std::cout << "startMeasurement(): " << m_ui->getMeasureButton()->state() << std::endl;
-	std::vector<Measurement::Segment> _segments = {
+	std::vector<LamureMeasurement::Segment> _segments = {
 		{ {0,-500,0},	{0,0,360},		200.0f, 30.0f },
 		{ {0,0,0},		{45,0,360},		200.0f,	30.0f },
 		{ {0,-400,0},	{0,0,0},		200.0f,	30.0f },
 	};
 	rendering_scheme = opencover::VRViewer::instance()->getRunFrameScheme();
 	opencover::VRViewer::instance()->setRunFrameScheme(osgViewer::Viewer::CONTINUOUS);
-	_measurement = std::make_unique<Measurement>(opencover::VRViewer::instance(), _segments, "C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Measurement/measurement1.txt", m_ui->getMeasureButton(), _measureCB);
+	_measurement = std::make_unique<LamureMeasurement>(this, opencover::VRViewer::instance(), _segments, "C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Measurement/measurement1.txt");
 }
 
 
 void Lamure::stopMeasurement() {
 	std::cout << "stopMeasurement(): " << m_ui->getMeasureButton()->state() << std::endl;
+    if (!_measurement) return;
+    if (opencover::VRViewer::instance() && opencover::VRViewer::instance()->getCamera()) {
+        opencover::VRViewer::instance()->getCamera()->setPreDrawCallback(nullptr);
+        opencover::VRViewer::instance()->getCamera()->setPostDrawCallback(nullptr);
+    }
+    _measurement->stop();
+    _measurement->writeLogAndStop();
 	opencover::VRViewer::instance()->setRunFrameScheme(rendering_scheme);
-	_measurement->writeLogAndStop();
-	m_ui->getMeasureButton()->setState(false);
 	_measurement.reset();
+	m_ui->getMeasureButton()->setState(false);
 }

@@ -53,8 +53,8 @@ void LamureUI::setupUi() {
 
     m_measure_group = new opencover::ui::Group(m_lamure_menu, "Measurement");
 
-    m_measure_button = new opencover::ui::Button(m_measure_group, "start_measurement");
-    m_measure_button->setText("Start Measurement");
+    m_measure_button = new opencover::ui::Button(m_measure_group, "run_measurement");
+    m_measure_button->setText("Run Measurement");
     m_measure_button->setShared(true);
     m_measure_button->setState(false);
     m_measure_button->setCallback([this](bool state) {

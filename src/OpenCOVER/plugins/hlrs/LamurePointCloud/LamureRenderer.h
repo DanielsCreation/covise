@@ -6,6 +6,10 @@
 #include <GL/glew.h>
 #endif
 
+// Platform-specific headers
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #include <scm/core/math.h>
 #include <osg/Geometry>

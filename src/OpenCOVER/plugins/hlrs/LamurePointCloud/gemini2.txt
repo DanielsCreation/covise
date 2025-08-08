@@ -1,0 +1,376 @@
+#include "LamureMeasurement.h"
+
+#include <cover/VRViewer.h>
+#include <osgViewer/Viewer>
+#include <osg/Stats>
+#include <fstream>
+#include <iostream>
+#include <iomanip> // For std::fixed and std::setprecision
+#include <cmath>
+#include <numeric>
+#include <algorithm>
+#include <locale>
+
+#include "Lamure.h"
+
+bool LamureMeasurement::getLatestAttribute(osg::Stats* stats, const std::string& attributeName, double& value) {
+    if (!stats) return false;
+    unsigned int latestFrame = stats->getLatestFrameNumber();
+    unsigned int earliestFrame = stats->getEarliestFrameNumber();
+
+    if (latestFrame <= earliestFrame) return false;
+
+    // Search backwards from the latest frame for a valid attribute.
+    // GPU timings might not be available for the most recent frame, so we look back.
+    for (unsigned int frame = latestFrame - 1; frame >= earliestFrame; --frame) {
+        if (stats->getAttribute(frame, attributeName, value)) {
+            return true;
+        }
+        if (frame == 0) break; // prevent underflow with unsigned int
+    }
+
+    return false;
+}
+
+
+LamureMeasurement::LamureMeasurement(
+    Lamure*                      plugin,
+    opencover::VRViewer*         viewer,
+    const std::vector<Segment>&  segments,
+    const std::string&           logfile) 
+    : m_plugin(plugin) 
+    , m_viewer(viewer) 
+    , m_segments(segments) 
+    , m_logfile(logfile) 
+{
+    m_running = true;
+    m_startTick = osg::Timer::instance()->tick();
+    m_lastFrameTick = m_startTick;
+    initCallbacks();
+
+    // Explicitly enable the collection of specific metrics once in the constructor
+    osg::Stats* viewerStats = m_viewer->getViewerStats();
+    osg::Stats* cameraStats = m_viewer->getCamera()->getStats();
+    if (viewerStats) {
+        viewerStats->collectStats("update", true);
+        viewerStats->collectStats("sync", true);
+        viewerStats->collectStats("swap", true);
+        viewerStats->collectStats("isect", true);
+        viewerStats->collectStats("plugin", true);
+        viewerStats->collectStats("opencover", true);
+        viewerStats->collectStats("frame_rate", true); // Ensure frame_rate is collected for GPU stats
+    }
+    if (cameraStats) {
+        cameraStats->collectStats("rendering", true);
+        cameraStats->collectStats("gpu", true);
+        cameraStats->collectStats("cull", true);
+        cameraStats->collectStats("draw", true);
+    }
+
+    std::cout << "[Measurement] Measurement started\n";
+}
+
+LamureMeasurement::~LamureMeasurement()
+{
+    // No explicit disable here. Stats collection remains active as long as the object exists.
+    std::cout << "[Measurement] Measurement finished.\n";
+}
+
+void LamureMeasurement::stop() {
+    m_running = false;
+}
+
+void LamureMeasurement::initCallbacks()
+{
+    auto cam = m_viewer->getCamera();
+    m_preCB = new MarkCallback(this, true);
+    m_postCB = new MarkCallback(this, false);
+    cam->setPreDrawCallback(m_preCB);
+    cam->setPostDrawCallback(m_postCB);
+}
+
+void LamureMeasurement::drawIncrement(bool preDraw, const osg::FrameStamp* frameStamp)
+{
+    if (!m_running) return;
+
+    osg::Timer_t now = osg::Timer::instance()->tick();
+
+    if (preDraw) {
+        m_lastFrameTick = now;
+    } else {
+        if (!frameStamp) return;
+
+        // We query stats for the LATEST completed frame. getLatestAttribute handles potential delays.
+        FrameStats stats;
+        osg::Stats* viewerStats = m_viewer->getViewerStats();
+        osg::Stats* cameraStats = m_viewer->getCamera()->getStats();
+        double value = 0.0;
+
+        // Get stats from the correct object using the latest available frame
+        if (getLatestAttribute(viewerStats, "Frame duration", value)) stats.frame_time_ms = value * 1000.0;
+        if (getLatestAttribute(viewerStats, "Update traversal time taken", value)) stats.cpu_update_ms = value * 1000.0;
+        if (getLatestAttribute(viewerStats, "sync time taken", value)) stats.sync_time_ms = value * 1000.0;
+        if (getLatestAttribute(viewerStats, "swap time taken", value)) stats.swap_time_ms = value * 1000.0;
+        if (getLatestAttribute(viewerStats, "Isect time taken", value)) stats.isect_ms = value * 1000.0;
+        if (getLatestAttribute(viewerStats, "Plugin time taken", value)) stats.plugin_ms = value * 1000.0;
+        if (getLatestAttribute(viewerStats, "opencover time taken", value)) stats.opencover_ms = value * 1000.0;
+
+        if (getLatestAttribute(viewerStats, "GPU Clock MHz", value)) stats.gpu_clock = value;
+        if (getLatestAttribute(viewerStats, "GPU Mem Clock MHz", value)) stats.gpu_mem_clock = value;
+        if (getLatestAttribute(viewerStats, "GPU Utilization", value)) stats.gpu_util = value;
+        if (getLatestAttribute(viewerStats, "GPU PCIe rx KB/s", value)) stats.gpu_pci = value;
+
+        if (cameraStats) {
+            if (getLatestAttribute(cameraStats, "Cull traversal time taken", value)) stats.cpu_cull_ms = value * 1000.0;
+            if (getLatestAttribute(cameraStats, "Draw traversal time taken", value)) stats.cpu_draw_ms = value * 1000.0;
+            if (getLatestAttribute(cameraStats, "GPU time taken", value)) stats.gpu_time_ms = value * 1000.0;
+        }
+
+        const auto& render_info = m_plugin->getRenderInfo();
+        stats.rendered_splats = render_info.rendered_splats;
+        stats.rendered_nodes = render_info.rendered_nodes;
+        stats.rendered_bounding_boxes = render_info.rendered_bounding_boxes;
+
+        osg::Matrixd viewMatrix = m_viewer->getCamera()->getViewMatrix();
+        stats.position = viewMatrix.getTrans();
+        stats.orientation = viewMatrix.getRotate();
+
+        m_stats.push_back(stats);
+
+        double dt = osg::Timer::instance()->delta_s(m_lastFrameTick, now);
+        m_segmentTime += dt;
+
+        while (m_currentSegment < m_segments.size())
+        {
+            const auto& seg = m_segments[m_currentSegment];
+            float dist = seg.tra.length();
+            double transDur = seg.transSpeed > 0.f ? dist / seg.transSpeed : 0.0;
+            float maxAngle = std::max({ std::abs(seg.rot.x()), std::abs(seg.rot.y()), std::abs(seg.rot.z()) });
+            double rotDur = seg.rotSpeed > 0.f ? maxAngle / seg.rotSpeed : 0.0;
+            double segDuration = std::max(transDur, rotDur);
+
+            if (m_segmentTime < segDuration)
+                break;
+
+            m_segmentTime -= segDuration;
+            m_cumulativeTra += seg.tra;
+            m_cumulativeRot += seg.rot;
+            ++m_currentSegment;
+        }
+
+        if (m_currentSegment >= m_segments.size())
+        {
+            m_running = false;
+            writeLogAndStop();
+            return;
+        }
+
+        const auto& seg = m_segments[m_currentSegment];
+        float dist = seg.tra.length();
+        double transDur = seg.transSpeed > 0.f ? dist / seg.transSpeed : 0.0;
+        float maxAngle = std::max({ std::abs(seg.rot.x()), std::abs(seg.rot.y()), std::abs(seg.rot.z()) });
+        double rotDur = seg.rotSpeed > 0.f ? maxAngle / seg.rotSpeed : 0.0;
+        double segDuration = std::max(transDur, rotDur);
+        double frac = segDuration > 0.0 ? std::min(m_segmentTime / segDuration, 1.0) : 1.0;
+
+        osg::Vec3 tra = m_cumulativeTra + seg.tra * float(frac);
+        osg::Vec3 rot = m_cumulativeRot + seg.rot * float(frac);
+
+        updateCamera(tra, rot);
+    }
+}
+
+void LamureMeasurement::updateCamera(const osg::Vec3& tra, const osg::Vec3& rot)
+{
+    double rx = osg::DegreesToRadians(rot.x());
+    double ry = osg::DegreesToRadians(rot.y());
+    double rz = osg::DegreesToRadians(rot.z());
+
+    osg::Matrix mrx, mry, mrz;
+    mrx.makeRotate(rx, 1, 0, 0);
+    mry.makeRotate(ry, 0, 1, 0);
+    mrz.makeRotate(rz, 0, 0, 1);
+    osg::Matrix rotMat = mrx * mry * mrz;
+
+    osg::Matrix dcs;
+    dcs.postMult(rotMat);
+
+    osg::Vec3 vp = opencover::cover->getViewerMat().getTrans();
+
+    dcs.postMult(osg::Matrix::translate(-vp));
+    dcs.postMult(osg::Matrix::translate(tra));
+    dcs.postMult(osg::Matrix::translate(vp));
+
+    opencover::cover->setXformMat(dcs);
+}
+
+void LamureMeasurement::printDebugStats()
+{
+    if (m_stats.empty()) {
+        std::cout << "[Measurement] No stats collected to print." << std::endl;
+        return;
+    }
+
+    auto print_frame = [](const FrameStats& s, int frame_num) {
+        std::cout << std::fixed << std::setprecision(4)
+            << "Frame #"          << std::setw(4) << frame_num                  << "\n"
+            << "Splats: "         << std::setw(8) << s.rendered_splats          << "\n"
+            << "Nodes: "          << std::setw(8) << s.rendered_nodes           << "\n"
+            << "Boxes: "          << std::setw(8) << s.rendered_bounding_boxes  << "\n"
+            << "GPUClk: "         << std::setw(8) << s.gpu_clock                << "\n"
+            << "GPUMemClk: "      << std::setw(8) << s.gpu_mem_clock            << "\n"
+            << "GPUUtil: "        << std::setw(8) << s.gpu_util                 << "\n"
+            << "GPUPCI: "         << std::setw(8) << s.gpu_pci                  << "\n"
+            << "CPUUpd: "         << std::setw(8) << s.cpu_update_ms            << "\n"
+            << "Isect: "          << std::setw(8) << s.isect_ms                 << "\n"
+            << "Plugin: "         << std::setw(8) << s.plugin_ms                << "\n"
+            << "OpenCov: "        << std::setw(8) << s.opencover_ms             << "\n"
+            << "FrameTime: "      << std::setw(8) << s.frame_time_ms            << "\n"
+            << "CPU Cull: "       << std::setw(8) << s.cpu_cull_ms              << "\n"
+            << "CPU Draw: "       << std::setw(8) << s.cpu_draw_ms              << "\n"
+            << "GPUTime: "        << std::setw(8) << s.gpu_time_ms              << "\n"
+            << "Sync: "           << std::setw(8) << s.sync_time_ms             << "\n"
+            << "Swap: "           << std::setw(8) << s.swap_time_ms             << "\n"
+            << "Pos: ("           << std::setw(6) << s.position.x() 
+            << ", "               << std::setw(6) << s.position.y() 
+            << ", "               << std::setw(6) << s.position.z() << ")\n"
+            << "Quat: ("          << std::setw(6) << s.orientation.x() 
+            << ", "               << std::setw(6) << s.orientation.y() 
+            << ", "               << std::setw(6) << s.orientation.z() 
+            << ", "               << std::setw(6) << s.orientation.w() << ")\n"
+            << std::endl;
+        };
+
+    std::cout << "--- Measurement Debug Stats ---" << std::endl;
+    size_t count = m_stats.size();
+
+    if (count <= 6) {
+        for (size_t i = 0; i < count; ++i) {
+            print_frame(m_stats[i], static_cast<int>(i + 1));
+        }
+    } else {
+        // First 3 frames
+        for (size_t i = 0; i < 3; ++i) {
+            print_frame(m_stats[i], static_cast<int>(i + 1));
+        }
+        std::cout << "..." << std::endl;
+        // Last 3 frames
+        for (size_t i = count - 3; i < count; ++i) {
+            print_frame(m_stats[i], static_cast<int>(i + 1));
+        }
+    }
+
+    std::cout << "-------------------------------" << std::endl;
+}
+
+void LamureMeasurement::writeLogAndStop()
+{
+    if (m_stats.empty())
+        return;
+
+    printDebugStats();
+
+    std::string base_path = m_logfile;
+    std::string::size_type pos = base_path.find_last_of(".");
+    if (pos != std::string::npos) {
+        base_path = base_path.substr(0, pos);
+    }
+
+    std::string frames_path = base_path + "_frames.csv";
+    std::string summary_path = base_path + "_summary.csv";
+
+    std::ofstream frames_out(frames_path);
+    if (!frames_out) {
+        std::cerr << "[Measurement] Fehler beim Öffnen von " << frames_path << "\n";
+    } else {
+        frames_out.imbue(std::locale::classic());
+        frames_out << std::fixed << std::setprecision(4);
+        frames_out << "frame_time_ms;rendered_splats;rendered_nodes;rendered_bounding_boxes;cpu_update_ms;cpu_cull_ms;cpu_draw_ms;gpu_time_ms;sync_time_ms;swap_time_ms;isect_ms;plugin_ms;opencover_ms;gpu_clock;gpu_mem_clock;gpu_util;gpu_pci;pos_x;pos_y;pos_z;quat_x;quat_y;quat_z;quat_w\n";
+        for (const auto& s : m_stats) {
+            frames_out << s.frame_time_ms << ";"
+                << s.rendered_splats << ";"
+                << s.rendered_nodes << ";"
+                << s.rendered_bounding_boxes << ";"
+                << s.cpu_update_ms << ";"
+                << s.cpu_cull_ms << ";"
+                << s.cpu_draw_ms << ";"
+                << s.gpu_time_ms << ";"
+                << s.sync_time_ms << ";"
+                << s.swap_time_ms << ";"
+                << s.isect_ms << ";"
+                << s.plugin_ms << ";"
+                << s.opencover_ms << ";"
+                << s.gpu_clock << ";"
+                << s.gpu_mem_clock << ";"
+                << s.gpu_util << ";"
+                << s.gpu_pci << ";"
+                << s.position.x() << ";" << s.position.y() << ";" << s.position.z() << ";"
+                << s.orientation.x() << ";" << s.orientation.y() << ";" << s.orientation.z() << ";" << s.orientation.w() << "\n";
+        }
+    }
+
+    std::ofstream summary_out(summary_path);
+    if (!summary_out) {
+        std::cerr << "[Measurement] Fehler beim Öffnen von " << summary_path << "\n";
+    } else {
+        summary_out.imbue(std::locale::classic());
+        summary_out << std::fixed << std::setprecision(4);
+
+        size_t n = m_stats.size();
+        double total_time_ms = 0;
+        uint64_t total_splats = 0, total_nodes = 0, total_boxes = 0;
+        double total_cpu_update = 0, total_cpu_cull = 0, total_cpu_draw = 0, total_gpu = 0, total_sync = 0, total_swap = 0;
+        double total_isect = 0, total_plugin = 0, total_opencover = 0;
+        double total_gpu_clock = 0, total_gpu_mem_clock = 0, total_gpu_util = 0, total_gpu_pci = 0;
+
+        for (const auto& s : m_stats) {
+            total_time_ms += s.frame_time_ms;
+            total_splats += s.rendered_splats;
+            total_nodes += s.rendered_nodes;
+            total_boxes += s.rendered_bounding_boxes;
+            total_cpu_update += s.cpu_update_ms;
+            total_cpu_cull += s.cpu_cull_ms;
+            total_cpu_draw += s.cpu_draw_ms;
+            total_gpu += s.gpu_time_ms;
+            total_sync += s.sync_time_ms;
+            total_swap += s.swap_time_ms;
+            total_isect += s.isect_ms;
+            total_plugin += s.plugin_ms;
+            total_opencover += s.opencover_ms;
+            total_gpu_clock += s.gpu_clock;
+            total_gpu_mem_clock += s.gpu_mem_clock;
+            total_gpu_util += s.gpu_util;
+            total_gpu_pci += s.gpu_pci;
+        }
+
+        double avg_frame_time = total_time_ms / n;
+        double avg_fps = 1000.0 / avg_frame_time;
+
+        summary_out << "Metric;Value\n";
+        summary_out << "Total Frames;" << n << "\n";
+        summary_out << "Total Time (s);" << total_time_ms / 1000.0 << "\n";
+        summary_out << "Avg Frame Time (ms);" << avg_frame_time << "\n";
+        summary_out << "Avg FPS;" << avg_fps << "\n";
+        summary_out << "Avg Splats/Frame;" << total_splats / n << "\n";
+        summary_out << "Avg Nodes/Frame;" << total_nodes / n << "\n";
+        summary_out << "Avg Boxes/Frame;" << total_boxes / n << "\n";
+        summary_out << "Avg CPU Update (ms);" << total_cpu_update / n << "\n";
+        summary_out << "Avg CPU Cull (ms);" << total_cpu_cull / n << "\n";
+        summary_out << "Avg CPU Draw (ms);" << total_cpu_draw / n << "\n";
+        summary_out << "Avg GPU Time (ms);" << total_gpu / n << "\n";
+        summary_out << "Avg Sync Time (ms);" << total_sync / n << "\n";
+        summary_out << "Avg Swap Time (ms);" << total_swap / n << "\n";
+        summary_out << "Avg Isect (ms);" << total_isect / n << "\n";
+        summary_out << "Avg Plugin (ms);" << total_plugin / n << "\n";
+        summary_out << "Avg OpenCOVER (ms);" << total_opencover / n << "\n";
+        summary_out << "Avg GPU Clock (MHz);" << total_gpu_clock / n << "\n";
+        summary_out << "Avg GPU Mem Clock (MHz);" << total_gpu_mem_clock / n << "\n";
+        summary_out << "Avg GPU Util (%);" << total_gpu_util / n << "\n";
+        summary_out << "Avg GPU PCIe RX (KB/s);" << total_gpu_pci / n << "\n";
+    }
+    std::cout << "Measurement written: " << std::endl << summary_path << std::endl << frames_path << std::endl;
+    m_stats.clear();
+    m_segmentTime = 0.0;
+    m_currentSegment = 0;
+    m_cumulativeRot = osg::Vec3(0.0f, 0.0f, 0.0f);
+}

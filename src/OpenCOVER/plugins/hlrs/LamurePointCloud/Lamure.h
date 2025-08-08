@@ -1,13 +1,13 @@
 #ifndef _Lamure_H
 #define _Lamure_H
 
-// Platform-specific headers
+#ifndef __gl_h_
+#include <GL/glew.h>
+#endif
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
-
-//gl
-#include <GL/glew.h>
 
 #include <cover/coVRPluginSupport.h>
 #include <osgViewer/ViewerBase>
@@ -38,7 +38,7 @@ namespace opencover
     }
 }
 class LamurePointCloudInteractor;
-class Measurement;
+class LamureMeasurement;
 
 class Lamure : public opencover::coVRPlugin, public opencover::ui::Owner
 {
@@ -184,7 +184,7 @@ private:
 
     lamure::ren::Data_Provenance        m_data_provenance;
     osgViewer::ViewerBase::FrameScheme  rendering_scheme;
-    std::unique_ptr<Measurement>        _measurement;
+    std::unique_ptr<LamureMeasurement>  _measurement;
     std::function<void(bool)>           _measureCB;
     std::vector<osg::Vec3>              _path;
     float                               _speed = 1.0f;

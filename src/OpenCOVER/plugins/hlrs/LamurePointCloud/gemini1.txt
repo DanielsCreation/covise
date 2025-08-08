@@ -1,291 +1,264 @@
-    virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
-    {
-        if (_renderer->getRendering()) { return; }
-        _renderer->setRendering(true);
+#include "LamureMeasurement.h"
 
-        GLState before = GLState::capture();
-        glDisable(GL_CULL_FACE);
+#include <cover/VRViewer.h>
+#include <osgViewer/Viewer>
+#include <osg/Stats>
+#include <fstream>
+#include <iostream>
+#include <iomanip> // For std::fixed and std::setprecision
+#include <cmath>
+#include <numeric>
+#include <algorithm>
+#include <locale>
 
-        osg::State* state = renderInfo.getState();
-        state->setCheckForGLErrors(osg::State::CheckForGLErrors::ONCE_PER_ATTRIBUTE);
+#include "Lamure.h"
 
-        scm::math::mat4 view_matrix = scm::math::mat4(_renderer->getModelviewMatrix());
-        scm::math::mat4 projection_matrix = scm::math::mat4(_renderer->getProjectionMatrix());
-        lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
-        lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
-        lamure::ren::controller* controller = lamure::ren::controller::get_instance();
-        lamure::pvs::pvs_database* pvs = lamure::pvs::pvs_database::get_instance();
+bool LamureMeasurement::getLatestAttribute(osg::Stats* stats, const std::string& attributeName, double& value) {
+    if (!stats) return false;
+    if (stats->getLatestFrameNumber() < stats->getEarliestFrameNumber()) return false;
+    return stats->getAttribute(stats->getLatestFrameNumber(), attributeName, value);
+}
 
-        if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) { controller->reset_system(_plugin->getDataProvenance()); }
-        else { controller->reset_system(); }
+LamureMeasurement::LamureMeasurement(
+    Lamure*                      plugin,
+    opencover::VRViewer*         viewer,
+    const std::vector<Segment>&  segments,
+    const std::string&           logfile)
+    : m_plugin(plugin)
+    , m_viewer(viewer)
+    , m_segments(segments)
+    , m_logfile(logfile)
+{
+    m_running = true;
+    m_startTick = osg::Timer::instance()->tick();
+    m_lastFrameTick = m_startTick;
+    initCallbacks();
 
-        lamure::context_t context_id = controller->deduce_context_id(_renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID());
-        lamure::view_t    view_id = controller->deduce_view_id(context_id, _renderer->getScmCamera()->view_id());
-        size_t surfels_per_node = database->get_primitives_per_node();
+    // Get the stats objects
+    osg::Stats* viewerStats = m_viewer->getViewerStats();
+    osg::Stats* cameraStats = m_viewer->getCamera()->getStats();
 
-        for (lamure::model_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
-            lamure::model_t m_id = controller->deduce_model_id(std::to_string(model_id));
-            cuts->send_transform(context_id, m_id, scm::math::mat4(_plugin->getModelInfo().model_transformations[m_id]));
-            cuts->send_threshold(context_id, m_id, _plugin->getSettings().lod_error);
-            cuts->send_rendered(context_id, m_id);
-            database->get_model(m_id)->set_transform(scm::math::mat4(_plugin->getModelInfo().model_transformations[m_id]));
-        }
-        cuts->send_camera(context_id, view_id, *(_renderer->getScmCamera()));
-        std::vector<scm::math::vec3d> corner_values = _renderer->getScmCamera()->get_frustum_corners();
-        double top_minus_bottom = scm::math::length((corner_values[2]) - (corner_values[0]));
-        float height_divided_by_top_minus_bottom = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height / top_minus_bottom;
-        cuts->send_height_divided_by_top_minus_bottom(context_id, view_id, height_divided_by_top_minus_bottom);
+    // Explicitly enable the collection of specific metrics
+    if (viewerStats) {
+        viewerStats->setCollectStats("update", true);
+        viewerStats->setCollectStats("sync", true);
+        viewerStats->setCollectStats("swap", true);
+    }
+    if (cameraStats) {
+        cameraStats->setCollectStats("rendering", true);
+        cameraStats->setCollectGPUMetrics(true);
+    }
 
-        if (_plugin->getSettings().use_pvs) {
-            scm::math::vec3d cam_pos = _renderer->getScmCamera()->get_cam_pos();
-            pvs->set_viewer_position(cam_pos);
-        }
-        if (_plugin->getSettings().lod_update) {
-            if (lamure::ren::policy::get_instance()->size_of_provenance() > 0)
-            { controller->dispatch(context_id, _renderer->getDevice(), _plugin->getDataProvenance()); }
-            else { controller->dispatch(context_id, _renderer->getDevice()); }
-        }
+    std::cout << "Measurement(flight mode) started\n";
+}
 
-        if (_initialized) { glBindVertexArray(_renderer->getPclResource().vao); }
-        _renderer->getContext()->apply_vertex_input();
-        if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
-            _renderer->getContext()->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, _renderer->getDevice(), _plugin->getDataProvenance()));
-        }
-        else { _renderer->getContext()->bind_vertex_array(controller->get_context_memory(context_id, lamure::ren::bvh::primitive_type::POINTCLOUD, _renderer->getDevice())); }
-        
-        scm::math::vec2 viewport = scm::math::vec2f(opencover::coVRConfig::instance()->windows[0].context->getTraits()->width, opencover::coVRConfig::instance()->windows[0].context->getTraits()->height);
-        uint64_t rendered_splats = 0;
-        uint64_t rendered_nodes = 0;
+LamureMeasurement::~LamureMeasurement()
+{
 
-        if (_plugin->getSettings().shader_type == LamureRenderer::ShaderType::SurfelMultipass) {
-            // ================= MULTI-PASS RENDER PATH =================
-            auto& res = _renderer->getPclResource();
-            const auto& s = _plugin->getSettings();
-            scm::math::vec3 eye_pos = scm::math::vec3f(_renderer->getScmCamera()->get_cam_pos());
+}
 
-            // --- PASS 1: Depth Pass ---
-            glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
-            glDrawBuffer(GL_NONE);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            glEnable(GL_DEPTH_TEST);
-            glDepthMask(GL_TRUE);
-            glDisable(GL_BLEND);
+void LamureMeasurement::stop() {
+    m_running = false;
+}
 
-            glUseProgram(_renderer->getSurfelPass1Shader().program);
-            glUniform1f(_renderer->getSurfelPass1Shader().far_plane_loc, _renderer->getScmCamera()->far_plane_value());
-            glUniform1f(_renderer->getSurfelPass1Shader().max_radius_loc, s.max_radius);
-            glUniform1f(_renderer->getSurfelPass1Shader().min_radius_loc, s.min_radius);
-            glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius);
+void LamureMeasurement::initCallbacks()
+{
+    auto cam = m_viewer->getCamera();
+    m_preCB = new MarkCallback(this, true);
+    m_postCB = new MarkCallback(this, false);
+    cam->setPreDrawCallback(m_preCB);
+    cam->setPostDrawCallback(m_postCB);
+}
 
-            for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
-                if (!_plugin->getUI()->getModelVisibility()[model_id]) { continue; }
-                lamure::ren::cut& cut = cuts->get_cut(context_id, _renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID(), model_id);
-                std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
-                const lamure::ren::bvh* bvh = database->get_model(model_id)->get_bvh();
-                const std::vector<scm::gl::boxf>& bounding_box_vector = bvh->get_bounding_boxes();
+void LamureMeasurement::drawIncrement(bool preDraw)
+{
+    if (!m_running) return;
 
-                scm::math::mat4 model_matrix = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
-                scm::math::mat4 model_view_matrix = view_matrix * model_matrix;
-                scm::math::mat4 mvp_matrix = projection_matrix * model_view_matrix;
-                scm::gl::frustum frustum = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
+    osg::Timer_t now = osg::Timer::instance()->tick();
 
-                glUniformMatrix4fv(_renderer->getSurfelPass1Shader().mvp_matrix_loc, 1, GL_FALSE, mvp_matrix.data_array);
-                glUniformMatrix4fv(_renderer->getSurfelPass1Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
-                glUniformMatrix4fv(_renderer->getSurfelPass1Shader().model_matrix_loc, 1, GL_FALSE, model_matrix.data_array);
+    if (preDraw) {
+        m_lastFrameTick = now;
+    } else {
+        FrameStats stats;
+        stats.frame_time_ms = osg::Timer::instance()->delta_m(m_lastFrameTick, now);
 
-                for (auto const& node_slot_aggregate : renderable) {
-                    if (_renderer->getScmCamera()->cull_against_frustum(frustum, bounding_box_vector[node_slot_aggregate.node_id_]) != 1) {
-                        glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
-                        rendered_splats += surfels_per_node;
-                        ++rendered_nodes;
-                    }
-                }
-            }
+        const auto& render_info = m_plugin->getRenderInfo();
+        stats.rendered_splats = render_info.rendered_splats;
+        stats.rendered_nodes = render_info.rendered_nodes;
+        stats.rendered_bounding_boxes = render_info.rendered_bounding_boxes;
 
-            // =================== DEBUG-CODE EINFÜGEN ===================
-            {
-                glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                glDisable(GL_DEPTH_TEST);
-                glDisable(GL_BLEND);
-                glDepthMask(GL_TRUE);
+        osg::Stats* viewerStats = m_viewer->getViewerStats();
+        osg::Stats* cameraStats = m_viewer->getCamera()->getStats();
+        double value = 0.0;
 
-                glUseProgram(_renderer->getDebugShader().program);
+        // Get stats from the correct object using the latest frame
+        if (getLatestAttribute(viewerStats, "Update traversal time taken", value)) stats.cpu_update_ms = value * 1000.0;
+        if (getLatestAttribute(viewerStats, "sync time taken", value)) stats.sync_time_ms = value * 1000.0;
+        if (getLatestAttribute(viewerStats, "swap time taken", value)) stats.swap_time_ms = value * 1000.0;
 
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, res.depth_texture);
-                glUniform1i(_renderer->getDebugShader().texture_depth_loc, 0);
-
-                glActiveTexture(GL_TEXTURE1);
-                glBindTexture(GL_TEXTURE_2D, res.texture_color);
-                glUniform1i(_renderer->getDebugShader().texture_color_loc, 1);
-
-                glActiveTexture(GL_TEXTURE2);
-                glBindTexture(GL_TEXTURE_2D, res.texture_normal);
-                glUniform1i(_renderer->getDebugShader().texture_normal_loc, 2);
-
-                glActiveTexture(GL_TEXTURE3);
-                glBindTexture(GL_TEXTURE_2D, res.texture_position);
-                glUniform1i(_renderer->getDebugShader().texture_position_loc, 3);
-
-                // ÄNDERN SIE DIESEN WERT, UM VERSCHIEDENE PUFFER ZU SEHEN:
-                // 0=Tiefe, 1=Farbe, 2=Normalen, 3=Position
-                glUniform1i(_renderer->getDebugShader().debug_mode_loc, 0);
-
-                glBindVertexArray(res.screen_quad_vao);
-                glDrawArrays(GL_TRIANGLES, 0, 6);
-                glBindVertexArray(0);
-
-                _renderer->setRendering(false);
-                before.restore();
-                return;
-            }
-            // ================= ENDE DEBUG-CODE ===================
-
-            // --- PASS 2: Accumulation Pass ---
-            glDepthFunc(GL_LEQUAL);
-            GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-            glDrawBuffers(3, drawBuffers);
-            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE);
-            glDepthMask(GL_FALSE);
-
-            glUseProgram(_renderer->getSurfelPass2Shader().program);
-            glUniform1f(_renderer->getSurfelPass2Shader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
-            glUniform1f(_renderer->getSurfelPass2Shader().max_radius_loc, s.max_radius);
-            glUniform1f(_renderer->getSurfelPass2Shader().min_radius_loc, s.min_radius);
-            glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_loc, s.scale_radius);
-            glUniform2fv(_renderer->getSurfelPass2Shader().win_size_loc, 1, viewport.data_array);
-            glUniform1i(_renderer->getSurfelPass2Shader().show_normals_loc, s.show_normals);
-            glUniform1i(_renderer->getSurfelPass2Shader().show_radius_dev_loc, s.show_radius_deviation);
-            glUniform1i(_renderer->getSurfelPass2Shader().show_output_sens_loc, s.show_output_sensitivity);
-            glUniform1i(_renderer->getSurfelPass2Shader().show_accuracy_loc, s.show_accuracy);
-            glUniform1i(_renderer->getSurfelPass2Shader().channel_loc, s.channel);
-            glUniform1i(_renderer->getSurfelPass2Shader().heatmap_loc, s.heatmap);
-            glUniform1f(_renderer->getSurfelPass2Shader().heatmap_min_loc, s.heatmap_min);
-            glUniform1f(_renderer->getSurfelPass2Shader().heatmap_max_loc, s.heatmap_max);
-            glUniform3fv(_renderer->getSurfelPass2Shader().heatmap_min_color_loc, 1, s.heatmap_color_min.data_array);
-            glUniform3fv(_renderer->getSurfelPass2Shader().heatmap_max_color_loc, 1, s.heatmap_color_max.data_array);
-
-            const scm::math::mat4d viewport_scale = scm::math::make_scale(viewport.x * 0.5, viewport.y * 0.5, 0.5);
-            const scm::math::mat4d viewport_translate = scm::math::make_translation(1.0, 1.0, 1.0);
-            const scm::math::mat4 viewport_matrix = scm::math::mat4(viewport_scale * viewport_translate);
-
-            for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
-                if (!_plugin->getUI()->getModelVisibility()[model_id]) { continue; }
-                lamure::ren::cut& cut = cuts->get_cut(context_id, _renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID(), model_id);
-                std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
-                const lamure::ren::bvh* bvh = database->get_model(model_id)->get_bvh();
-                const std::vector<scm::gl::boxf>& bounding_box_vector = bvh->get_bounding_boxes();
-
-                scm::math::mat4 model_matrix = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
-                scm::math::mat4 model_view_matrix = view_matrix * model_matrix;
-                scm::math::mat4 mvp_matrix = projection_matrix * model_view_matrix;
-                scm::math::mat4 inv_mv_matrix = scm::math::inverse(model_view_matrix);
-                scm::math::mat4 model_view_projection_matrix = projection_matrix * model_view_matrix;
-                scm::math::mat4 model_to_screen_matrix = viewport_matrix * model_view_projection_matrix;
-                scm::gl::frustum frustum = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
-
-                glUniformMatrix4fv(_renderer->getSurfelPass2Shader().mvp_matrix_loc, 1, GL_FALSE, mvp_matrix.data_array);
-                glUniformMatrix4fv(_renderer->getSurfelPass2Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
-                glUniformMatrix4fv(_renderer->getSurfelPass2Shader().model_matrix_loc, 1, GL_FALSE, model_matrix.data_array);
-                glUniformMatrix4fv(_renderer->getSurfelPass2Shader().model_to_screen_matrix_loc, 1, GL_FALSE, model_to_screen_matrix.data_array);
-
-                for (auto const& node_slot_aggregate : renderable) {
-                    if (_renderer->getScmCamera()->cull_against_frustum(frustum, bounding_box_vector[node_slot_aggregate.node_id_]) != 1) {
-                        _renderer->setNodeUniforms(bvh, node_slot_aggregate.node_id_);
-                        glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
-                    }
-                }
-            }
-
-            // --- PASS 3: Resolve Pass ---
-            glDepthFunc(GL_LESS);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glDisable(GL_BLEND);
-            glDisable(GL_DEPTH_TEST);
-            glDepthMask(GL_TRUE);
-
-            glUseProgram(_renderer->getSurfelPass3Shader().program);
-
-            osg::Matrix base = opencover::VRSceneGraph::instance()->getScaleTransform()->getMatrix();
-            base.postMult(opencover::VRSceneGraph::instance()->getTransform()->getMatrix());
-            scm::math::mat4 viewMat = LamureUtil::matConv4F(_renderer->getOsgCamera()->getViewMatrix()) * LamureUtil::matConv4F(base);
-            scm::math::mat3 viewMat3 = LamureUtil::matConv4to3F(viewMat);
-            scm::math::mat3 normalMat = scm::math::transpose(scm::math::inverse(viewMat3));
-
-            glUniform3fv(_renderer->getSurfelPass3Shader().background_color_loc, 1, s.background_color.data_array);
-            glUniformMatrix4fv(_renderer->getSurfelPass3Shader().view_matrix_loc, 1, GL_FALSE, viewMat.data_array);
-            glUniformMatrix3fv(_renderer->getSurfelPass3Shader().view_normal_matrix_loc, 1, GL_FALSE, normalMat.data_array);
-            glUniform1i(_renderer->getSurfelPass3Shader().use_material_color_loc, s.use_material_color ? 1 : 0);
-            glUniform3fv(_renderer->getSurfelPass3Shader().material_diffuse_loc,    1, s.material_diffuse.data_array);
-            glUniform4fv(_renderer->getSurfelPass3Shader().material_specular_loc, 1, s.material_specular.data_array);
-            glUniform3fv(_renderer->getSurfelPass3Shader().ambient_light_color_loc, 1, s.ambient_light_color.data_array);
-            glUniform4fv(_renderer->getSurfelPass3Shader().point_light_color_loc, 1, s.point_light_color.data_array);
-            glUniform3fv(_renderer->getSurfelPass3Shader().point_light_pos_loc, 1, (viewMat3 * s.point_light_pos).data_array);
-
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, res.texture_color);
-            glUniform1i(_renderer->getSurfelPass3Shader().in_color_texture_loc, 0);
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, res.texture_normal);
-            glUniform1i(_renderer->getSurfelPass3Shader().in_normal_texture_loc, 1);
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D, res.texture_position);
-            glUniform1i(_renderer->getSurfelPass3Shader().in_vs_position_texture_loc, 2);
-
-            glBindVertexArray(res.screen_quad_vao);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            glBindVertexArray(0);
-            glActiveTexture(GL_TEXTURE0);
-
-        }
-        else {
-            // ================= SINGLE-PASS RENDER PATH =================
-            _renderer->setFrameUniforms(projection_matrix, viewport);
-            for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
-                if (!_plugin->getUI()->getModelVisibility()[model_id]) { continue; }
-                lamure::ren::cut& cut = cuts->get_cut(context_id, _renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID(), model_id);
-                std::vector<lamure::ren::cut::node_slot_aggregate> renderable = cut.complete_set();
-                const lamure::ren::bvh* bvh = database->get_model(model_id)->get_bvh();
-                std::vector<scm::gl::boxf>const& bounding_box_vector = bvh->get_bounding_boxes();
-
-                scm::math::mat4 model_matrix = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
-                scm::math::mat4 model_view_matrix = view_matrix * model_matrix;
-                scm::math::mat4 mvp_matrix = projection_matrix * model_view_matrix;
-                scm::gl::frustum frustum = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
-                _renderer->setModelUniforms(mvp_matrix);
-                for (auto const& node_slot_aggregate : renderable) {
-
-                    if (_renderer->getScmCamera()->cull_against_frustum(frustum, bounding_box_vector[node_slot_aggregate.node_id_]) != 1) {
-                        _renderer->setNodeUniforms(bvh, node_slot_aggregate.slot_id_);
-                        glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
-                        rendered_splats += surfels_per_node;
-                        ++rendered_nodes;
-                    }
-                }
-            }
-
+        if (cameraStats) {
+            if (getLatestAttribute(cameraStats, "Cull traversal time taken", value)) stats.cpu_cull_ms = value * 1000.0;
+            if (getLatestAttribute(cameraStats, "Draw traversal time taken", value)) stats.cpu_draw_ms = value * 1000.0;
+            if (getLatestAttribute(cameraStats, "GPU time taken", value)) stats.gpu_time_ms = value * 1000.0;
         }
 
-        _plugin->getRenderInfo().rendered_splats = rendered_splats;
-        _plugin->getRenderInfo().rendered_nodes = rendered_nodes;
-        _renderer->setRendering(false);
+        osg::Matrixd viewMatrix = m_viewer->getCamera()->getViewMatrix();
+        stats.position = viewMatrix.getTrans();
+        stats.orientation = viewMatrix.getRotate();
 
-        if (!_initialized) {
-            GLState after = GLState::capture();
-            if (after.getVertexArrayBinding()
-                != before.getVertexArrayBinding())
-            {
-                _plugin->getRenderer()->getPclResource().vao = after.getVertexArrayBinding();
-                _initialized = true;
-            }
+        m_stats.push_back(stats);
+
+        double dt = osg::Timer::instance()->delta_s(m_lastFrameTick, now);
+        m_segmentTime += dt;
+
+        while (m_currentSegment < m_segments.size())
+        {
+            const auto& seg = m_segments[m_currentSegment];
+            float dist = seg.tra.length();
+            double transDur = seg.transSpeed > 0.f ? dist / seg.transSpeed : 0.0;
+            float maxAngle = std::max({ std::abs(seg.rot.x()), std::abs(seg.rot.y()), std::abs(seg.rot.z()) });
+            double rotDur = seg.rotSpeed > 0.f ? maxAngle / seg.rotSpeed : 0.0;
+            double segDuration = std::max(transDur, rotDur);
+
+            if (m_segmentTime < segDuration)
+                break;
+
+            m_segmentTime -= segDuration;
+            m_cumulativeTra += seg.tra;
+            m_cumulativeRot += seg.rot;
+            ++m_currentSegment;
         }
 
-        before.restore();
-        if (_plugin->getUI()->getNotifyButton()->state()) {
-            GLState after = GLState::capture();
-            GLState::compare(before, after, "[Notify] PointsDrawCallback::drawImplementation()");
+        if (m_currentSegment >= m_segments.size())
+        {
+            m_running = false;
+            return;
+        }
+
+        const auto& seg = m_segments[m_currentSegment];
+        float dist = seg.tra.length();
+        double transDur = seg.transSpeed > 0.f ? dist / seg.transSpeed : 0.0;
+        float maxAngle = std::max({ std::abs(seg.rot.x()), std::abs(seg.rot.y()), std::abs(seg.rot.z()) });
+        double rotDur = seg.rotSpeed > 0.f ? maxAngle / seg.rotSpeed : 0.0;
+        double segDuration = std.max(transDur, rotDur);
+        double frac = segDuration > 0.0 ? std::min(m_segmentTime / segDuration, 1.0) : 1.0;
+
+        osg::Vec3 tra = m_cumulativeTra + seg.tra * float(frac);
+        osg::Vec3 rot = m_cumulativeRot + seg.rot * float(frac);
+
+        updateCamera(tra, rot);
+    }
+}
+
+void LamureMeasurement::updateCamera(const osg::Vec3& tra, const osg::Vec3& rot)
+{
+    double rx = osg::DegreesToRadians(rot.x());
+    double ry = osg::DegreesToRadians(rot.y());
+    double rz = osg::DegreesToRadians(rot.z());
+
+    osg::Matrix mrx, mry, mrz;
+    mrx.makeRotate(rx, 1, 0, 0);
+    mry.makeRotate(ry, 0, 1, 0);
+    mrz.makeRotate(rz, 0, 0, 1);
+    osg::Matrix rotMat = mrx * mry * mrz;
+
+    osg::Matrix dcs;
+    dcs.postMult(rotMat);
+
+    osg::Vec3 vp = opencover::cover->getViewerMat().getTrans();
+
+    dcs.postMult(osg::Matrix::translate(-vp));
+    dcs.postMult(osg::Matrix::translate(tra));
+    dcs.postMult(osg::Matrix::translate(vp));
+
+    opencover::cover->setXformMat(dcs);
+}
+
+void LamureMeasurement::writeLogAndStop()
+{
+    if (m_stats.empty())
+        return;
+
+    std::string base_path = m_logfile;
+    std::string::size_type pos = base_path.find_last_of(".");
+    if (pos != std::string::npos) {
+        base_path = base_path.substr(0, pos);
+    }
+
+    std::string frames_path = base_path + "_frames.csv";
+    std::string summary_path = base_path + "_summary.csv";
+
+    // Write frames file
+    std::ofstream frames_out(frames_path);
+    if (!frames_out) {
+        std::cerr << "[Measurement] Fehler beim Öffnen von " << frames_path << "\n";
+    } else {
+        frames_out.imbue(std::locale::classic());
+        frames_out << std::fixed << std::setprecision(4);
+        frames_out << "frame_time_ms,rendered_splats,rendered_nodes,rendered_bounding_boxes,cpu_update_ms,cpu_cull_ms,cpu_draw_ms,gpu_time_ms,sync_time_ms,swap_time_ms,pos_x,pos_y,pos_z,quat_x,quat_y,quat_z,quat_w\n";
+        for (const auto& s : m_stats) {
+            frames_out << s.frame_time_ms << ","
+                 << s.rendered_splats << ","
+                 << s.rendered_nodes << ","
+                 << s.rendered_bounding_boxes << ","
+                 << s.cpu_update_ms << ","
+                 << s.cpu_cull_ms << ","
+                 << s.cpu_draw_ms << ","
+                 << s.gpu_time_ms << ","
+                 << s.sync_time_ms << ","
+                 << s.swap_time_ms << ","
+                 << s.position.x() << "," << s.position.y() << "," << s.position.z() << ","
+                 << s.orientation.x() << "," << s.orientation.y() << "," << s.orientation.z() << "," << s.orientation.w() << "\n";
         }
     }
+
+    // Write summary file
+    std::ofstream summary_out(summary_path);
+    if (!summary_out) {
+        std::cerr << "[Measurement] Fehler beim Öffnen von " << summary_path << "\n";
+    } else {
+        summary_out.imbue(std::locale::classic());
+        summary_out << std::fixed << std::setprecision(4);
+
+        size_t n = m_stats.size();
+        double total_time_ms = 0;
+        uint64_t total_splats = 0, total_nodes = 0, total_boxes = 0;
+        double total_cpu_update = 0, total_cpu_cull = 0, total_cpu_draw = 0, total_gpu = 0, total_sync = 0, total_swap = 0;
+
+        for (const auto& s : m_stats) {
+            total_time_ms += s.frame_time_ms;
+            total_splats += s.rendered_splats;
+            total_nodes += s.rendered_nodes;
+            total_boxes += s.rendered_bounding_boxes;
+            total_cpu_update += s.cpu_update_ms;
+            total_cpu_cull += s.cpu_cull_ms;
+            total_cpu_draw += s.cpu_draw_ms;
+            total_gpu += s.gpu_time_ms;
+            total_sync += s.sync_time_ms;
+            total_swap += s.swap_time_ms;
+        }
+
+        double avg_frame_time = total_time_ms / n;
+        double avg_fps = 1000.0 / avg_frame_time;
+
+        summary_out << "Metric,Value\n";
+        summary_out << "Total Frames," << n << "\n";
+        summary_out << "Total Time (s)," << total_time_ms / 1000.0 << "\n";
+        summary_out << "Avg Frame Time (ms)," << avg_frame_time << "\n";
+        summary_out << "Avg FPS," << avg_fps << "\n";
+        summary_out << "Avg Splats/Frame," << total_splats / n << "\n";
+        summary_out << "Avg Nodes/Frame," << total_nodes / n << "\n";
+        summary_out << "Avg Boxes/Frame," << total_boxes / n << "\n";
+        summary_out << "Avg CPU Update (ms)," << total_cpu_update / n << "\n";
+        summary_out << "Avg CPU Cull (ms)," << total_cpu_cull / n << "\n";
+        summary_out << "Avg CPU Draw (ms)," << total_cpu_draw / n << "\n";
+        summary_out << "Avg GPU Time (ms)," << total_gpu / n << "\n";
+        summary_out << "Avg Sync Time (ms)," << total_sync / n << "\n";
+        summary_out << "Avg Swap Time (ms)," << total_swap / n << "\n";
+    }
+    std::cout << "Measurement written to: " << summary_path << "\n" << frames_path << "\n";
+    m_stats.clear();
+    m_segmentTime = 0.0;
+    m_currentSegment = 0;
+    m_cumulativeRot = osg::Vec3(0.0f, 0.0f, 0.0f);
+}
