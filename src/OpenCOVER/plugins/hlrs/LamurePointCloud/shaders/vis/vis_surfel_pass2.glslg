@@ -1,57 +1,55 @@
 #version 420 core
 
-uniform mat4 mvp_matrix;
-uniform mat4 model_view_matrix;
+uniform mat4 model_view_matrix;  // V*M
+uniform mat4 projection_matrix;  // P
 
-layout (points) in;
-layout (triangle_strip, max_vertices = 4) out;
+layout(points) in;
+layout(triangle_strip, max_vertices = 4) out;
 
-in VertexData {
-  // Input from Vertex Shader
-  vec3 pass_ms_u;
-  vec3 pass_ms_v;
-  vec3 pass_point_color;
-  vec3 pass_vs_normal;
-  vec3 mv_vertex_position;
-} VertexIn[];
+in VS_OUT {
+    vec3 ms_u;
+    vec3 ms_v;
+    vec3 center_ms;
+    vec3 vs_normal;
+    vec3 point_color;
+    float radius_ws;
+} vin[];
 
-out VertexData {
-  // Output to Fragment Shader
-  vec3 pass_point_color;
-  vec3 pass_vs_normal;
-  vec2 pass_uv_coords;
-  vec3 mv_vertex_position;
-} VertexOut;
+out GS_OUT {
+    noperspective vec2 uv;
+    flat vec3  vs_u;
+    flat vec3  vs_v;
+    flat vec3  center_vs;
+    flat vec3  vs_normal;
+    flat vec3  point_color;
+    flat float radius_ws;
+} vout;
 
 void main() {
-  VertexOut.pass_point_color = VertexIn[0].pass_point_color;
-  VertexOut.pass_vs_normal = VertexIn[0].pass_vs_normal; 
-  
-  vec3 center   = gl_in[0].gl_Position.xyz;
-  vec3 step_u   = VertexIn[0].pass_ms_u;
-  vec3 step_v   = VertexIn[0].pass_ms_v;
+    vec3 center_vs = (model_view_matrix * vec4(vin[0].center_ms, 1.0)).xyz;
+    vec3 u_vs      = (model_view_matrix * vec4(vin[0].ms_u, 0.0)).xyz;
+    vec3 v_vs      = (model_view_matrix * vec4(vin[0].ms_v, 0.0)).xyz;
 
-  vec3 offs[4] = vec3[4](
-      -step_u - step_v,
-       step_u - step_v,
-      -step_u + step_v,
-       step_u + step_v
-  );
+    vout.center_vs  = center_vs;
+    vout.vs_u       = u_vs;
+    vout.vs_v       = v_vs;
+    vout.vs_normal  = normalize(vin[0].vs_normal);
+    vout.point_color= vin[0].point_color;
+    vout.radius_ws  = vin[0].radius_ws;
 
-  vec2 uvs[4] = vec2[4](
-      vec2(-1.0, -1.0),
-      vec2( 1.0, -1.0),
-      vec2(-1.0,  1.0),
-      vec2( 1.0,  1.0)
-  );
+    const vec2 U[4] = vec2[4](
+        vec2(-1.0, -1.0),
+        vec2( 1.0, -1.0),
+        vec2(-1.0,  1.0),
+        vec2( 1.0,  1.0)
+    );
 
-  for(int i = 0; i < 4; ++i) {
-      VertexOut.pass_uv_coords = uvs[i];
-      vec4 model_space_pos = vec4(center + offs[i], 1.0);
-      VertexOut.mv_vertex_position = (model_view_matrix * model_space_pos).xyz;
-      gl_Position = mvp_matrix * model_space_pos;
-      EmitVertex();
-  }
-  EndPrimitive();
-  
+    for (int i=0;i<4;++i) {
+        vec2 t = U[i];
+        vout.uv = t;
+        vec3 corner_vs = center_vs + t.x * u_vs + t.y * v_vs;
+        gl_Position = projection_matrix * vec4(corner_vs, 1.0);
+        EmitVertex();
+    }
+    EndPrimitive();
 }

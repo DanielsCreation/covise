@@ -16,13 +16,13 @@ show_text : 0
 show_sync : 1
 show_notify : 0
 
-point_light_intensity : 1.0;
-ambient_intensity : 0.5;
+point_light_intensity : 1.0
+ambient_intensity : 0.5
 
-point_light_pos_x : 300.0;
-point_light_pos_y : 300.0;
-point_light_pos_z : 1000.0;
-
+point_light_pos_x : 300.0
+point_light_pos_y : 300.0
+point_light_pos_z : 1000.0
+shader : "Surfel Multipass"
 
 
 # \Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_012\naturkundemuseum_School012.bvh

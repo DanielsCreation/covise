@@ -11,6 +11,12 @@
 #include <windows.h>
 #endif
 
+#include <array>
+#include <vector>
+#include <map>
+#include <string>
+#include <cstdint>
+
 #include <scm/core/math.h>
 #include <osg/Geometry>
 #include <osg/StateSet>
@@ -209,11 +215,12 @@ private:
     struct SurfelPass1Shader {
         GLuint program{0};
         GLint mvp_matrix_loc{-1};           // mat4 mvp_matrix
+        GLint projection_matrix_loc{-1};    
         GLint model_view_matrix_loc{-1};
-        GLint normal_matrix_loc{-1};    // mat4 model_view_matrix
         GLint model_matrix_loc{-1};         // mat4 model_matrix
         GLint near_plane_loc{-1};           // float near_plane
         GLint far_plane_loc{-1};            // float far_plane
+        GLint viewport_loc {-1};
 
         GLint max_radius_loc{-1};           // float max_radius
         GLint min_radius_loc{-1};           // float min_radius
@@ -227,6 +234,7 @@ private:
         // Matrix uniforms (from VS/GS, same as pass 1)
         GLint mvp_matrix_loc{-1};
         GLint model_view_matrix_loc{-1};
+        GLint projection_matrix_loc{-1};    
         GLint normal_matrix_loc{-1};
         GLint model_matrix_loc{-1};
         GLint inv_mv_matrix_loc{-1};
@@ -234,6 +242,7 @@ private:
         GLint depth_texture_loc{-1};
         GLint far_plane_loc{-1};
         GLint near_plane_loc{-1};
+        GLint viewport_loc {-1};
         // Scaling uniforms (from VS)
         GLint max_radius_loc{-1};
         GLint min_radius_loc{-1};
@@ -252,8 +261,8 @@ private:
         GLint heatmap_max_loc{-1};
         GLint heatmap_min_color_loc{-1};
         GLint heatmap_max_color_loc{-1};
-        // Fragment shader specific
-        GLint win_size_loc{-1};
+        GLint edge_profile_loc{-1};
+        GLint depth_epsilon_vs_loc{-1};
     };
     SurfelPass2Shader m_surfel_pass2_shader;
 
@@ -277,6 +286,20 @@ private:
         GLint shininess_loc             {-1};
         GLint use_tone_mapping_loc      {-1};
         GLint gamma_loc                 {-1};
+
+        GLint show_normals_loc{-1};
+        GLint show_accuracy_loc{-1};
+        GLint show_radius_dev_loc{-1};
+        GLint show_output_sens_loc{-1};
+        GLint accuracy_loc{-1};
+        GLint average_radius_loc{-1};
+
+        GLint inv_view_matrix_loc{-1};
+        GLint fy_pixels_loc{-1};
+        GLint show_radius_deviation_loc{-1};
+        GLint show_output_sensitivity_loc{-1};
+        GLint accuracy{-1};
+        GLint average_radius{-1};
     };
     SurfelPass3Shader m_surfel_pass3_shader;
 
@@ -317,6 +340,10 @@ private:
             -1.0f,  1.0f, 0.0f,  -1.0f, -1.0f, 0.0f,   1.0f, -1.0f, 0.0f,
             -1.0f,  1.0f, 0.0f,   1.0f, -1.0f, 0.0f,   1.0f,  1.0f, 0.0f
         };
+        GLuint msaa_fbo = 0;
+        GLuint msaa_color = 0, msaa_normal = 0, msaa_position = 0, msaa_depth = 0;
+        GLuint resolve_fbo = 0;
+        GLuint resolve_color = 0, resolve_normal = 0, resolve_position = 0;
     };
     PclResource m_pcl_resource;
 
@@ -505,8 +532,8 @@ public:
     void initLamureShader();
     void initSchismObjects();
     void initUniforms();
-    void initFramebuffer();
     void initPclResources();
+    void initPclResources(bool use_msaa, int msaa_samples);
 
     bool getRendering() { return m_rendering; };
     void setRendering(bool rendering) { m_rendering = rendering; };
@@ -541,7 +568,7 @@ public:
         SurfelMultipass
     };
 
-    struct LamureRenderer::ShaderInfo {
+    struct ShaderInfo {
         ShaderType type;
         std::string name;
     };
@@ -567,7 +594,7 @@ public:
     void setNodeUniforms(const lamure::ren::bvh* bvh, uint32_t node_id);
 
     void print_active_uniforms(GLuint programID, const std::string& shaderName);
-    std::string LamureRenderer::glTypeToString(GLenum type);
+    std::string glTypeToString(GLenum type);
 
     const PointShader&                  getPointShader()                const { return m_point_shader; }
     const PointColorShader&             getPointColorShader()           const { return m_point_color_shader; }

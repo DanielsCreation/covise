@@ -52,7 +52,6 @@ public:
         int32_t upload{32};
         bool provenance{1};
         bool create_aux_resources{1};
-        bool gamma_correction{0};
         bool face_eye{0};
         int32_t gui{1};
         int32_t travel{2};
@@ -88,7 +87,8 @@ public:
         bool use_tone_mapping{0};
         bool heatmap{0};
         float heatmap_min{0.0f};
-        float heatmap_max{0.05f};
+        float heatmap_max{ 0.05f };
+        std::string shader = "";
         scm::math::vec3f background_color{68.0f / 255.0f, 0.0f, 84.0f / 255.0f};
         scm::math::vec3f heatmap_color_min{68.0f / 255.0f, 0.0f, 84.0f / 255.0f};
         scm::math::vec3f heatmap_color_max{251.f / 255.f, 231.f / 255.f, 35.f / 255.f};

@@ -1,5 +1,4 @@
-// vis_surfel_color.glslv (Vertex Shader)
-#version 420 core
+#version 420 core // vis_surfel_color.glslv (Vertex Shader)
 
 layout(location = 0)  in vec3  in_position;
 layout(location = 1)  in float in_r;

@@ -123,12 +123,35 @@ void Lamure::loadSettings(const std::string& filename) {
     };
 
     auto strip_ws = [](std::string s) {
-        s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) { return !std::isspace(ch); }));
-        s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
+        s.erase(s.begin(), std::find_if(s.begin(), s.end(),
+            [](unsigned char ch){ return !std::isspace(ch); }));
+        s.erase(std::find_if(s.rbegin(), s.rend(),
+            [](unsigned char ch){ return !std::isspace(ch); }).base(), s.end());
         return s;
-    };
+        };
 
-    // Prepare settings map
+    auto unquote = [strip_ws](std::string s) {
+        s = strip_ws(std::move(s));
+        if (!s.empty() && (s.front() == '"' || s.front() == '\'')) s.erase(s.begin());
+        if (!s.empty() && (s.back()  == '"' || s.back()  == '\'')) s.pop_back();
+        return s;
+        };
+
+    auto parse_value = [strip_ws, unquote](std::string s) {
+        s = strip_ws(std::move(s));
+        const bool quoted = (!s.empty() && (s.front()=='"' || s.front()=='\''));
+        if (quoted) {
+            return strip_ws(unquote(std::move(s))); // keep internal spaces
+        } else {
+            // cut inline comments for unquoted values
+            size_t pos_hash  = s.find('#');
+            size_t pos_slash = s.find("//");
+            size_t pos = std::min(pos_hash, pos_slash == std::string::npos ? pos_hash : pos_slash);
+            if (pos != std::string::npos) s.erase(pos);
+            return strip_ws(std::move(s));
+        }
+        };
+
     using SettingHandler = std::function<void(const std::string&)>;
     std::unordered_map<std::string, SettingHandler> setting_handlers;
     auto& s = plugin->m_settings;
@@ -138,7 +161,6 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["ram"]                 = [&](const auto& v) { s.ram = std::max(std::atoi(v.c_str()), 8); };
     setting_handlers["upload"]              = [&](const auto& v) { s.upload = std::max(std::atoi(v.c_str()), 8); };
     setting_handlers["face_eye"]            = [&](const auto& v) { s.face_eye = (std::atoi(v.c_str()) != 0); };
-    setting_handlers["gamma_correction"]    = [&](const auto& v) { s.gamma_correction = (std::atoi(v.c_str()) != 0); };
     setting_handlers["pvs_culling"]         = [&](const auto& v) { s.pvs_culling = (std::atoi(v.c_str()) != 0); };
     setting_handlers["use_pvs"]             = [&](const auto& v) { s.use_pvs = (std::atoi(v.c_str()) != 0); };
     setting_handlers["aux_point_size"]      = [&](const auto& v) { s.aux_point_size = std::clamp(std::stof(v.c_str()), 0.00001f, 1.0f); };
@@ -192,6 +214,8 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["show_text"]          = [&](const auto& v) { s.show_text = (std::atoi(v.c_str()) != 0); };
     setting_handlers["show_sync"]          = [&](const auto& v) { s.show_sync = (std::atoi(v.c_str()) != 0); };
     setting_handlers["show_notify"]        = [&](const auto& v) { s.show_notify = (std::atoi(v.c_str()) != 0); };
+    setting_handlers["shader"] = [&](const auto& v) { s.shader = unquote(v); };
+
 
     s.background_color = scm::math::vec3(covise::coCoviseConfig::getFloat("r", "COVER.Background", 0.0f), 
                                          covise::coCoviseConfig::getFloat("g", "COVER.Background", 0.0f), 
@@ -272,16 +296,15 @@ void Lamure::loadSettings(const std::string& filename) {
         s.transforms[model_id] = scm::math::mat4d::identity();
     }
 
-    // Second pass: parse settings
     for (const auto& l : setting_lines) {
         auto colon = l.find(':');
-        auto key = strip_ws(l.substr(0, colon));
-        auto value = strip_ws(l.substr(colon + 1));
+        auto key   = strip_ws(l.substr(0, colon));
+        auto value = parse_value(l.substr(colon + 1)); // <- hier!
 
         if (!key.empty() && key[0] == '@') {
-            auto ws = l.find_first_of(' ');
+            auto ws   = l.find_first_of(' ');
             uint32_t addr = std::atoi(strip_ws(l.substr(1, ws - 1)).c_str());
-            key = strip_ws(l.substr(ws + 1, colon - (ws + 1)));
+            key   = strip_ws(l.substr(ws + 1, colon - (ws + 1)));
             if (key == "tf") {
                 s.transforms[addr] = LamureUtil::loadMatrix(value);
             } else {
@@ -290,9 +313,8 @@ void Lamure::loadSettings(const std::string& filename) {
             }
         } else {
             auto it = setting_handlers.find(key);
-            if (it != setting_handlers.end()) {
-                it->second(value);
-            } else {
+            if (it != setting_handlers.end()) it->second(value);
+            else {
                 std::cerr << "unrecognized key: " << key << std::endl;
                 std::exit(EXIT_FAILURE);
             }
@@ -301,6 +323,8 @@ void Lamure::loadSettings(const std::string& filename) {
 
     for (auto const& m : s.models) { std::cout << "Loaded model: " << m << std::endl; }
     for (auto const& m : s.initial_selection) { std::cout << "Selected models: " << m << std::endl; }
+
+    std::cout << "Shader: " << s.shader << std::endl;
 }
 
 

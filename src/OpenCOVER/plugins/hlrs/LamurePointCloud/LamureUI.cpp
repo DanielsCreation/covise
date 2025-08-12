@@ -154,21 +154,51 @@ void LamureUI::setupUi() {
     }
     m_shader_choice->setList(ui_items);
 
-    auto current_type = m_plugin->getSettings().shader_type;
-    auto it = std::find_if(available_shaders.begin(), available_shaders.end(), 
-        [current_type](const LamureRenderer::ShaderInfo& info){ return info.type == current_type; });
-
-    if (it != available_shaders.end()) {
-        m_shader_choice->select(std::distance(available_shaders.begin(), it));
-    } else if (!available_shaders.empty()) {
-        m_plugin->getSettings().shader_type = available_shaders[0].type;
-        m_shader_choice->select(0);
+    // Preselect per String (Settings::shader), falls gesetzt
+    int selected_idx = -1;
+    {
+        const auto& want = m_plugin->getSettings().shader; // z.B. "Surfel Multipass"
+        if (!want.empty()) {
+            auto itn = std::find_if(available_shaders.begin(), available_shaders.end(),
+                [&](const LamureRenderer::ShaderInfo& info){
+                    return info.name == want; // bei Bedarf auf case-insensitive erweitern
+                });
+            if (itn != available_shaders.end()) {
+                selected_idx = static_cast<int>(std::distance(available_shaders.begin(), itn));
+                // Typ synchronisieren
+                m_plugin->getSettings().shader_type = itn->type;
+                m_shader_choice->select(selected_idx);
+            }
+        }
     }
 
+    // Fallback: vorhandenen shader_type verwenden
+    if (selected_idx < 0) {
+        auto current_type = m_plugin->getSettings().shader_type;
+        auto it = std::find_if(available_shaders.begin(), available_shaders.end(),
+            [current_type](const LamureRenderer::ShaderInfo& info){ return info.type == current_type; });
+
+        if (it != available_shaders.end()) {
+            selected_idx = static_cast<int>(std::distance(available_shaders.begin(), it));
+            m_shader_choice->select(selected_idx);
+            // String nachziehen, falls leer
+            if (m_plugin->getSettings().shader.empty())
+                m_plugin->getSettings().shader = it->name;
+        } else if (!available_shaders.empty()) {
+            // finaler Fallback: erstes Element
+            selected_idx = 0;
+            m_plugin->getSettings().shader_type = available_shaders[0].type;
+            m_plugin->getSettings().shader      = available_shaders[0].name;
+            m_shader_choice->select(0);
+        }
+    }
+
+    // UI-Callback: String + Typ synchron halten
     m_shader_choice->setCallback([this, available_shaders](int idx) {
         if (idx >= 0 && static_cast<size_t>(idx) < available_shaders.size()) {
-            auto shader_type = available_shaders[idx].type;
-            m_plugin->getSettings().shader_type = shader_type;
+            const auto& chosen = available_shaders[idx];
+            m_plugin->getSettings().shader_type = chosen.type;
+            m_plugin->getSettings().shader      = chosen.name;
         }
         });
 

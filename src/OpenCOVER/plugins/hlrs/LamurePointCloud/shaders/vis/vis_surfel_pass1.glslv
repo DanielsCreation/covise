@@ -1,39 +1,43 @@
 #version 420 core
 
-out VertexData {
-  vec3 pass_ms_u;
-  vec3 pass_ms_v;
+// Basis aus Normal (Frisvad)
+vec3 any_tangent(vec3 n) {
+    float s = n.z >= 0.0 ? 1.0 : -1.0;
+    float a = -1.0 / (s + n.z);
+    float b = n.x * n.y * a;
+    return normalize(vec3(1.0 + s * n.x * n.x * a, s * b, -s * n.x));
+}
+void build_basis(in vec3 n_in, out vec3 u, out vec3 v) {
+    vec3 n = normalize(n_in);
+    u = any_tangent(n);
+    v = normalize(cross(n, u));
+}
 
-} VertexOut;
-
-// Custom scaling uniforms
+// Uniforms
 uniform float max_radius;
 uniform float min_radius;
 uniform float scale_radius;
 
+// Attributes (Model Space)
 layout(location = 0) in vec3 in_position;
-layout(location = 1) in float in_r;
-layout(location = 2) in float in_g;
-layout(location = 3) in float in_b;
-layout(location = 4) in float empty;
 layout(location = 5) in float in_radius;
 layout(location = 6) in vec3 in_normal;
 
+// To GS
+out VS_OUT {
+    vec3 ms_u;   // half-extent (MS)
+    vec3 ms_v;   // half-extent (MS)
+    vec3 center_ms;
+} vsOut;
+
 void main() {
+    float r_ws = clamp(in_radius * scale_radius, min_radius, max_radius);
+    vec3 u_ms, v_ms; build_basis(in_normal, u_ms, v_ms);
 
-  vec3 n = normalize(in_normal);
-  vec3 ref;
-  if (abs(n.x) > abs(n.y) && abs(n.x) > abs(n.z)) { ref = vec3(0.0, 1.0, 0.0); } 
-  else if (abs(n.y) > abs(n.z)) { ref = vec3(0.0, 0.0, 1.0); } 
-  else { ref = vec3(1.0, 0.0, 0.0); }
-  
-  vec3 u = normalize(cross(ref, n));
-  vec3 v = normalize(cross(n, u));
+    vsOut.ms_u = u_ms * r_ws;
+    vsOut.ms_v = v_ms * r_ws;
+    vsOut.center_ms = in_position;
 
-  float r_world = clamp(in_radius * scale_radius, min_radius, max_radius);
-
-  VertexOut.pass_ms_u        = u * (r_world * 0.5);
-  VertexOut.pass_ms_v        = v * (r_world * 0.5);
-
-  gl_Position = vec4(in_position, 1.0);
+    // Transport des Centers via gl_Position (MS)
+    gl_Position = vec4(in_position, 1.0);
 }

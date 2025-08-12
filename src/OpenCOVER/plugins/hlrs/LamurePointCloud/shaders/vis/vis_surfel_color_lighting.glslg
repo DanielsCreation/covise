@@ -1,5 +1,4 @@
-// vis_surfel_color.glslg (Geometry Shader)
-#version 420 core
+#version 420 core // vis_surfel_color.glslg (Geometry Shader)
 
 layout(points) in;
 layout(triangle_strip, max_vertices = 4) out;

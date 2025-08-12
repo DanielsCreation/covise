@@ -1,4 +1,4 @@
-// vis_color_prov.glsl
+// vis_color_no_prov.glsl
 
 INCLUDE ../common/heatmapping/wavelength_to_rainbow.glsl
 INCLUDE ../common/heatmapping/colormap.glsl
