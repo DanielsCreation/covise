@@ -325,26 +325,34 @@ private:
 
 
     struct PclResource {
-        GLuint vao;
-        // FBO f�r das Multi-Pass-Rendering
-        GLuint fbo = 0;
-        // Texturen, die an das FBO angeh�ngt werden
-        GLuint texture_color = 0;    // Attachment 0: Akkumulierte Farben (RGB) und Gewicht (A)
-        GLuint texture_normal = 0;   // Attachment 1: Akkumulierte Normalen
-        GLuint texture_position = 0; // Attachment 2: Akkumulierte View-Space Positionen
-        GLuint depth_texture = 0;    // Tiefen-Textur f�r den Z-Buffer
-        // VAO/VBO f�r das bildschirmf�llende Viereck in Pass 3
         GLuint screen_quad_vao = 0;
         GLuint screen_quad_vbo = 0;
-        std::array<float, 18> screen_quad_vertex= {
-            -1.0f,  1.0f, 0.0f,  -1.0f, -1.0f, 0.0f,   1.0f, -1.0f, 0.0f,
-            -1.0f,  1.0f, 0.0f,   1.0f, -1.0f, 0.0f,   1.0f,  1.0f, 0.0f
+        std::array<float, 18> screen_quad_vertex = {
+            -1.0f,  1.0f, 0.0f,   -1.0f, -1.0f, 0.0f,    1.0f, -1.0f, 0.0f,
+            -1.0f,  1.0f, 0.0f,    1.0f, -1.0f, 0.0f,    1.0f,  1.0f, 0.0f
         };
-        GLuint msaa_fbo = 0;
-        GLuint msaa_color = 0, msaa_normal = 0, msaa_position = 0, msaa_depth = 0;
-        GLuint resolve_fbo = 0;
-        GLuint resolve_color = 0, resolve_normal = 0, resolve_position = 0;
+
+        GLuint vao = 0;
+
+        GLuint fbo = 0;
+        GLuint texture_color   = 0; // GL_COLOR_ATTACHMENT0: akk. Farbe (RGB) + Gewicht (A)
+        GLuint texture_normal  = 0; // GL_COLOR_ATTACHMENT1: akk. Normalen
+        GLuint texture_position= 0; // GL_COLOR_ATTACHMENT2: akk. View-Space-Position
+        GLuint depth_texture   = 0; // GL_DEPTH_ATTACHMENT  : Depth-Textur (z.B. D24)
+
+        int msaa_samples = 0;
+        GLuint msaa_fbo       = 0;
+        GLuint msaa_color_rbo   = 0; // RBO für Farbe (multisampled)
+        GLuint msaa_normal_rbo  = 0; // RBO für Normal (multisampled)
+        GLuint msaa_position_rbo= 0; // RBO für Position (multisampled)
+        GLuint msaa_depth_rbo   = 0; // RBO für Depth (multisampled)
+
+        GLuint resolve_fbo     = 0;
+        GLuint resolve_color   = 0;
+        GLuint resolve_normal  = 0;
+        GLuint resolve_position= 0;
     };
+
     PclResource m_pcl_resource;
 
 
@@ -534,6 +542,7 @@ public:
     void initUniforms();
     void initPclResources();
     void initPclResources(bool use_msaa, int msaa_samples);
+    void initPclResources(int msaaSamples);
 
     bool getRendering() { return m_rendering; };
     void setRendering(bool rendering) { m_rendering = rendering; };

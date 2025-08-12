@@ -1,6 +1,5 @@
 #version 420 core
 
-layout(early_fragment_tests) in;
 in GsOut {
     noperspective vec2 uv;  // -1..1
 } fs_in;

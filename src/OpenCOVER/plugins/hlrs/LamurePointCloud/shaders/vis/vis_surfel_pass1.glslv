@@ -1,13 +1,11 @@
 #version 420 core
 
-// Global parameters.
 uniform float max_radius;
 uniform float min_radius;
 uniform float scale_radius;
 uniform mat4  model_view_matrix; 
 uniform mat4  projection_matrix;  
 
-// Vertex attributes.
 layout(location = 0) in vec3 in_position;
 layout(location = 5) in float in_radius;
 layout(location = 6) in vec3 in_normal;

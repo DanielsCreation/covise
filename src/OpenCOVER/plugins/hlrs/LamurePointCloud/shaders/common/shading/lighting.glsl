@@ -14,14 +14,14 @@ vec3 shade_blinn_phong(in vec3 vs_pos, in vec3 vs_normal, in vec3 vs_color)
     vec3 view_dir = normalize(-vs_pos);
     vec3 light_dir = normalize(point_light_pos_vs - vs_pos);
 
+    if (dot(normal, view_dir) < 0.0) { normal *= -1.0; }
+
     float NdotL = max(dot(normal, light_dir), 0.0);
-    if (NdotL <= 0.0) {
-        // Nur Ambient, wenn Licht hinter der Fläche steht
-        vec3 amb = ambient_intensity * vs_color;
-        vec3 mapped = use_tone_mapping ? (amb / (amb + vec3(1.0))) : amb;
-        // Gamma (linear -> display)
-        return pow(mapped, vec3(1.0 / max(gamma, 1e-6)));
-    }
+    //if (NdotL <= 0.0) {
+    //    vec3 amb = ambient_intensity * vs_color;
+    //    vec3 mapped = use_tone_mapping ? (amb / (amb + vec3(1.0))) : amb;
+    //    return pow(mapped, vec3(1.0 / max(gamma, 1e-6)));
+    //}
 
     vec3  half_dir = normalize(light_dir + view_dir);
     float NdotH    = max(dot(normal, half_dir), 0.0);

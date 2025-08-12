@@ -88,7 +88,7 @@ struct InitCullCallback : public osg::Drawable::CullCallback {
             _renderer->initSchismObjects();
             _renderer->initFrustumResources();
             _renderer->initBoxResources();
-            _renderer->initPclResources();
+            _renderer->initPclResources(2);
             _renderer->initLamureShader();
             _renderer->initUniforms();
             _renderer->getPointcloudGeode()->setNodeMask(_plugin->getUI()->getPointcloudButton()->state() ? 0xFFFFFFFF : 0);
@@ -482,20 +482,28 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             const int height = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height;
             const int width  = opencover::coVRConfig::instance()->windows[0].context->getTraits()->width;
 
-            // --- PASS 1: Depth pre-pass (depth-only to HW depth buffer) ---
-            glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
+            // --- PASS 1: Depth pre-pass (depth-only)
+            const bool useMSAA = (res.msaa_samples > 1 && res.msaa_fbo != 0);
+            glBindFramebuffer(GL_FRAMEBUFFER, useMSAA ? res.msaa_fbo : res.fbo);
+
+            //glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
             glViewport(0, 0, width, height);
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
             glClear(GL_DEPTH_BUFFER_BIT);
 
+            glDisable(GL_BLEND);
+            glDisable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
-            glDisable(GL_BLEND);
+            glDepthFunc(GL_LEQUAL);
 
             glUseProgram(_renderer->getSurfelPass1Shader().program);
 
             // Global scalars.
+            glUniform2f(_renderer->getSurfelPass1Shader().viewport_loc, width, height);
+            glUniform1f(_renderer->getSurfelPass1Shader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
+            glUniform1f(_renderer->getSurfelPass1Shader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
             glUniform1f(_renderer->getSurfelPass1Shader().max_radius_loc,   s.max_radius);
             glUniform1f(_renderer->getSurfelPass1Shader().min_radius_loc,   s.min_radius);
             glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius);
@@ -523,28 +531,32 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 }
             }
 
+            if (useMSAA) {
+                glBindFramebuffer(GL_READ_FRAMEBUFFER, res.msaa_fbo);
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.fbo);
+                glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+                glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
+            }
+
             // --- PASS 2: Accumulation pass (additively into 3 targets) ---
+            glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
             GLenum accumBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
             glDrawBuffers(3, accumBuffers);
             glClearColor(0.f, 0.f, 0.f, 0.f);
             glClear(GL_COLOR_BUFFER_BIT);
             glEnable(GL_BLEND);
             glBlendFunc(GL_ONE, GL_ONE);
-            glDisable(GL_DEPTH_TEST);
-            glDepthFunc(GL_LEQUAL);
+            glDisable(GL_CULL_FACE);
+            glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_FALSE);
+            glDepthFunc(GL_LEQUAL);
 
             glUseProgram(_renderer->getSurfelPass2Shader().program);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, res.depth_texture);
+
             glUniform1i(_renderer->getSurfelPass2Shader().depth_texture_loc, 0);
-
-            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,   GL_NEAREST);
-            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,   GL_NEAREST);
-            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,       GL_CLAMP_TO_EDGE);
-            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,       GL_CLAMP_TO_EDGE);
-
+            glUniform2f(_renderer->getSurfelPass2Shader().viewport_loc, width, height);
             glUniform1f(_renderer->getSurfelPass2Shader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
             glUniform1f(_renderer->getSurfelPass2Shader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
             glUniform1f(_renderer->getSurfelPass2Shader().max_radius_loc,   s.max_radius);
@@ -555,7 +567,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             glUniform1i(_renderer->getSurfelPass2Shader().show_radius_dev_loc,        s.show_radius_deviation);
             glUniform1i(_renderer->getSurfelPass2Shader().show_accuracy_loc,          s.show_accuracy);
 
-            const bool needNodeUniforms = (s.show_radius_deviation || s.show_output_sensitivity);
+            const bool needNodeUniforms = (s.show_radius_deviation || s.show_accuracy);
             for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
                 if (!_plugin->getUI()->getModelVisibility()[model_id]) continue;
 
@@ -566,10 +578,12 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
                 scm::math::mat4 model_matrix      = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
                 scm::math::mat4 model_view_matrix = view_matrix * model_matrix;
+
+                scm::math::mat3 normal_matrix;
+                scm::math::mat3 model_view_3x3 = LamureUtil::matConv4to3F(model_view_matrix);
                 scm::math::mat3 normal_matrix     = scm::math::transpose(scm::math::inverse(LamureUtil::matConv4to3F(model_view_matrix)));
                 scm::gl::frustum frustum          = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
 
-                // Matrices required by VS/GS/FS in pass 2.
                 glUniformMatrix4fv(_renderer->getSurfelPass2Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
                 glUniformMatrix4fv(_renderer->getSurfelPass2Shader().projection_matrix_loc, 1, GL_FALSE, projection_matrix.data_array);
                 glUniformMatrix3fv(_renderer->getSurfelPass2Shader().normal_matrix_loc,     1, GL_FALSE, normal_matrix.data_array);
@@ -582,26 +596,33 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                     }
                 }
             }
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.fbo);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prev_fbo);
+            glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
+
 
             // --- PASS 3: Resolve / lighting ---
             glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
             glViewport(0, 0, width, height);
-            glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_FALSE);
 
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
             auto &prog = _renderer->getSurfelPass3Shader();
-            glUseProgram(prog.program);
+            glUseProgram(_renderer->getSurfelPass3Shader().program);
 
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, res.texture_color);
-            glUniform1i(prog.in_color_texture_loc, 0);
+            glUniform1i(_renderer->getSurfelPass3Shader().in_color_texture_loc, 0);
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, res.texture_normal);
-            glUniform1i(prog.in_normal_texture_loc, 1);
+            glUniform1i(_renderer->getSurfelPass3Shader().in_normal_texture_loc, 1);
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, res.texture_position);
-            glUniform1i(prog.in_vs_position_texture_loc, 2);
+            glUniform1i(_renderer->getSurfelPass3Shader().in_vs_position_texture_loc, 2);
 
             // View-space lighting setup.
             osg::Matrix base = opencover::VRSceneGraph::instance()->getScaleTransform()->getMatrix();
@@ -614,15 +635,19 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             scm::math::vec4 light_vs4 = viewMat * light_ws;
             scm::math::vec3 light_vs(light_vs4[0], light_vs4[1], light_vs4[2]);
 
-            glUniform3fv(prog.background_color_loc,   1, background_color.data_array);
-            glUniformMatrix4fv(prog.view_matrix_loc,  1, GL_FALSE, viewMat.data_array);
-            glUniform3fv(prog.point_light_pos_vs_loc, 1, light_vs.data_array);
-            glUniform1f(prog.point_light_intensity_loc, s.point_light_intensity);
-            glUniform1f(prog.ambient_intensity_loc,     s.ambient_intensity);
-            glUniform1f(prog.specular_intensity_loc,    s.specular_intensity);
-            glUniform1f(prog.shininess_loc,             s.shininess);
-            glUniform1f(prog.gamma_loc,                 s.gamma);
-            glUniform1i(prog.use_tone_mapping_loc,      s.use_tone_mapping ? 1 : 0);
+            glUniform1i(_renderer->getSurfelPass3Shader().show_normals_loc,           s.show_normals);
+            glUniform1i(_renderer->getSurfelPass3Shader().show_output_sens_loc,       s.show_output_sensitivity);
+            glUniform1i(_renderer->getSurfelPass3Shader().show_radius_dev_loc,        s.show_radius_deviation);
+            glUniform1i(_renderer->getSurfelPass3Shader().show_accuracy_loc,          s.show_accuracy);
+            glUniform3fv(_renderer->getSurfelPass3Shader().background_color_loc,   1, background_color.data_array);
+            glUniformMatrix4fv(_renderer->getSurfelPass3Shader().view_matrix_loc,  1, GL_FALSE, viewMat.data_array);
+            glUniform3fv(_renderer->getSurfelPass3Shader().point_light_pos_vs_loc, 1, light_vs.data_array);
+            glUniform1f(_renderer->getSurfelPass3Shader().point_light_intensity_loc, s.point_light_intensity);
+            glUniform1f(_renderer->getSurfelPass3Shader().ambient_intensity_loc,     s.ambient_intensity);
+            glUniform1f(_renderer->getSurfelPass3Shader().specular_intensity_loc,    s.specular_intensity);
+            glUniform1f(_renderer->getSurfelPass3Shader().shininess_loc,             s.shininess);
+            glUniform1f(_renderer->getSurfelPass3Shader().gamma_loc,                 s.gamma);
+            glUniform1i(_renderer->getSurfelPass3Shader().use_tone_mapping_loc,      s.use_tone_mapping ? 1 : 0);
 
             // Fullscreen quad draw.
             glBindVertexArray(res.screen_quad_vao);
@@ -631,7 +656,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
             // Restore texture unit if needed by later code.
             glActiveTexture(GL_TEXTURE0);
-
         }
         else {
             // ================= SINGLE-PASS RENDER PATH =================
@@ -1253,8 +1277,7 @@ void LamureRenderer::setNodeUniforms(const lamure::ren::bvh* bvh, uint32_t node_
     switch (s.shader_type) {
     case ShaderType::PointColor: {
         if (s.show_accuracy) {
-            float accuracy = 1.0f - float(bvh->get_depth_of_node(node_id))
-                / float(bvh->get_depth() - 1);
+            float accuracy = 1.0f - float(bvh->get_depth_of_node(node_id)) / float(bvh->get_depth() - 1);
             glUniform1f(m_point_color_shader.accuracy_loc, accuracy);
         }
         if (s.show_radius_deviation) {
@@ -1290,8 +1313,7 @@ void LamureRenderer::setNodeUniforms(const lamure::ren::bvh* bvh, uint32_t node_
     }
     case ShaderType::SurfelColor: {
         if (s.show_accuracy) {
-            float accuracy = 1.0f - float(bvh->get_depth_of_node(node_id))
-                / float(bvh->get_depth() - 1);
+            float accuracy = 1.0f - float(bvh->get_depth_of_node(node_id)) / float(bvh->get_depth() - 1);
             glUniform1f(m_surfel_color_shader.accuracy_loc, accuracy);
         }
         if (s.show_radius_deviation) {
@@ -1646,105 +1668,6 @@ GLuint LamureRenderer::compileAndLinkShaders(std::string vs_source, std::string 
 }
 
 
-void LamureRenderer::initPclResources()
-{
-    if (m_plugin->getUI()->getNotifyButton()->state()) {
-        std::cout << "[Notify] initPclResources() " << std::endl;
-    }
-
-    const int height = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height;
-    const int width  = opencover::coVRConfig::instance()->windows[0].context->getTraits()->width;
-
-    // Vorherige Ressourcen freigeben
-    if (m_pcl_resource.fbo != 0) {
-        glDeleteFramebuffers(1, &m_pcl_resource.fbo);
-        glDeleteTextures(1, &m_pcl_resource.texture_color);
-        glDeleteTextures(1, &m_pcl_resource.texture_normal);
-        glDeleteTextures(1, &m_pcl_resource.texture_position);
-        glDeleteTextures(1, &m_pcl_resource.depth_texture);
-        m_pcl_resource = {}; // nullt auch Handles
-    }
-
-    // FBO
-    glGenFramebuffers(1, &m_pcl_resource.fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, m_pcl_resource.fbo);
-
-    // COLOR: RGBA16F (A = sum(weight))
-    glGenTextures(1, &m_pcl_resource.texture_color);
-    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_color);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_pcl_resource.texture_color, 0);
-
-    // NORMAL: RGB16F
-    glGenTextures(1, &m_pcl_resource.texture_normal);
-    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_normal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_pcl_resource.texture_normal, 0);
-
-    // POSITION: RGB16F
-    glGenTextures(1, &m_pcl_resource.texture_position);
-    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_position);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_pcl_resource.texture_position, 0);
-
-    // DEPTH: 32F (kann auch D24 sein, 32F ist ok)
-    glGenTextures(1, &m_pcl_resource.depth_texture);
-    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.depth_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_pcl_resource.depth_texture, 0);
-
-    // Standard-Draw-Buffers (Pass 2 setzt das dynamisch um)
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-    glDrawBuffers(3, drawBuffers);
-
-    // Check
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-    }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Screen-Quad (falls noch nicht vorhanden)
-    if (m_pcl_resource.screen_quad_vao == 0) {
-        GLuint vao, vbo;
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
-
-        glGenBuffers(1, &vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER,
-            sizeof(float) * m_pcl_resource.screen_quad_vertex.size(),
-            m_pcl_resource.screen_quad_vertex.data(), GL_STATIC_DRAW);
-
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
-
-        m_pcl_resource.screen_quad_vao = vao;
-        m_pcl_resource.screen_quad_vbo = vbo;
-
-        glBindVertexArray(0);
-    }
-}
-
-
-
 void LamureRenderer::initFrustumResources() {
     if (m_plugin->getUI()->getNotifyButton()->state()) {
         std::cout << "[Notify] create_frustum_resources() " << std::endl;
@@ -1873,3 +1796,235 @@ void LamureRenderer::print_active_uniforms(GLuint programID, const std::string& 
     }
 }
 
+
+void LamureRenderer::initPclResources()
+{
+    if (m_plugin->getUI()->getNotifyButton()->state()) {
+        std::cout << "[Notify] initPclResources() " << std::endl;
+    }
+
+    const int height = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height;
+    const int width  = opencover::coVRConfig::instance()->windows[0].context->getTraits()->width;
+
+    // Vorherige Ressourcen freigeben
+    if (m_pcl_resource.fbo != 0) {
+        glDeleteFramebuffers(1, &m_pcl_resource.fbo);
+        glDeleteTextures(1, &m_pcl_resource.texture_color);
+        glDeleteTextures(1, &m_pcl_resource.texture_normal);
+        glDeleteTextures(1, &m_pcl_resource.texture_position);
+        glDeleteTextures(1, &m_pcl_resource.depth_texture);
+        m_pcl_resource = {}; // nullt auch Handles
+    }
+
+    // FBO
+    glGenFramebuffers(1, &m_pcl_resource.fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_pcl_resource.fbo);
+
+    // COLOR: RGBA16F (A = sum(weight))
+    glGenTextures(1, &m_pcl_resource.texture_color);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_color);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_pcl_resource.texture_color, 0);
+
+    // NORMAL: RGB16F
+    glGenTextures(1, &m_pcl_resource.texture_normal);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_normal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_pcl_resource.texture_normal, 0);
+
+    // POSITION: RGB16F
+    glGenTextures(1, &m_pcl_resource.texture_position);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_position);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_pcl_resource.texture_position, 0);
+
+    // DEPTH: 32F (kann auch D24 sein, 32F ist ok)
+    glGenTextures(1, &m_pcl_resource.depth_texture);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.depth_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_pcl_resource.depth_texture, 0);
+
+    // Standard-Draw-Buffers (Pass 2 setzt das dynamisch um)
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, drawBuffers);
+
+    // Check
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Screen-Quad (falls noch nicht vorhanden)
+    if (m_pcl_resource.screen_quad_vao == 0) {
+        GLuint vao, vbo;
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER,
+            sizeof(float) * m_pcl_resource.screen_quad_vertex.size(),
+            m_pcl_resource.screen_quad_vertex.data(), GL_STATIC_DRAW);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
+
+        m_pcl_resource.screen_quad_vao = vao;
+        m_pcl_resource.screen_quad_vbo = vbo;
+
+        glBindVertexArray(0);
+    }
+}
+
+
+void LamureRenderer::initPclResources(int msaaSamples) {
+    if (m_plugin->getUI()->getNotifyButton()->state()) {
+        std::cout << "[Notify] initPclResources(samples=" << msaaSamples << ") " << std::endl;
+    }
+
+    GLint savedFbo = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &savedFbo);
+
+    const int height = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height;
+    const int width  = opencover::coVRConfig::instance()->windows[0].context->getTraits()->width;
+
+    // Vorherige Ressourcen freigeben
+    if (m_pcl_resource.fbo != 0) {
+        glDeleteFramebuffers(1, &m_pcl_resource.fbo);
+        glDeleteTextures(1, &m_pcl_resource.texture_color);
+        glDeleteTextures(1, &m_pcl_resource.texture_normal);
+        glDeleteTextures(1, &m_pcl_resource.texture_position);
+        glDeleteTextures(1, &m_pcl_resource.depth_texture);
+    }
+    if (m_pcl_resource.msaa_fbo != 0) {
+        glDeleteFramebuffers(1, &m_pcl_resource.msaa_fbo);
+        m_pcl_resource.msaa_fbo = 0;
+    }
+    if (m_pcl_resource.msaa_depth_rbo != 0) {
+        glDeleteRenderbuffers(1, &m_pcl_resource.msaa_depth_rbo);
+        m_pcl_resource.msaa_depth_rbo = 0;
+    }
+
+    // Singlesample FBO (Color/Normal/Position als Texturen, Depth als Textur D24)
+    glGenFramebuffers(1, &m_pcl_resource.fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_pcl_resource.fbo);
+
+    // COLOR: RGBA16F (A = sum(weight))
+    glGenTextures(1, &m_pcl_resource.texture_color);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_color);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_pcl_resource.texture_color, 0);
+
+    // NORMAL: RGB16F
+    glGenTextures(1, &m_pcl_resource.texture_normal);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_normal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_pcl_resource.texture_normal, 0);
+
+    // POSITION: RGB16F
+    glGenTextures(1, &m_pcl_resource.texture_position);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_position);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_pcl_resource.texture_position, 0);
+
+    // DEPTH (singlesample) als Textur D24 → wird in Pass 2 gesampelt
+    glGenTextures(1, &m_pcl_resource.depth_texture);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.depth_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_pcl_resource.depth_texture, 0);
+
+    // Standard Draw-Buffers
+    {
+        GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+        glDrawBuffers(3, drawBuffers);
+    }
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "ERROR: singlesample FBO incomplete!" << std::endl;
+    }
+
+    // Optional: MSAA-Depth-FBO für Pass 1
+    GLint maxSamples = 0;
+    glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
+    const int samples = std::max(1, std::min(msaaSamples, maxSamples));
+    m_pcl_resource.msaa_samples = samples;
+
+    if (samples > 1) {
+        glGenFramebuffers(1, &m_pcl_resource.msaa_fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_pcl_resource.msaa_fbo);
+
+        glGenRenderbuffers(1, &m_pcl_resource.msaa_depth_rbo);
+        glBindRenderbuffer(GL_RENDERBUFFER, m_pcl_resource.msaa_depth_rbo);
+        glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH_COMPONENT24, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_pcl_resource.msaa_depth_rbo);
+
+        // Nur Depth in Pass 1 → keine Color-Anhänge nötig
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "ERROR: msaa depth FBO incomplete!" << std::endl;
+        }
+    }
+
+    // zurück auf Default
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Screen-Quad (falls noch nicht vorhanden)
+    if (m_pcl_resource.screen_quad_vao == 0) {
+        GLuint vao, vbo;
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER,
+            sizeof(float) * m_pcl_resource.screen_quad_vertex.size(),
+            m_pcl_resource.screen_quad_vertex.data(), GL_STATIC_DRAW);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
+
+        m_pcl_resource.screen_quad_vao = vao;
+        m_pcl_resource.screen_quad_vbo = vbo;
+
+        glBindVertexArray(0);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, savedFbo);
+}
