@@ -1,6 +1,24 @@
 #version 420 core
 
-// Basis aus Normal (Frisvad)
+// Global parameters.
+uniform float max_radius;
+uniform float min_radius;
+uniform float scale_radius;
+uniform mat4  model_view_matrix; 
+uniform mat4  projection_matrix;  
+
+// Vertex attributes.
+layout(location = 0) in vec3 in_position;
+layout(location = 5) in float in_radius;
+layout(location = 6) in vec3 in_normal;
+
+out VsOut {
+    vec3 vs_center;
+    vec3 vs_half_u;
+    vec3 vs_half_v;
+} vs_out;
+
+// Orthonormale Basis aus Normalenvektor (Frisvad).
 vec3 any_tangent(vec3 n) {
     float s = n.z >= 0.0 ? 1.0 : -1.0;
     float a = -1.0 / (s + n.z);
@@ -13,31 +31,19 @@ void build_basis(in vec3 n_in, out vec3 u, out vec3 v) {
     v = normalize(cross(n, u));
 }
 
-// Uniforms
-uniform float max_radius;
-uniform float min_radius;
-uniform float scale_radius;
-
-// Attributes (Model Space)
-layout(location = 0) in vec3 in_position;
-layout(location = 5) in float in_radius;
-layout(location = 6) in vec3 in_normal;
-
-// To GS
-out VS_OUT {
-    vec3 ms_u;   // half-extent (MS)
-    vec3 ms_v;   // half-extent (MS)
-    vec3 center_ms;
-} vsOut;
-
 void main() {
-    float r_ws = clamp(in_radius * scale_radius, min_radius, max_radius);
-    vec3 u_ms, v_ms; build_basis(in_normal, u_ms, v_ms);
+    float radius_ms = clamp(in_radius * scale_radius, min_radius, max_radius);
 
-    vsOut.ms_u = u_ms * r_ws;
-    vsOut.ms_v = v_ms * r_ws;
-    vsOut.center_ms = in_position;
+    vec3 ms_u, ms_v;
+    build_basis(in_normal, ms_u, ms_v);
 
-    // Transport des Centers via gl_Position (MS)
-    gl_Position = vec4(in_position, 1.0);
+    vec3 vs_center = (model_view_matrix * vec4(in_position, 1.0)).xyz;
+    vec3 vs_half_u = (model_view_matrix * vec4(ms_u * radius_ms, 0.0)).xyz; // w=0: nur linearer Anteil
+    vec3 vs_half_v = (model_view_matrix * vec4(ms_v * radius_ms, 0.0)).xyz;
+
+    vs_out.vs_center = vs_center;
+    vs_out.vs_half_u = vs_half_u;
+    vs_out.vs_half_v = vs_half_v;
+
+    gl_Position = projection_matrix * vec4(vs_center, 1.0);
 }

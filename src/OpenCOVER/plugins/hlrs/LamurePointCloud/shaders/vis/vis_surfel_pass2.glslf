@@ -1,22 +1,22 @@
 #version 420 core
-layout(early_fragment_tests) in;
+//layout(early_fragment_tests) in;
 
-in GS_OUT {
-    noperspective vec2 uv;
-    flat vec3  vs_u;
-    flat vec3  vs_v;
-    flat vec3  center_vs;
-    flat vec3  vs_normal;
-    flat vec3  point_color;
-    flat float radius_ws;
-} fin;
+// Input from GS.
+in GsOut {
+    noperspective vec2 uv;   // -1..1
+    flat vec3 vs_center;
+    flat vec3 vs_half_u;
+    flat vec3 vs_half_v;
+    flat vec3 vs_normal;
+    flat vec3 albedo_rgb;
+} fs_in;
 
-// MRTs
-layout(location = 0) out vec4 accumulated_colors;        // rgb=Σ(color*w), a=Σw
-layout(location = 1) out vec3 accumulated_normals;       // Σ(normal*w)
-layout(location = 2) out vec4 accumulated_vs_position;   // rgb=Σ(pos_vs*w), a=Σ(radius_ws*w)
+// Accumulation targets.
+layout(location = 0) out vec4 accumulated_colors;      // rgb = Σ(color*w), a = Σw
+layout(location = 1) out vec3 accumulated_normals;     // Σ(normal*w)
+layout(location = 2) out vec3 accumulated_vs_positions;// Σ(pos_vs*w)
 
-// Gaussian LUT (32)
+// Gaussian LUT.
 const float gaussian[32] = float[](
   1.000000, 1.000000, 0.988235, 0.968627, 0.956862, 0.917647, 0.894117, 0.870588, 0.915686, 0.788235,
   0.749020, 0.690196, 0.654902, 0.619608, 0.552941, 0.513725, 0.490196, 0.458824, 0.392157, 0.356863,
@@ -24,40 +24,16 @@ const float gaussian[32] = float[](
   0.074510, 0.062745
 );
 
-// Depth-Band Test (gegen vorderste Schicht aus Pass 1)
-layout(binding = 3) uniform sampler2D u_depth_tex; // aus Pass 1
-uniform float u_near_plane;
-uniform float u_far_plane;
-uniform float u_depth_epsilon_vs; // Breite der Schicht in View-Space
-
-float linearize_depth(float d, float n, float f) {
-    // d in [0,1] -> NDC z in [-1,1]
-    float z_ndc = d * 2.0 - 1.0;
-    // Rückgabe: positive lineare Distanz (vor Kamera)
-    return (2.0 * n * f) / (f + n - z_ndc * (f - n));
-}
-
 void main() {
-    vec2 uv = fin.uv;
+    vec2 uv = fs_in.uv;
     if (dot(uv, uv) > 1.0) discard;
 
-    // Rekonstruierte Position in VS
-    vec3 pos_vs = fin.center_vs + fin.vs_u * uv.x + fin.vs_v * uv.y;
+    float idx = clamp(length(uv) * 31.0, 0.0, 31.0);
+    float w   = gaussian[int(idx)];
 
-    // Tiefenband-Prüfung gegen vorderste Surfel-Schicht (Pass1)
-    float scene_depth = texture(u_depth_tex, gl_FragCoord.xy / textureSize(u_depth_tex, 0)).r;
-    if (scene_depth >= 1.0) discard; // nichts im Prepass
+    vec3 pos_vs = fs_in.vs_center + fs_in.vs_half_u * uv.x + fs_in.vs_half_v * uv.y;
 
-    float z_front_lin = linearize_depth(scene_depth, u_near_plane, u_far_plane); // >0
-    float z_front_vs  = -z_front_lin;
-    float dz = abs(pos_vs.z - z_front_vs);
-    if (dz > u_depth_epsilon_vs) discard;
-
-    // Gewicht & Accumulation
-    float r = clamp(length(uv) * 31.0, 0.0, 31.0);
-    float w = gaussian[int(r)];
-
-    accumulated_colors       = vec4(fin.point_color * w, w);
-    accumulated_normals      = normalize(fin.vs_normal) * w;
-    accumulated_vs_position  = vec4(pos_vs * w, fin.radius_ws * w);
+    accumulated_colors       = vec4(fs_in.albedo_rgb * w, w);
+    accumulated_normals      = normalize(fs_in.vs_normal) * w;
+    accumulated_vs_positions = pos_vs * w;
 }

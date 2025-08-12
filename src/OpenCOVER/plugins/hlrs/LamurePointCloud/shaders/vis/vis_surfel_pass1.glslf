@@ -1,8 +1,11 @@
 #version 420 core
-in GS_OUT { noperspective vec2 uv; } fin;
+
+layout(early_fragment_tests) in;
+in GsOut {
+    noperspective vec2 uv;  // -1..1
+} fs_in;
 
 void main() {
-    if (dot(fin.uv, fin.uv) > 1.0) discard;
-    // tiefe nur für valide Pixel schreiben (Late-Z)
-    gl_FragDepth = gl_FragCoord.z;
+    if (dot(fs_in.uv, fs_in.uv) > 1.0)
+        discard;
 }

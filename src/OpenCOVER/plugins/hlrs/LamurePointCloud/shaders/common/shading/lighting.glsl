@@ -8,12 +8,8 @@ uniform float shininess;
 uniform float gamma;
 uniform bool  use_tone_mapping;
 
-vec3 shade_blinn_phong(
-    in vec3 vs_pos,
-    in vec3 vs_normal,
-    in vec3 vs_color) 
+vec3 shade_blinn_phong(in vec3 vs_pos, in vec3 vs_normal, in vec3 vs_color) 
 {
-    // Robustheit
     vec3 normal   = normalize(vs_normal);
     vec3 view_dir = normalize(-vs_pos);
     vec3 light_dir = normalize(point_light_pos_vs - vs_pos);
