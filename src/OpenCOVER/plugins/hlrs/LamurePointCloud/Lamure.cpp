@@ -214,8 +214,8 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["shader"] = [&](const auto& v) { s.shader = unquote(v); };
 
 
-    s.background_color = scm::math::vec3(covise::coCoviseConfig::getFloat("r", "COVER.Background", 0.0f), 
-                                         covise::coCoviseConfig::getFloat("g", "COVER.Background", 0.0f), 
+    s.background_color = scm::math::vec3(covise::coCoviseConfig::getFloat("r", "COVER.Background", 0.0f),
+                                         covise::coCoviseConfig::getFloat("g", "COVER.Background", 0.0f),
                                          covise::coCoviseConfig::getFloat("b", "COVER.Background", 0.0f));
 
     std::ifstream file(filename);
