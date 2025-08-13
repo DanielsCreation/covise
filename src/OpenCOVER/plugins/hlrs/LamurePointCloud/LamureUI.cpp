@@ -224,7 +224,7 @@ void LamureUI::setupUi() {
 
     m_specular_intenity_slider = new opencover::ui::Slider(m_lighting_menu, "specular_intensity");
     m_specular_intenity_slider->setText("Specular Intensity");
-    m_specular_intenity_slider->setBounds(0.0, 10.0);
+    m_specular_intenity_slider->setBounds(0.0, 1.0);
     m_specular_intenity_slider->setValue(m_plugin->getSettings().specular_intensity);
     m_specular_intenity_slider->setShared(true);
     m_specular_intenity_slider->setCallback([this](double value, bool) {
@@ -233,7 +233,7 @@ void LamureUI::setupUi() {
 
     m_shininess_slider = new opencover::ui::Slider(m_lighting_menu, "shininess");
     m_shininess_slider->setText("Shininess");
-    m_shininess_slider->setBounds(1.0, 10.0);
+    m_shininess_slider->setBounds(0.0, 1.0);
     m_shininess_slider->setValue(m_plugin->getSettings().shininess);
     m_shininess_slider->setShared(true);
     m_shininess_slider->setCallback([this](double value, bool) {

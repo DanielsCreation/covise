@@ -542,7 +542,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
             glEnable(GL_BLEND);
             glBlendFunc(GL_ONE, GL_ONE);       // Summenbildung (premultiplied sums)
-            glEnable(GL_DEPTH_TEST);
+            glDisable(GL_DEPTH_TEST);
             glDepthMask(GL_FALSE);
             glDepthFunc(GL_ALWAYS);            // Tiefe entscheidet rein im FS
 
@@ -607,8 +607,8 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_FALSE);
 
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); // premultiplied resolve
+            glDisable(GL_BLEND);
+            //glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); // premultiplied resolve
 
             glUseProgram(_renderer->getSurfelPass3Shader().program);
 

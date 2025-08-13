@@ -3,9 +3,9 @@ C:\Users\Daniel\Documents\Studium\Forschungsarbeit\Data\Data_bin
 
 initial_selection : 1
 show_pvs : 0
-min_radius : 0.0
+min_radius : 0.01
 max_radius : 0.1
-scale_radius : 1.0
+scale_radius : 1.2
 lod_error : 7.5
 
 show_pointcloud : 1
@@ -18,6 +18,9 @@ show_notify : 0
 
 point_light_intensity : 1.0
 ambient_intensity : 0.5
+shininess : 0.1
+specular_intensity : 0.1
+gamma : 1.0
 
 point_light_pos_x : 300.0
 point_light_pos_y : 300.0

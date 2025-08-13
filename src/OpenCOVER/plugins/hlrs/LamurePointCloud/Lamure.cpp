@@ -190,9 +190,6 @@ void Lamure::loadSettings(const std::string& filename) {
     setting_handlers["point_light_pos_y"]     = [&](const auto& v) { s.point_light_pos.y = std::stof(v.c_str()); };
     setting_handlers["point_light_pos_z"]     = [&](const auto& v) { s.point_light_pos.z = std::stof(v.c_str()); };
     auto parse_color = [&](const std::string& v) { return std::min(std::max(std::atoi(v.c_str()), 0), 255) / 255.0f; };
-    setting_handlers["background_color_r"]  = [&](const auto& v) { s.background_color.x = std::stof(v.c_str()); };
-    setting_handlers["background_color_g"]  = [&](const auto& v) { s.background_color.y = std::stof(v.c_str()); };
-    setting_handlers["background_color_b"]  = [&](const auto& v) { s.background_color.z = std::stof(v.c_str()); };
     setting_handlers["heatmap"]             = [&](const auto& v) { s.heatmap = (std::atoi(v.c_str()) != 0); };
     setting_handlers["heatmap_min"]         = [&](const auto& v) { s.heatmap_min = std::max(std::stof(v.c_str()), 0.0f); };
     setting_handlers["heatmap_max"]         = [&](const auto& v) { s.heatmap_max = std::max(std::stof(v.c_str()), 0.0f); };
