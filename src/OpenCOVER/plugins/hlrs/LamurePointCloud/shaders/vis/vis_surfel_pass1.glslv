@@ -4,7 +4,8 @@ uniform float max_radius;
 uniform float min_radius;
 uniform float scale_radius;
 uniform mat4  model_view_matrix; 
-uniform mat4  projection_matrix;  
+uniform mat4  projection_matrix;
+uniform mat3  normal_matrix;
 
 layout(location = 0) in vec3 in_position;
 layout(location = 5) in float in_radius;
@@ -16,28 +17,40 @@ out VsOut {
     vec3 vs_half_v;
 } vs_out;
 
-// Orthonormale Basis aus Normalenvektor (Frisvad).
-vec3 any_tangent(vec3 n) {
-    float s = n.z >= 0.0 ? 1.0 : -1.0;
-    float a = -1.0 / (s + n.z);
-    float b = n.x * n.y * a;
-    return normalize(vec3(1.0 + s * n.x * n.x * a, s * b, -s * n.x));
-}
-void build_basis(in vec3 n_in, out vec3 u, out vec3 v) {
-    vec3 n = normalize(n_in);
-    u = any_tangent(n);
-    v = normalize(cross(n, u));
-}
-
 void main() {
+    // Radius-Skalierung mit Begrenzung
     float radius_ms = clamp(in_radius * scale_radius, min_radius, max_radius);
 
-    vec3 ms_u, ms_v;
-    build_basis(in_normal, ms_u, ms_v);
+    // --- Stabile Basis-Vektor-Berechnung ---
+    // Absichern gegen eine (0,0,0) Normale und normalisieren
+    vec3 n = normalize((length(in_normal) > 0.0001) ? in_normal : vec3(0.0, 0.0, 1.0));
+    
+    // Wähle einen Referenz-Vektor, der garantiert nicht parallel zu n ist
+    vec3 ref;
+    if (abs(n.x) > abs(n.y) && abs(n.x) > abs(n.z)) {
+        ref = vec3(0.0, 1.0, 0.0);
+    } else if (abs(n.y) > abs(n.z)) {
+        ref = vec3(0.0, 0.0, 1.0);
+    } else {
+        ref = vec3(1.0, 0.0, 0.0);
+    }
+    
+    // Berechne die orthogonalen Basisvektoren im Model-Space
+    vec3 ms_u = normalize(cross(ref, n));
+    vec3 ms_v = normalize(cross(n, ms_u));
+    // --- Ende der Basis-Berechnung ---
 
+    // Transformation der Basis in den View-Space
     vec3 vs_center = (model_view_matrix * vec4(in_position, 1.0)).xyz;
-    vec3 vs_half_u = (model_view_matrix * vec4(ms_u * radius_ms, 0.0)).xyz; // w=0: nur linearer Anteil
+    vec3 vs_half_u = (model_view_matrix * vec4(ms_u * radius_ms, 0.0)).xyz;
     vec3 vs_half_v = (model_view_matrix * vec4(ms_v * radius_ms, 0.0)).xyz;
+    vec3 vs_normal = normalize(normal_matrix * n);
+
+    // --- KORREKTUR ---
+    //if (dot(cross(vs_half_u, vs_half_v), vs_normal) < 0.0) {
+    //    vs_half_v = -vs_half_v;
+    //}
+    // --- ENDE KORREKTUR ---
 
     vs_out.vs_center = vs_center;
     vs_out.vs_half_u = vs_half_u;

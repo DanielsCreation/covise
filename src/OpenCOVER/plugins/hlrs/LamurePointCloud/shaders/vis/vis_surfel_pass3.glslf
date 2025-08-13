@@ -32,14 +32,16 @@ void main()
     if (accumulated_color.a > 0.0) {
         float total_weight = accumulated_color.a;
 
+        // Decode weighted sums.
         vec3 albedo    = accumulated_color.rgb  / total_weight;
         vec3 normal_vs = normalize(accumulated_normal / total_weight);
         vec3 pos_vs    = accumulated_pos_vs     / total_weight;
 
-
+        // Wenn einer der Debug-Modi aktiv ist → kein Lighting anwenden
         if (show_normals || show_accuracy || show_radius_deviation || show_output_sensitivity) {
             out_color = vec4(albedo, 1.0);
         } else {
+            // Normales Shading (Blinn-Phong)
             out_color = vec4(shade_blinn_phong(pos_vs, normal_vs, albedo), 1.0);
         }
     }

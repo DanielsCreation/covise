@@ -91,7 +91,7 @@ private:
         GLuint program{0};
         GLint mvp_matrix_loc            {-1};
         GLint view_matrix_loc           {-1};
-        GLint view_normal_matrix_loc    {-1};
+        GLint normal_matrix_loc    {-1};
         GLint max_radius_loc            {-1};
         GLint min_radius_loc            {-1};
         GLint scale_radius_loc          {-1};
@@ -170,7 +170,7 @@ private:
         GLint scale_radius_loc          {-1}; // float scale_radius
         GLint viewport_loc              {-1}; // vec2 viewport
         GLint view_matrix_loc           {-1}; // mat4 view_matrix
-        GLint view_normal_matrix_loc    {-1}; // mat3 view_normal_matrix
+        GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
         GLint show_normals_loc          {-1}; // bool  show_normals
         GLint show_accuracy_loc         {-1}; // bool  show_accuracy
         GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
@@ -215,6 +215,7 @@ private:
     struct SurfelPass1Shader {
         GLuint program{0};
         GLint mvp_matrix_loc{-1};           // mat4 mvp_matrix
+        GLint normal_matrix_loc{-1};    
         GLint projection_matrix_loc{-1};    
         GLint model_view_matrix_loc{-1};
         GLint model_matrix_loc{-1};         // mat4 model_matrix
@@ -277,7 +278,7 @@ private:
         GLint background_color_loc{-1};
         // Lighting uniforms (for Blinn-Phong shading)
         GLint view_matrix_loc{-1};
-        GLint view_normal_matrix_loc{-1};
+        GLint normal_matrix_loc{-1};
         // --- Unified float-based lighting uniforms ---
         GLint point_light_pos_vs_loc    {-1};
         GLint point_light_intensity_loc {-1};

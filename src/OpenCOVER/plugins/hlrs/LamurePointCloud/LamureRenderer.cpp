@@ -88,7 +88,7 @@ struct InitCullCallback : public osg::Drawable::CullCallback {
             _renderer->initSchismObjects();
             _renderer->initFrustumResources();
             _renderer->initBoxResources();
-            _renderer->initPclResources(2);
+            _renderer->initPclResources();
             _renderer->initLamureShader();
             _renderer->initUniforms();
             _renderer->getPointcloudGeode()->setNodeMask(_plugin->getUI()->getPointcloudButton()->state() ? 0xFFFFFFFF : 0);
@@ -493,10 +493,12 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             glClear(GL_DEPTH_BUFFER_BIT);
 
             glDisable(GL_BLEND);
-            glDisable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
             glDepthFunc(GL_LEQUAL);
+            glDisable(GL_CULL_FACE);
+            //glCullFace(GL_BACK);
+            //glCullFace(GL_FRONT);
 
             glUseProgram(_renderer->getSurfelPass1Shader().program);
 
@@ -519,8 +521,10 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
                 scm::math::mat4 model_matrix      = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
                 scm::math::mat4 model_view_matrix = view_matrix * model_matrix;
+                scm::math::mat3 normal_matrix     = scm::math::transpose(scm::math::inverse(LamureUtil::matConv4to3F(model_view_matrix)));
                 scm::gl::frustum frustum          = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
                 glUniformMatrix4fv(_renderer->getSurfelPass1Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
+                glUniformMatrix3fv(_renderer->getSurfelPass1Shader().normal_matrix_loc, 1, GL_FALSE, normal_matrix.data_array);
 
                 for (auto const &node_slot_aggregate : renderable) {
                     if (_renderer->getScmCamera()->cull_against_frustum(frustum, bounding_box_vector[node_slot_aggregate.node_id_]) != 1) {
@@ -546,10 +550,12 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             glClear(GL_COLOR_BUFFER_BIT);
             glEnable(GL_BLEND);
             glBlendFunc(GL_ONE, GL_ONE);
-            glDisable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_FALSE);
             glDepthFunc(GL_LEQUAL);
+            glDisable(GL_CULL_FACE);
+            //glCullFace(GL_BACK);
+            //glCullFace(GL_FRONT);
 
             glUseProgram(_renderer->getSurfelPass2Shader().program);
             glActiveTexture(GL_TEXTURE0);
@@ -578,9 +584,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
                 scm::math::mat4 model_matrix      = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
                 scm::math::mat4 model_view_matrix = view_matrix * model_matrix;
-
-                scm::math::mat3 normal_matrix;
-                scm::math::mat3 model_view_3x3 = LamureUtil::matConv4to3F(model_view_matrix);
                 scm::math::mat3 normal_matrix     = scm::math::transpose(scm::math::inverse(LamureUtil::matConv4to3F(model_view_matrix)));
                 scm::gl::frustum frustum          = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
 
@@ -610,6 +613,9 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
             glEnable(GL_BLEND);
             glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            glDisable(GL_CULL_FACE);
+            //glCullFace(GL_BACK);
+            //glCullFace(GL_FRONT);
 
             auto &prog = _renderer->getSurfelPass3Shader();
             glUseProgram(_renderer->getSurfelPass3Shader().program);
@@ -850,7 +856,7 @@ void LamureRenderer::initUniforms()
     m_point_color_lighting_shader.scale_projection_loc    = glGetUniformLocation(m_point_color_lighting_shader.program, "scale_projection");
 
     m_point_color_lighting_shader.view_matrix_loc         = glGetUniformLocation(m_point_color_lighting_shader.program, "view_matrix");
-    m_point_color_lighting_shader.view_normal_matrix_loc  = glGetUniformLocation(m_point_color_lighting_shader.program, "view_normal_matrix");
+    m_point_color_lighting_shader.normal_matrix_loc     = glGetUniformLocation(m_point_color_lighting_shader.program, "normal_matrix");
 
     m_point_color_lighting_shader.show_normals_loc        = glGetUniformLocation(m_point_color_lighting_shader.program, "show_normals");
     m_point_color_lighting_shader.show_accuracy_loc       = glGetUniformLocation(m_point_color_lighting_shader.program, "show_accuracy");
@@ -920,7 +926,7 @@ void LamureRenderer::initUniforms()
     m_surfel_color_lighting_shader.viewport_loc            = glGetUniformLocation(m_surfel_color_lighting_shader.program, "viewport");
 
     m_surfel_color_lighting_shader.view_matrix_loc         = glGetUniformLocation(m_surfel_color_lighting_shader.program, "view_matrix");
-    m_surfel_color_lighting_shader.view_normal_matrix_loc  = glGetUniformLocation(m_surfel_color_lighting_shader.program, "view_normal_matrix");
+    m_surfel_color_lighting_shader.normal_matrix_loc       = glGetUniformLocation(m_surfel_color_lighting_shader.program, "normal_matrix");
 
     m_surfel_color_lighting_shader.show_normals_loc        = glGetUniformLocation(m_surfel_color_lighting_shader.program, "show_normals");
     m_surfel_color_lighting_shader.show_accuracy_loc       = glGetUniformLocation(m_surfel_color_lighting_shader.program, "show_accuracy");
@@ -979,6 +985,7 @@ void LamureRenderer::initUniforms()
     // --- PASS 1 ---
     glUseProgram(m_surfel_pass1_shader.program);
     m_surfel_pass1_shader.mvp_matrix_loc         = glGetUniformLocation(m_surfel_pass1_shader.program, "mvp_matrix");
+    m_surfel_pass1_shader.normal_matrix_loc      = glGetUniformLocation(m_surfel_pass1_shader.program, "normal_matrix");
     m_surfel_pass1_shader.projection_matrix_loc  = glGetUniformLocation(m_surfel_pass1_shader.program, "projection_matrix");
     m_surfel_pass1_shader.model_view_matrix_loc  = glGetUniformLocation(m_surfel_pass1_shader.program, "model_view_matrix");
     m_surfel_pass1_shader.model_matrix_loc       = glGetUniformLocation(m_surfel_pass1_shader.program, "model_matrix");
@@ -1041,7 +1048,7 @@ void LamureRenderer::initUniforms()
     m_surfel_pass3_shader.background_color_loc        = glGetUniformLocation(m_surfel_pass3_shader.program, "background_color");
 
     m_surfel_pass3_shader.view_matrix_loc             = glGetUniformLocation(m_surfel_pass3_shader.program, "view_matrix");
-    m_surfel_pass3_shader.view_normal_matrix_loc      = glGetUniformLocation(m_surfel_pass3_shader.program, "view_normal_matrix");
+    m_surfel_pass3_shader.normal_matrix_loc      = glGetUniformLocation(m_surfel_pass3_shader.program, "normal_matrix");
 
     m_surfel_pass3_shader.point_light_pos_vs_loc      = glGetUniformLocation(m_surfel_pass3_shader.program, "point_light_pos_vs");
     m_surfel_pass3_shader.point_light_intensity_loc   = glGetUniformLocation(m_surfel_pass3_shader.program, "point_light_intensity");
@@ -1109,7 +1116,7 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         auto& prog = m_point_color_lighting_shader;
         glUseProgram(prog.program);
         glUniformMatrix4fv(prog.view_matrix_loc, 1, GL_FALSE, viewMat.data_array);
-        glUniformMatrix3fv(prog.view_normal_matrix_loc, 1, GL_FALSE, normalMat.data_array);
+        glUniformMatrix3fv(prog.normal_matrix_loc, 1, GL_FALSE, normalMat.data_array);
         glUniform1f(prog.min_radius_loc, s.min_radius);
         glUniform1f(prog.max_radius_loc, s.max_radius);
         glUniform1f(prog.scale_radius_loc, s.scale_radius);
@@ -1185,7 +1192,7 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         //glEnable(GL_DEPTH_TEST);
         glUseProgram(prog.program);
         glUniformMatrix4fv(prog.view_matrix_loc,        1, GL_FALSE, viewMat.data_array);
-        glUniformMatrix3fv(prog.view_normal_matrix_loc, 1, GL_FALSE, normalMat.data_array);
+        glUniformMatrix3fv(prog.normal_matrix_loc, 1, GL_FALSE, normalMat.data_array);
 
         glUniform1f(prog.min_radius_loc,   s.min_radius);
         glUniform1f(prog.max_radius_loc,   s.max_radius);
@@ -2013,9 +2020,7 @@ void LamureRenderer::initPclResources(int msaaSamples) {
 
         glGenBuffers(1, &vbo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER,
-            sizeof(float) * m_pcl_resource.screen_quad_vertex.size(),
-            m_pcl_resource.screen_quad_vertex.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * m_pcl_resource.screen_quad_vertex.size(), m_pcl_resource.screen_quad_vertex.data(), GL_STATIC_DRAW);
 
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));

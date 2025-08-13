@@ -4,11 +4,11 @@
 uniform float max_radius;
 uniform float min_radius;
 uniform float scale_radius;
-uniform mat3  normal_matrix;       // transpose(inverse(mat3(V*M)))
-uniform mat4  model_matrix;        // M
-uniform mat4  model_view_matrix;   // V*M
-uniform mat4  projection_matrix;   // P
-uniform vec2  viewport;            // (width, height)
+uniform mat3  normal_matrix;
+uniform mat4  model_matrix;
+uniform mat4  model_view_matrix;
+uniform mat4  projection_matrix;
+uniform vec2  viewport;
 uniform bool  show_normals;
 uniform bool  show_accuracy;
 uniform bool  show_radius_deviation;
@@ -26,11 +26,11 @@ layout(location = 6) in vec3  in_normal;
 
 // VS → GS.
 out VsOut {
-    vec3 vs_center;    // view-space center
-    vec3 vs_half_u;    // view-space half-extent U
-    vec3 vs_half_v;    // view-space half-extent V
-    vec3 vs_normal;    // unit-length view-space normal
-    vec3 albedo_rgb;   // color computed in VS
+    vec3 vs_center;
+    vec3 vs_half_u;
+    vec3 vs_half_v;
+    vec3 vs_normal;
+    vec3 albedo_rgb;
 } vs_out;
 
 // Color mapping includes.
@@ -50,12 +50,12 @@ vec3 get_color(in vec3 position,
                in float radius,
                in float screen_size) {
 
-    vec3 view_color = vec3(0.0);
+    vec3 view_color = base_color;
 
     if (show_normals) {
-        vec3 n = normal;
-        if (n.z < 0.0) n *= -1.0;
-        view_color = n * 0.5 + 0.5;
+        vec3 n_vis = normal;
+        if (n_vis.z < 0.0) n_vis *= -1.0;
+        view_color = n_vis * 0.5 + 0.5;
     }
     else if (show_output_sensitivity) {
         view_color = get_output_sensitivity_color(screen_size);
@@ -76,14 +76,11 @@ vec3 get_color(in vec3 position,
     return view_color;
 }
 
-// Computes screen size in pixels from projected center and half-axes.
-// Called only when show_output_sensitivity is enabled.
 float compute_screen_size_px(vec3 vs_center, vec3 vs_half_u, vec3 vs_half_v, vec2 viewport_wh) {
     vec4 ndc_c = projection_matrix * vec4(vs_center,             1.0);
     vec4 ndc_u = projection_matrix * vec4(vs_center + vs_half_u, 1.0);
     vec4 ndc_v = projection_matrix * vec4(vs_center + vs_half_v, 1.0);
 
-    // Avoid division by zero; preserve sign of w.
     ndc_c /= max(abs(ndc_c.w), 1e-6) * sign(ndc_c.w);
     ndc_u /= max(abs(ndc_u.w), 1e-6) * sign(ndc_u.w);
     ndc_v /= max(abs(ndc_v.w), 1e-6) * sign(ndc_v.w);
@@ -95,49 +92,56 @@ float compute_screen_size_px(vec3 vs_center, vec3 vs_half_u, vec3 vs_half_v, vec
     return max(length(sc - su), length(sv - sc));
 }
 
-// Orthonormal basis from normal (Frisvad).
-vec3 any_tangent(vec3 n) {
-    float s = n.z >= 0.0 ? 1.0 : -1.0;
-    float a = -1.0 / (s + n.z);
-    float b = n.x * n.y * a;
-    return normalize(vec3(1.0 + s * n.x * n.x * a, s * b, -s * n.x));
-}
-void build_basis(in vec3 n_in, out vec3 u, out vec3 v) {
-    vec3 n = normalize(n_in);
-    u = any_tangent(n);
-    v = normalize(cross(n, u));
-}
 
 void main() {
     float radius_ws = clamp(in_radius * scale_radius, min_radius, max_radius);
 
-    vec3 ms_u, ms_v;
-    build_basis(in_normal, ms_u, ms_v);
+    // --- Stabile Basis-Vektor-Berechnung ---
+    // Absichern gegen eine (0,0,0) Normale und normalisieren
+    vec3 n = normalize((length(in_normal) > 0.0001) ? in_normal : vec3(0.0, 0.0, 1.0));
+    
+    // Wähle einen Referenz-Vektor, der garantiert nicht parallel zu n ist
+    vec3 ref;
+    if (abs(n.x) > abs(n.y) && abs(n.x) > abs(n.z)) {
+        ref = vec3(0.0, 1.0, 0.0);
+    } else if (abs(n.y) > abs(n.z)) {
+        ref = vec3(0.0, 0.0, 1.0);
+    } else {
+        ref = vec3(1.0, 0.0, 0.0);
+    }
+    
+    // Berechne die orthogonalen Basisvektoren im Model-Space
+    vec3 ms_u = normalize(cross(ref, n));
+    vec3 ms_v = normalize(cross(n, ms_u));
+    // --- Ende der Basis-Berechnung ---
 
     vec3 ws_center = (model_matrix      * vec4(in_position, 1.0)).xyz;
     vec3 vs_center = (model_view_matrix * vec4(in_position, 1.0)).xyz;
+
     vec3 vs_half_u = (model_view_matrix * vec4(ms_u * radius_ws, 0.0)).xyz;
     vec3 vs_half_v = (model_view_matrix * vec4(ms_v * radius_ws, 0.0)).xyz;
-    vec3 vs_normal = normalize(normal_matrix * in_normal);
+    vec3 vs_normal = normalize(normal_matrix * n);
+
+    // --- KORREKTUR ---
+    //if (dot(cross(vs_half_u, vs_half_v), vs_normal) < 0.0) {
+    //    vs_half_v = -vs_half_v;
+    //}
+    // --- ENDE KORREKTUR ---
 
     vec3 base_color = vec3(in_r, in_g, in_b);
 
-    // Compute screen_size only if the mode requires it.
     float screen_size = 0.0;
     if (show_output_sensitivity) {
         screen_size = compute_screen_size_px(vs_center, vs_half_u, vs_half_v, viewport);
     }
 
-    // Final per-vertex color via mapping.
     vec3 color_vs = get_color(ws_center, vs_normal, base_color, radius_ws, screen_size);
 
-    // Pass data to GS.
     vs_out.vs_center  = vs_center;
     vs_out.vs_half_u  = vs_half_u;
     vs_out.vs_half_v  = vs_half_v;
     vs_out.vs_normal  = vs_normal;
     vs_out.albedo_rgb = color_vs;
 
-    // Clip-space center; GS expands to quad corners.
     gl_Position = projection_matrix * vec4(vs_center, 1.0);
 }
