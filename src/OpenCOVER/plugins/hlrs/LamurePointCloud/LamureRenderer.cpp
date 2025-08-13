@@ -468,22 +468,20 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
         uint64_t rendered_splats = 0;
         uint64_t rendered_nodes = 0;
 
-
         if (_plugin->getSettings().shader_type == LamureRenderer::ShaderType::SurfelMultipass && _initialized) {
             // ================= MULTI-PASS RENDER PATH =================
-            auto& res = _renderer->getPclResource();
-            const auto& s = _plugin->getSettings();
+            auto&       res = _renderer->getPclResource();
+            const auto& s   = _plugin->getSettings();
 
             GLint prev_fbo = 0;
-            GLint prev_viewport[4] = {0};
+            GLint prev_viewport[4] = {0,0,0,0};
             glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prev_fbo);
             glGetIntegerv(GL_VIEWPORT, prev_viewport);
 
             const int height = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height;
             const int width  = opencover::coVRConfig::instance()->windows[0].context->getTraits()->width;
 
-            // --- PASS 1: Depth pre-pass (depth-only)
-
+            // --- PASS 1: Depth pre-pass (depth-only, kreisförmiges discard im FS)
             glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
             glViewport(0, 0, width, height);
             glDrawBuffer(GL_NONE);
@@ -497,70 +495,20 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
             glUseProgram(_renderer->getSurfelPass1Shader().program);
 
-            // Global scalars.
-            glUniform2f(_renderer->getSurfelPass1Shader().viewport_loc, width, height);
-            glUniform1f(_renderer->getSurfelPass1Shader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
-            glUniform1f(_renderer->getSurfelPass1Shader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
-            glUniform1f(_renderer->getSurfelPass1Shader().max_radius_loc,   s.max_radius);
-            glUniform1f(_renderer->getSurfelPass1Shader().min_radius_loc,   s.min_radius);
-            glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius);
-            glUniformMatrix4fv(_renderer->getSurfelPass1Shader().projection_matrix_loc, 1, GL_FALSE, projection_matrix.data_array);
+            // Globale Uniforms (nur setzen, wenn vorhanden)
+            if (_renderer->getSurfelPass1Shader().viewport_loc          >= 0) glUniform2f(_renderer->getSurfelPass1Shader().viewport_loc, width, height);
+            if (_renderer->getSurfelPass1Shader().near_plane_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
+            if (_renderer->getSurfelPass1Shader().far_plane_loc         >= 0) glUniform1f(_renderer->getSurfelPass1Shader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
+            if (_renderer->getSurfelPass1Shader().max_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().max_radius_loc,   s.max_radius);
+            if (_renderer->getSurfelPass1Shader().min_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().min_radius_loc,   s.min_radius);
+            if (_renderer->getSurfelPass1Shader().scale_radius_loc      >= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius);
+            if (_renderer->getSurfelPass1Shader().projection_matrix_loc >= 0) glUniformMatrix4fv(_renderer->getSurfelPass1Shader().projection_matrix_loc, 1, GL_FALSE, projection_matrix.data_array);
 
             for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
                 if (!_plugin->getUI()->getModelVisibility()[model_id]) continue;
 
-                lamure::ren::cut &cut = cuts->get_cut(context_id, _renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID(), model_id);
-                auto renderable = cut.complete_set();
-                const lamure::ren::bvh *bvh = database->get_model(model_id)->get_bvh();
-                const auto &bounding_box_vector = bvh->get_bounding_boxes();
-
-                scm::math::mat4 model_matrix      = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
-                scm::math::mat4 model_view_matrix = view_matrix * model_matrix;
-                scm::math::mat3 normal_matrix     = scm::math::transpose(scm::math::inverse(LamureUtil::matConv4to3F(model_view_matrix)));
-                scm::gl::frustum frustum          = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
-                glUniformMatrix4fv(_renderer->getSurfelPass1Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
-                glUniformMatrix3fv(_renderer->getSurfelPass1Shader().normal_matrix_loc, 1, GL_FALSE, normal_matrix.data_array);
-
-                for (auto const &node_slot_aggregate : renderable) {
-                    if (_renderer->getScmCamera()->cull_against_frustum(frustum, bounding_box_vector[node_slot_aggregate.node_id_]) != 1) {
-                        glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
-                        rendered_splats += surfels_per_node;
-                        ++rendered_nodes;
-                    }
-                }
-            }
-            // --- PASS 2: Accumulation pass (additively into 3 targets) ---
-            GLenum accumBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-            glDrawBuffers(3, accumBuffers);
-            glClearColor(0.f, 0.f, 0.f, 0.f);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE);
-            glEnable(GL_DEPTH_TEST);
-            glDepthMask(GL_FALSE);
-            glDepthFunc(GL_ALWAYS);
-
-            glUseProgram(_renderer->getSurfelPass2Shader().program);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, res.depth_texture);
-
-            glUniform1i(_renderer->getSurfelPass2Shader().depth_texture_loc, 0);
-            glUniform2f(_renderer->getSurfelPass2Shader().viewport_loc, width, height);
-            glUniform1f(_renderer->getSurfelPass2Shader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
-            glUniform1f(_renderer->getSurfelPass2Shader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
-            glUniform1f(_renderer->getSurfelPass2Shader().max_radius_loc,   s.max_radius);
-            glUniform1f(_renderer->getSurfelPass2Shader().min_radius_loc,   s.min_radius);
-            glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_loc, s.scale_radius);
-            glUniform1i(_renderer->getSurfelPass2Shader().show_normals_loc,           s.show_normals);
-            glUniform1i(_renderer->getSurfelPass2Shader().show_output_sens_loc,       s.show_output_sensitivity);
-            glUniform1i(_renderer->getSurfelPass2Shader().show_radius_dev_loc,        s.show_radius_deviation);
-            glUniform1i(_renderer->getSurfelPass2Shader().show_accuracy_loc,          s.show_accuracy);
-
-            const bool needNodeUniforms = (s.show_radius_deviation || s.show_accuracy);
-            for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
-                if (!_plugin->getUI()->getModelVisibility()[model_id]) continue;
-
-                lamure::ren::cut &cut = cuts->get_cut(context_id, _renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID(), model_id);
+                lamure::ren::cut &cut = cuts->get_cut(context_id,
+                    _renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID(), model_id);
                 auto renderable = cut.complete_set();
                 const lamure::ren::bvh *bvh = database->get_model(model_id)->get_bvh();
                 const auto &bbox = bvh->get_bounding_boxes();
@@ -570,76 +518,146 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 scm::math::mat3 normal_matrix     = scm::math::transpose(scm::math::inverse(LamureUtil::matConv4to3F(model_view_matrix)));
                 scm::gl::frustum frustum          = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
 
-                glUniformMatrix4fv(_renderer->getSurfelPass2Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
-                glUniformMatrix4fv(_renderer->getSurfelPass2Shader().projection_matrix_loc, 1, GL_FALSE, projection_matrix.data_array);
-                glUniformMatrix3fv(_renderer->getSurfelPass2Shader().normal_matrix_loc,     1, GL_FALSE, normal_matrix.data_array);
+                if (_renderer->getSurfelPass1Shader().model_view_matrix_loc >= 0)
+                    glUniformMatrix4fv(_renderer->getSurfelPass1Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
+                if (_renderer->getSurfelPass1Shader().normal_matrix_loc >= 0)
+                    glUniformMatrix3fv(_renderer->getSurfelPass1Shader().normal_matrix_loc, 1, GL_FALSE, normal_matrix.data_array);
 
-                // Optional node uniforms (only when needed by your current FS).
                 for (auto const &node_slot_aggregate : renderable) {
                     if (_renderer->getScmCamera()->cull_against_frustum(frustum, bbox[node_slot_aggregate.node_id_]) != 1) {
-                        if (needNodeUniforms) { _renderer->setNodeUniforms(bvh, node_slot_aggregate.node_id_);}
-                        glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
+                        glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST,
+                            (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node,
+                            surfels_per_node);
+                        rendered_splats += surfels_per_node;
+                        ++rendered_nodes;
                     }
                 }
             }
 
-            // --- PASS 3: Resolve / lighting ---
+            // --- PASS 2: Accumulation (additiv), FS macht NDC-Depth-Vergleich + Randmaske
+            GLenum accumBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+            glDrawBuffers(3, accumBuffers);
+            glClearColor(0.f, 0.f, 0.f, 0.f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE);       // Summenbildung (premultiplied sums)
+            glEnable(GL_DEPTH_TEST);
+            glDepthMask(GL_FALSE);
+            glDepthFunc(GL_ALWAYS);            // Tiefe entscheidet rein im FS
+
+            glUseProgram(_renderer->getSurfelPass2Shader().program);
+
+            // Tiefe aus Pass 1
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, res.depth_texture);
+            if (_renderer->getSurfelPass2Shader().depth_texture_loc >= 0)
+                glUniform1i(_renderer->getSurfelPass2Shader().depth_texture_loc, 0);
+
+            // Globale Uniforms für VS/GS/FS
+            if (_renderer->getSurfelPass2Shader().viewport_loc            >= 0) glUniform2f(_renderer->getSurfelPass2Shader().viewport_loc, viewport.x, viewport.y);
+            if (_renderer->getSurfelPass2Shader().max_radius_loc          >= 0) glUniform1f(_renderer->getSurfelPass2Shader().max_radius_loc,   s.max_radius);
+            if (_renderer->getSurfelPass2Shader().min_radius_loc          >= 0) glUniform1f(_renderer->getSurfelPass2Shader().min_radius_loc,   s.min_radius);
+            if (_renderer->getSurfelPass2Shader().scale_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_loc, s.scale_radius);
+            if (_renderer->getSurfelPass2Shader().show_normals_loc        >= 0) glUniform1i(_renderer->getSurfelPass2Shader().show_normals_loc,         s.show_normals);
+            if (_renderer->getSurfelPass2Shader().show_output_sens_loc    >= 0) glUniform1i(_renderer->getSurfelPass2Shader().show_output_sens_loc,     s.show_output_sensitivity);
+            if (_renderer->getSurfelPass2Shader().show_radius_dev_loc     >= 0) glUniform1i(_renderer->getSurfelPass2Shader().show_radius_dev_loc,      s.show_radius_deviation);
+            if (_renderer->getSurfelPass2Shader().show_accuracy_loc       >= 0) glUniform1i(_renderer->getSurfelPass2Shader().show_accuracy_loc,        s.show_accuracy);
+            if (_renderer->getSurfelPass2Shader().projection_matrix_loc   >= 0) glUniformMatrix4fv(_renderer->getSurfelPass2Shader().projection_matrix_loc, 1, GL_FALSE, projection_matrix.data_array);
+
+            const bool needNodeUniforms = (s.show_radius_deviation || s.show_accuracy);
+
+            for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
+                if (!_plugin->getUI()->getModelVisibility()[model_id]) continue;
+
+                lamure::ren::cut &cut = cuts->get_cut(context_id,
+                    _renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID(), model_id);
+                auto renderable = cut.complete_set();
+                const lamure::ren::bvh *bvh = database->get_model(model_id)->get_bvh();
+                const auto &bbox = bvh->get_bounding_boxes();
+
+                scm::math::mat4 model_matrix      = scm::math::mat4(_plugin->getModelInfo().model_transformations[model_id]);
+                scm::math::mat4 model_view_matrix = view_matrix * model_matrix;
+                scm::math::mat3 normal_matrix     = scm::math::transpose(scm::math::inverse(LamureUtil::matConv4to3F(model_view_matrix)));
+                scm::gl::frustum frustum          = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
+
+                if (_renderer->getSurfelPass2Shader().model_view_matrix_loc >= 0)
+                    glUniformMatrix4fv(_renderer->getSurfelPass2Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
+                if (_renderer->getSurfelPass2Shader().normal_matrix_loc >= 0)
+                    glUniformMatrix3fv(_renderer->getSurfelPass2Shader().normal_matrix_loc, 1, GL_FALSE, normal_matrix.data_array);
+
+                for (auto const &node_slot_aggregate : renderable) {
+                    if (_renderer->getScmCamera()->cull_against_frustum(frustum, bbox[node_slot_aggregate.node_id_]) != 1) {
+                        if (needNodeUniforms) { _renderer->setNodeUniforms(bvh, node_slot_aggregate.node_id_); }
+                        glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST,
+                            (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node,
+                            surfels_per_node);
+                    }
+                }
+            }
+
+            // --- PASS 3: Resolve / Lighting (premultiplied coverage)
             glBindFramebuffer(GL_READ_FRAMEBUFFER, res.fbo);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prev_fbo);
             glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
             glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
-            glViewport(0, 0, width, height);
+            glViewport(prev_viewport[0], prev_viewport[1], prev_viewport[2], prev_viewport[3]);
+
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_FALSE);
 
             glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); // premultiplied resolve
 
-            auto &prog = _renderer->getSurfelPass3Shader();
             glUseProgram(_renderer->getSurfelPass3Shader().program);
 
+            // G-Buffer
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, res.texture_color);
-            glUniform1i(_renderer->getSurfelPass3Shader().in_color_texture_loc, 0);
+            if (_renderer->getSurfelPass3Shader().in_color_texture_loc >= 0)
+                glUniform1i(_renderer->getSurfelPass3Shader().in_color_texture_loc, 0);
+
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, res.texture_normal);
-            glUniform1i(_renderer->getSurfelPass3Shader().in_normal_texture_loc, 1);
+            if (_renderer->getSurfelPass3Shader().in_normal_texture_loc >= 0)
+                glUniform1i(_renderer->getSurfelPass3Shader().in_normal_texture_loc, 1);
+
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, res.texture_position);
-            glUniform1i(_renderer->getSurfelPass3Shader().in_vs_position_texture_loc, 2);
+            if (_renderer->getSurfelPass3Shader().in_vs_position_texture_loc >= 0)
+                glUniform1i(_renderer->getSurfelPass3Shader().in_vs_position_texture_loc, 2);
 
-            // View-space lighting setup.
+            // View-space lighting Setup
             osg::Matrix base = opencover::VRSceneGraph::instance()->getScaleTransform()->getMatrix();
             base.postMult(opencover::VRSceneGraph::instance()->getTransform()->getMatrix());
             scm::math::mat4 viewMat = LamureUtil::matConv4F(_renderer->getOsgCamera()->getViewMatrix()) * LamureUtil::matConv4F(base);
             scm::math::vec3 background_color = LamureUtil::vecConv3F(_renderer->getOsgCamera()->getClearColor());
 
-            // If your lighting include expects a point light in view space:
             scm::math::vec4 light_ws(s.point_light_pos[0], s.point_light_pos[1], s.point_light_pos[2], 1.0f);
             scm::math::vec4 light_vs4 = viewMat * light_ws;
             scm::math::vec3 light_vs(light_vs4[0], light_vs4[1], light_vs4[2]);
 
-            glUniform1i(_renderer->getSurfelPass3Shader().show_normals_loc,           s.show_normals);
-            glUniform1i(_renderer->getSurfelPass3Shader().show_output_sens_loc,       s.show_output_sensitivity);
-            glUniform1i(_renderer->getSurfelPass3Shader().show_radius_dev_loc,        s.show_radius_deviation);
-            glUniform1i(_renderer->getSurfelPass3Shader().show_accuracy_loc,          s.show_accuracy);
-            glUniform3fv(_renderer->getSurfelPass3Shader().background_color_loc,   1, background_color.data_array);
-            glUniformMatrix4fv(_renderer->getSurfelPass3Shader().view_matrix_loc,  1, GL_FALSE, viewMat.data_array);
-            glUniform3fv(_renderer->getSurfelPass3Shader().point_light_pos_vs_loc, 1, light_vs.data_array);
-            glUniform1f(_renderer->getSurfelPass3Shader().point_light_intensity_loc, s.point_light_intensity);
-            glUniform1f(_renderer->getSurfelPass3Shader().ambient_intensity_loc,     s.ambient_intensity);
-            glUniform1f(_renderer->getSurfelPass3Shader().specular_intensity_loc,    s.specular_intensity);
-            glUniform1f(_renderer->getSurfelPass3Shader().shininess_loc,             s.shininess);
-            glUniform1f(_renderer->getSurfelPass3Shader().gamma_loc,                 s.gamma);
-            glUniform1i(_renderer->getSurfelPass3Shader().use_tone_mapping_loc,      s.use_tone_mapping ? 1 : 0);
+            if (_renderer->getSurfelPass3Shader().show_normals_loc            >= 0) glUniform1i(_renderer->getSurfelPass3Shader().show_normals_loc,            s.show_normals);
+            if (_renderer->getSurfelPass3Shader().show_output_sens_loc        >= 0) glUniform1i(_renderer->getSurfelPass3Shader().show_output_sens_loc,        s.show_output_sensitivity);
+            if (_renderer->getSurfelPass3Shader().show_radius_dev_loc         >= 0) glUniform1i(_renderer->getSurfelPass3Shader().show_radius_dev_loc,         s.show_radius_deviation);
+            if (_renderer->getSurfelPass3Shader().show_accuracy_loc           >= 0) glUniform1i(_renderer->getSurfelPass3Shader().show_accuracy_loc,           s.show_accuracy);
+            if (_renderer->getSurfelPass3Shader().background_color_loc        >= 0) glUniform3fv(_renderer->getSurfelPass3Shader().background_color_loc, 1, background_color.data_array);
+            if (_renderer->getSurfelPass3Shader().view_matrix_loc             >= 0) glUniformMatrix4fv(_renderer->getSurfelPass3Shader().view_matrix_loc,  1, GL_FALSE, viewMat.data_array);
+            if (_renderer->getSurfelPass3Shader().point_light_pos_vs_loc      >= 0) glUniform3fv(_renderer->getSurfelPass3Shader().point_light_pos_vs_loc, 1, light_vs.data_array);
+            if (_renderer->getSurfelPass3Shader().point_light_intensity_loc   >= 0) glUniform1f(_renderer->getSurfelPass3Shader().point_light_intensity_loc, s.point_light_intensity);
+            if (_renderer->getSurfelPass3Shader().ambient_intensity_loc       >= 0) glUniform1f(_renderer->getSurfelPass3Shader().ambient_intensity_loc,     s.ambient_intensity);
+            if (_renderer->getSurfelPass3Shader().specular_intensity_loc      >= 0) glUniform1f(_renderer->getSurfelPass3Shader().specular_intensity_loc,    s.specular_intensity);
+            if (_renderer->getSurfelPass3Shader().shininess_loc               >= 0) glUniform1f(_renderer->getSurfelPass3Shader().shininess_loc,             s.shininess);
+            if (_renderer->getSurfelPass3Shader().gamma_loc                   >= 0) glUniform1f(_renderer->getSurfelPass3Shader().gamma_loc,                 s.gamma);
+            if (_renderer->getSurfelPass3Shader().use_tone_mapping_loc        >= 0) glUniform1i(_renderer->getSurfelPass3Shader().use_tone_mapping_loc,      s.use_tone_mapping ? 1 : 0);
 
-            // Fullscreen quad draw.
+            // Fullscreen-Quad
             glBindVertexArray(res.screen_quad_vao);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             glBindVertexArray(0);
 
-            // Restore texture unit if needed by later code.
-            glActiveTexture(GL_TEXTURE0);
+            glActiveTexture(GL_TEXTURE0); // sauber zurücksetzen
         }
         else {
             // ================= SINGLE-PASS RENDER PATH =================

@@ -1,3 +1,4 @@
+// ---------- vis_surfel_pass1.glslg ----------
 #version 420 core
 
 uniform mat4 projection_matrix;
@@ -16,25 +17,22 @@ out GsOut {
 } gs_out;
 
 void main() {
-    
     vec3 vs_center = v_in[0].vs_center;
     vec3 vs_half_u = v_in[0].vs_half_u;
     vec3 vs_half_v = v_in[0].vs_half_v;
 
     const vec2 kQuadUV[4] = vec2[4](
         vec2(-1.0, -1.0),
-        vec2( -1.0, 1.0),
-        vec2(1.0,  -1.0),
+        vec2(-1.0,  1.0),
+        vec2( 1.0, -1.0),
         vec2( 1.0,  1.0)
     );
 
     for (int i = 0; i < 4; ++i) {
         vec2 t = kQuadUV[i];
         gs_out.uv = t;
-
         vec3 corner_vs = vs_center + t.x * vs_half_u + t.y * vs_half_v;
         gl_Position   = projection_matrix * vec4(corner_vs, 1.0);
-
         EmitVertex();
     }
     EndPrimitive();

@@ -1,3 +1,4 @@
+// ---------- vis_surfel_pass2.glslg ----------
 #version 420 core
 
 uniform mat4 projection_matrix; // P
@@ -5,7 +6,6 @@ uniform mat4 projection_matrix; // P
 layout(points) in;
 layout(triangle_strip, max_vertices = 4) out;
 
-// Input from VS.
 in VsOut {
     vec3 vs_center;
     vec3 vs_half_u;
@@ -14,7 +14,6 @@ in VsOut {
     vec3 albedo_rgb;
 } v_in[];
 
-// Output to FS.
 out GsOut {
     noperspective vec2 uv;   // -1..1
     flat vec3  vs_center;
@@ -41,10 +40,8 @@ void main() {
     for (int i = 0; i < 4; ++i) {
         vec2 t = kQuadUV[i];
         gs_out.uv = t;
-
         vec3 corner_vs = gs_out.vs_center + t.x * gs_out.vs_half_u + t.y * gs_out.vs_half_v;
         gl_Position = projection_matrix * vec4(corner_vs, 1.0);
-
         EmitVertex();
     }
     EndPrimitive();

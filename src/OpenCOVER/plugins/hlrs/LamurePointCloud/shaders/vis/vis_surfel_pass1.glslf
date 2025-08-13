@@ -1,3 +1,5 @@
+
+// ---------- vis_surfel_pass1.glslf ----------
 #version 420 core
 
 in GsOut {
@@ -5,6 +7,7 @@ in GsOut {
 } fs_in;
 
 void main() {
+    // Nur die kreisförmige Surfel-Fläche lässt Tiefe schreiben
     if (dot(fs_in.uv, fs_in.uv) > 1.0)
         discard;
 }

@@ -1,12 +1,10 @@
+// ---------- vis_surfel_pass2.glslf (Variante A) ----------
 #version 420 core
 //layout(early_fragment_tests) in;
 
-uniform sampler2D depth_texture;
-uniform vec2      viewport;
-uniform float     near_plane;
-uniform float     far_plane;
+uniform sampler2D depth_texture;      // Prepass-Tiefe
+uniform mat4      projection_matrix;  // für NDC-Projektion der Surfel-Frag-Tiefe
 
-// Input from GS.
 in GsOut {
     noperspective vec2 uv;   // -1..1
     flat vec3 vs_center;
@@ -16,43 +14,44 @@ in GsOut {
     flat vec3 albedo_rgb;
 } fs_in;
 
-// Accumulation targets.
-layout(location = 0) out vec4 accumulated_colors;      // rgb = Σ(color*w), a = Σw
-layout(location = 1) out vec3 accumulated_normals;     // Σ(normal*w)
-layout(location = 2) out vec3 accumulated_vs_positions;// Σ(pos_vs*w)
+layout(location = 0) out vec4 accumulated_colors;       // rgb = Σ(color*w), a = Σw
+layout(location = 1) out vec3 accumulated_normals;      // Σ(normal*w)
+layout(location = 2) out vec3 accumulated_vs_positions; // Σ(pos_vs*w)
 
-// Gaussian LUT.
-const float gaussian[32] = float[](
-  1.000000, 1.000000, 0.988235, 0.968627, 0.956862, 0.917647, 0.894117, 0.870588, 0.915686, 0.788235,
-  0.749020, 0.690196, 0.654902, 0.619608, 0.552941, 0.513725, 0.490196, 0.458824, 0.392157, 0.356863,
-  0.341176, 0.278431, 0.254902, 0.227451, 0.188235, 0.164706, 0.152941, 0.125490, 0.109804, 0.098039,
-  0.074510, 0.062745
-);
-
-float linearize_depth(float d) {
-     if (d == 1.0) return far_plane; // Hintergrund-Pixel nicht umrechnen
-     float z_ndc = d * 2.0 - 1.0; // Konvertiert den Bereich [0,1] zu [-1,1]
-     return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z_ndc * (far_plane - near_plane));
-}
+// ---- Tunables (keine neuen Uniforms) ----
+const float kEpsMin    = 1e-6; // Mindest-Epsilon in NDC
+const float kEpsScale  = 2.0;  // fwidth-Skalierung (1.5..3.0)
+const float kMaskStart = 0.90; // ab 90% Radius weicher Rand
+const float kMaskEnd   = 1.00; // bei 100% Radius 0
 
 void main() {
-    vec2 uv = fs_in.uv;
-    if (dot(uv, uv) > 1.0) discard;
+    // Kreis-Coverage in Screen-Space (noperspective → stabil)
+    vec2  uv = fs_in.uv;
+    float r2 = dot(uv, uv);
+    if (r2 > 1.0) discard;
 
-    float idx = clamp(length(uv) * 31.0, 0.0, 31.0);
-    float w   = gaussian[int(idx)];
-
+    // View-Space Fragmentposition der Surfel-Disc
     vec3 pos_vs = fs_in.vs_center + fs_in.vs_half_u * uv.x + fs_in.vs_half_v * uv.y;
-    float current_linear_z = abs(pos_vs.z);
-    vec2 screen_uv = gl_FragCoord.xy / viewport;
-    float stored_depth_ndc = texture(depth_texture, screen_uv).r;
-    float stored_linear_z = linearize_depth(stored_depth_ndc);
 
-    if (current_linear_z > stored_linear_z + length(fs_in.vs_half_u + fs_in.vs_half_v)) {
-      discard;
-    }
+    // Projizierte Tiefe in NDC [0,1]
+    vec4  clip = projection_matrix * vec4(pos_vs, 1.0);
+    float z01  = (clip.z / clip.w) * 0.5 + 0.5;
+
+    // Szene-Tiefe aus Pass 1 am aktuellen Pixel (nearest, keine Filterung)
+    float z_scene = texelFetch(depth_texture, ivec2(gl_FragCoord.xy), 0).r;
+
+    // Adaptives Epsilon (lokale Ableitungen + Mindestbias)
+    float eps_ndc = max(kEpsMin, fwidth(z01)) * kEpsScale;
+
+    // Manueller LEQUAL-Test in NDC
+    if (z01 > z_scene + eps_ndc) discard;
+
+    // Analytischer Rand-Falloff (Coverage-Weight)
+    float  r    = sqrt(r2);
+    float  mask = 1.0 - smoothstep(kMaskStart, kMaskEnd, r);
+    float  w    = mask;
 
     accumulated_colors       = vec4(fs_in.albedo_rgb * w, w);
-    accumulated_normals      = normalize(fs_in.vs_normal) * w;
+    accumulated_normals      = fs_in.vs_normal * w; // vs_normal ist normiert
     accumulated_vs_positions = pos_vs * w;
 }

@@ -1,3 +1,4 @@
+// ---------- vis_surfel_pass2.glslv ----------
 #version 420 core
 
 // Global parameters.
@@ -8,7 +9,7 @@ uniform mat3  normal_matrix;
 uniform mat4  model_matrix;
 uniform mat4  model_view_matrix;
 uniform mat4  projection_matrix;
-uniform vec2  viewport;
+uniform vec2  viewport;                // kann von Debug-Farben verwendet werden
 uniform bool  show_normals;
 uniform bool  show_accuracy;
 uniform bool  show_radius_deviation;
@@ -33,7 +34,7 @@ out VsOut {
     vec3 albedo_rgb;
 } vs_out;
 
-// Color mapping includes.
+// Optional: Debug-Farbgebung (wie gehabt)
 INCLUDE ../common/heatmapping/wavelength_to_rainbow.glsl
 INCLUDE ../common/heatmapping/colormap.glsl
 
@@ -42,38 +43,6 @@ vec3 get_output_sensitivity_color(float screen_size) {
     float max_screen_size = 10.0;
     float val = clamp(screen_size, min_screen_size, max_screen_size);
     return data_value_to_rainbow(val, min_screen_size, max_screen_size);
-}
-
-vec3 get_color(in vec3 position,
-               in vec3 normal,
-               in vec3 base_color,
-               in float radius,
-               in float screen_size) {
-
-    vec3 view_color = base_color;
-
-    if (show_normals) {
-        vec3 n_vis = normal;
-        if (n_vis.z < 0.0) n_vis *= -1.0;
-        view_color = n_vis * 0.5 + 0.5;
-    }
-    else if (show_output_sensitivity) {
-        view_color = get_output_sensitivity_color(screen_size);
-    }
-    else if (show_radius_deviation) {
-        float max_fac  = 2.0;
-        float safe_avg = max(1e-8, average_radius);
-        view_color = vec3(min(max_fac, radius / safe_avg) / max_fac);
-    }
-    else {
-        view_color = base_color;
-    }
-
-    if (show_accuracy) {
-        view_color += vec3(accuracy, 0.0, 0.0);
-    }
-
-    return view_color;
 }
 
 float compute_screen_size_px(vec3 vs_center, vec3 vs_half_u, vec3 vs_half_v, vec2 viewport_wh) {
@@ -88,60 +57,50 @@ float compute_screen_size_px(vec3 vs_center, vec3 vs_half_u, vec3 vs_half_v, vec
     vec2 sc = (ndc_c.xy * 0.5 + 0.5) * viewport_wh;
     vec2 su = (ndc_u.xy * 0.5 + 0.5) * viewport_wh;
     vec2 sv = (ndc_v.xy * 0.5 + 0.5) * viewport_wh;
-
     return max(length(sc - su), length(sv - sc));
 }
-
 
 void main() {
     float radius_ws = clamp(in_radius * scale_radius, min_radius, max_radius);
 
-    // --- Stabile Basis-Vektor-Berechnung ---
-    // Absichern gegen eine (0,0,0) Normale und normalisieren
-    vec3 n = normalize((length(in_normal) > 0.0001) ? in_normal : vec3(0.0, 0.0, 1.0));
-    
-    // Wähle einen Referenz-Vektor, der garantiert nicht parallel zu n ist
+    // Stabile Basis
+    vec3 n = normalize((length(in_normal) > 1e-4) ? in_normal : vec3(0.0, 0.0, 1.0));
     vec3 ref;
-    if (abs(n.x) > abs(n.y) && abs(n.x) > abs(n.z)) {
-        ref = vec3(0.0, 1.0, 0.0);
-    } else if (abs(n.y) > abs(n.z)) {
-        ref = vec3(0.0, 0.0, 1.0);
-    } else {
-        ref = vec3(1.0, 0.0, 0.0);
-    }
-    
-    // Berechne die orthogonalen Basisvektoren im Model-Space
+    if (abs(n.x) > abs(n.y) && abs(n.x) > abs(n.z))      ref = vec3(0.0, 1.0, 0.0);
+    else if (abs(n.y) > abs(n.z))                         ref = vec3(0.0, 0.0, 1.0);
+    else                                                  ref = vec3(1.0, 0.0, 0.0);
+
     vec3 ms_u = normalize(cross(ref, n));
     vec3 ms_v = normalize(cross(n, ms_u));
-    // --- Ende der Basis-Berechnung ---
 
     vec3 ws_center = (model_matrix      * vec4(in_position, 1.0)).xyz;
     vec3 vs_center = (model_view_matrix * vec4(in_position, 1.0)).xyz;
-
     vec3 vs_half_u = (model_view_matrix * vec4(ms_u * radius_ws, 0.0)).xyz;
     vec3 vs_half_v = (model_view_matrix * vec4(ms_v * radius_ws, 0.0)).xyz;
     vec3 vs_normal = normalize(normal_matrix * n);
 
-    // --- KORREKTUR ---
-    //if (dot(cross(vs_half_u, vs_half_v), vs_normal) < 0.0) {
-    //    vs_half_v = -vs_half_v;
-    //}
-    // --- ENDE KORREKTUR ---
+    // (Optional) Umlaufrichtung checken
+    // if (dot(cross(vs_half_u, vs_half_v), vs_normal) < 0.0) vs_half_v = -vs_half_v;
 
+    // Basisfarbe (inkl. Debug-Modi deiner Pipeline)
     vec3 base_color = vec3(in_r, in_g, in_b);
-
-    float screen_size = 0.0;
-    if (show_output_sensitivity) {
-        screen_size = compute_screen_size_px(vs_center, vs_half_u, vs_half_v, viewport);
+    if (show_normals) {
+        vec3 n_vis = vs_normal; if (n_vis.z < 0.0) n_vis *= -1.0; base_color = n_vis * 0.5 + 0.5;
     }
-
-    vec3 color_vs = get_color(ws_center, vs_normal, base_color, radius_ws, screen_size);
+    if (show_radius_deviation) {
+        float max_fac  = 2.0; float safe_avg = max(1e-8, average_radius); base_color = vec3(min(max_fac, radius_ws / safe_avg) / max_fac);
+    }
+    if (show_accuracy) base_color += vec3(accuracy, 0.0, 0.0);
+    if (show_output_sensitivity) {
+        float screen_size = compute_screen_size_px(vs_center, vs_half_u, vs_half_v, viewport);
+        base_color = get_output_sensitivity_color(screen_size);
+    }
 
     vs_out.vs_center  = vs_center;
     vs_out.vs_half_u  = vs_half_u;
     vs_out.vs_half_v  = vs_half_v;
     vs_out.vs_normal  = vs_normal;
-    vs_out.albedo_rgb = color_vs;
+    vs_out.albedo_rgb = base_color;
 
     gl_Position = projection_matrix * vec4(vs_center, 1.0);
 }
