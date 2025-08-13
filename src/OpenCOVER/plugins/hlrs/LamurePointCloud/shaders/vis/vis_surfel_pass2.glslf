@@ -42,20 +42,15 @@ void main() {
     float idx = clamp(length(uv) * 31.0, 0.0, 31.0);
     float w   = gaussian[int(idx)];
 
-
     vec3 pos_vs = fs_in.vs_center + fs_in.vs_half_u * uv.x + fs_in.vs_half_v * uv.y;
-    //float current_linear_z = abs(pos_vs.z);
-    //vec2 screen_uv = gl_FragCoord.xy / viewport;
-    //float stored_depth_ndc = texture(depth_texture, screen_uv).r;
-    //float stored_linear_z = linearize_depth(stored_depth_ndc);
+    float current_linear_z = abs(pos_vs.z);
+    vec2 screen_uv = gl_FragCoord.xy / viewport;
+    float stored_depth_ndc = texture(depth_texture, screen_uv).r;
+    float stored_linear_z = linearize_depth(stored_depth_ndc);
 
-
-    //const float depth_epsilon = 100.0;
-    //const float relative_epsilon_factor = 0.01;
-    //float depth_epsilon = stored_linear_z * relative_epsilon_factor;
-    //if (current_linear_z > stored_linear_z + depth_epsilon) {
-    //  discard;
-    //}
+    if (current_linear_z > stored_linear_z + length(fs_in.vs_half_u + fs_in.vs_half_v)) {
+      discard;
+    }
 
     accumulated_colors       = vec4(fs_in.albedo_rgb * w, w);
     accumulated_normals      = normalize(fs_in.vs_normal) * w;

@@ -108,8 +108,8 @@ void LamureUI::setupUi() {
 
     m_scale_radius_slider = new opencover::ui::Slider(m_point_size_menu, "scale_radius");
     m_scale_radius_slider->setText("Scale Radius");
-    //m_scale_radius_slider->setBounds(0.0001, m_plugin->getSettings().scale_radius * 5.0f);
-    //m_scale_radius_slider->setScale(opencover::ui::Slider::Logarithmic);
+    m_scale_radius_slider->setBounds(0.0001, m_plugin->getSettings().scale_radius * 5.0f);
+    m_scale_radius_slider->setScale(opencover::ui::Slider::Logarithmic);
     m_scale_radius_slider->setBounds(0.0, 8.0f);
     m_scale_radius_slider->setValue(m_plugin->getSettings().scale_radius);
     m_scale_radius_slider->setShared(true);

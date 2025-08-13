@@ -483,10 +483,8 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             const int width  = opencover::coVRConfig::instance()->windows[0].context->getTraits()->width;
 
             // --- PASS 1: Depth pre-pass (depth-only)
-            const bool useMSAA = (res.msaa_samples > 1 && res.msaa_fbo != 0);
-            glBindFramebuffer(GL_FRAMEBUFFER, useMSAA ? res.msaa_fbo : res.fbo);
 
-            //glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
             glViewport(0, 0, width, height);
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
@@ -496,9 +494,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
             glDepthFunc(GL_LEQUAL);
-            glDisable(GL_CULL_FACE);
-            //glCullFace(GL_BACK);
-            //glCullFace(GL_FRONT);
 
             glUseProgram(_renderer->getSurfelPass1Shader().program);
 
@@ -534,16 +529,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                     }
                 }
             }
-
-            if (useMSAA) {
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, res.msaa_fbo);
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.fbo);
-                glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-                glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
-            }
-
             // --- PASS 2: Accumulation pass (additively into 3 targets) ---
-            glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
             GLenum accumBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
             glDrawBuffers(3, accumBuffers);
             glClearColor(0.f, 0.f, 0.f, 0.f);
@@ -552,10 +538,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             glBlendFunc(GL_ONE, GL_ONE);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_FALSE);
-            glDepthFunc(GL_LEQUAL);
-            glDisable(GL_CULL_FACE);
-            //glCullFace(GL_BACK);
-            //glCullFace(GL_FRONT);
+            glDepthFunc(GL_ALWAYS);
 
             glUseProgram(_renderer->getSurfelPass2Shader().program);
             glActiveTexture(GL_TEXTURE0);
@@ -599,13 +582,11 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                     }
                 }
             }
+
+            // --- PASS 3: Resolve / lighting ---
             glBindFramebuffer(GL_READ_FRAMEBUFFER, res.fbo);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prev_fbo);
             glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-            glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
-
-
-            // --- PASS 3: Resolve / lighting ---
             glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
             glViewport(0, 0, width, height);
             glEnable(GL_DEPTH_TEST);
@@ -613,9 +594,6 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
             glEnable(GL_BLEND);
             glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-            glDisable(GL_CULL_FACE);
-            //glCullFace(GL_BACK);
-            //glCullFace(GL_FRONT);
 
             auto &prog = _renderer->getSurfelPass3Shader();
             glUseProgram(_renderer->getSurfelPass3Shader().program);
@@ -1899,137 +1877,4 @@ void LamureRenderer::initPclResources()
 
         glBindVertexArray(0);
     }
-}
-
-
-void LamureRenderer::initPclResources(int msaaSamples) {
-    if (m_plugin->getUI()->getNotifyButton()->state()) {
-        std::cout << "[Notify] initPclResources(samples=" << msaaSamples << ") " << std::endl;
-    }
-
-    GLint savedFbo = 0;
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &savedFbo);
-
-    const int height = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height;
-    const int width  = opencover::coVRConfig::instance()->windows[0].context->getTraits()->width;
-
-    // Vorherige Ressourcen freigeben
-    if (m_pcl_resource.fbo != 0) {
-        glDeleteFramebuffers(1, &m_pcl_resource.fbo);
-        glDeleteTextures(1, &m_pcl_resource.texture_color);
-        glDeleteTextures(1, &m_pcl_resource.texture_normal);
-        glDeleteTextures(1, &m_pcl_resource.texture_position);
-        glDeleteTextures(1, &m_pcl_resource.depth_texture);
-    }
-    if (m_pcl_resource.msaa_fbo != 0) {
-        glDeleteFramebuffers(1, &m_pcl_resource.msaa_fbo);
-        m_pcl_resource.msaa_fbo = 0;
-    }
-    if (m_pcl_resource.msaa_depth_rbo != 0) {
-        glDeleteRenderbuffers(1, &m_pcl_resource.msaa_depth_rbo);
-        m_pcl_resource.msaa_depth_rbo = 0;
-    }
-
-    // Singlesample FBO (Color/Normal/Position als Texturen, Depth als Textur D24)
-    glGenFramebuffers(1, &m_pcl_resource.fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, m_pcl_resource.fbo);
-
-    // COLOR: RGBA16F (A = sum(weight))
-    glGenTextures(1, &m_pcl_resource.texture_color);
-    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_color);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_pcl_resource.texture_color, 0);
-
-    // NORMAL: RGB16F
-    glGenTextures(1, &m_pcl_resource.texture_normal);
-    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_normal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_pcl_resource.texture_normal, 0);
-
-    // POSITION: RGB16F
-    glGenTextures(1, &m_pcl_resource.texture_position);
-    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_position);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_pcl_resource.texture_position, 0);
-
-    // DEPTH (singlesample) als Textur D24 → wird in Pass 2 gesampelt
-    glGenTextures(1, &m_pcl_resource.depth_texture);
-    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.depth_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_pcl_resource.depth_texture, 0);
-
-    // Standard Draw-Buffers
-    {
-        GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-        glDrawBuffers(3, drawBuffers);
-    }
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "ERROR: singlesample FBO incomplete!" << std::endl;
-    }
-
-    // Optional: MSAA-Depth-FBO für Pass 1
-    GLint maxSamples = 0;
-    glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
-    const int samples = std::max(1, std::min(msaaSamples, maxSamples));
-    m_pcl_resource.msaa_samples = samples;
-
-    if (samples > 1) {
-        glGenFramebuffers(1, &m_pcl_resource.msaa_fbo);
-        glBindFramebuffer(GL_FRAMEBUFFER, m_pcl_resource.msaa_fbo);
-
-        glGenRenderbuffers(1, &m_pcl_resource.msaa_depth_rbo);
-        glBindRenderbuffer(GL_RENDERBUFFER, m_pcl_resource.msaa_depth_rbo);
-        glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH_COMPONENT24, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_pcl_resource.msaa_depth_rbo);
-
-        // Nur Depth in Pass 1 → keine Color-Anhänge nötig
-        glDrawBuffer(GL_NONE);
-        glReadBuffer(GL_NONE);
-
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            std::cerr << "ERROR: msaa depth FBO incomplete!" << std::endl;
-        }
-    }
-
-    // zurück auf Default
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Screen-Quad (falls noch nicht vorhanden)
-    if (m_pcl_resource.screen_quad_vao == 0) {
-        GLuint vao, vbo;
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
-
-        glGenBuffers(1, &vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * m_pcl_resource.screen_quad_vertex.size(), m_pcl_resource.screen_quad_vertex.data(), GL_STATIC_DRAW);
-
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
-
-        m_pcl_resource.screen_quad_vao = vao;
-        m_pcl_resource.screen_quad_vbo = vbo;
-
-        glBindVertexArray(0);
-    }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, savedFbo);
 }
