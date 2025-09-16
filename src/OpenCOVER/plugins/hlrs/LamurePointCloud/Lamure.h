@@ -26,6 +26,10 @@
 
 #include <lamure/ren/data_provenance.h>
 #include <lamure/prov/prov_aux.h>
+#include <bitset>
+#include <initializer_list>
+#include <osgGA/GUIEventAdapter>
+#include <cover/coVRPlugin.h>
 
 // Forward declarations
 namespace opencover
@@ -102,9 +106,18 @@ public:
         std::map<uint32_t, std::shared_ptr<lamure::prov::octree>> octrees;
         std::map<uint32_t, std::vector<lamure::prov::aux::view>> views;
         std::map<uint32_t, std::string> aux;
+        float scale_radius{1.5f};
+        float scale_radius_gamma = 0.5f;
+        float scale_element = 1.0f;
+        float scale_point = 1.0f;
+        float scale_surfel = 2.0f;
         float min_radius{0.0f};
         float max_radius{std::min(std::numeric_limits<float>::max(), 0.1f)};
-        float scale_radius{1.5f};
+        float min_screen_size{0.0f};
+        float max_screen_size{std::min(std::numeric_limits<float>::max(), 0.1f)};
+        float max_radius_cut = 10.0f;
+        float depth_range = 2.0f;
+        float flank_lift = 0.0f;
         std::vector<float> bvh_color{1.0f, 1.0f, 0.0f, 1.0f};
         std::vector<float> frustum_color{0.0f, 0.0f, 0.0f, 1.0f};
         uint16_t num_models;
@@ -115,7 +128,21 @@ public:
         bool show_text{ false };
         bool show_sync{ true };
         bool show_notify{ true };
+        bool use_initial_navigation = false;
+        osg::Matrix initial_navigation;
+        bool use_initial_view = false;
+        osg::Matrix initial_view;
+        bool initial_tf_overrides = false;
 
+        std::vector<LamureMeasurement::Segment> measurement_segments;
+        std::string measurement_dir;
+        std::string measurement_name;
+
+        bool coloring { false };
+        bool lighting { false };
+        bool point { false };
+        bool surfel { false };
+        bool splatting { false };
     };
 
     struct ModelInfo
@@ -152,9 +179,11 @@ public:
     bool init2();
     static int loadLMR(const char* filename, osg::Group* parent, const char* ck = "");
     static int unloadLMR(const char* filename, const char* ck = "");
+    void loadSettingsFromCovise();
     void preFrame();
     void startMeasurement();
     void stopMeasurement();
+    void applyInitialTransforms();
 
     LamureUI* getUI() { return m_ui.get(); }
     LamureRenderer* getRenderer() { return m_renderer.get(); }
@@ -170,6 +199,8 @@ public:
     
     void loadSettings(const std::string &filename);
     bool rendering_ = false;
+    void dumpSettings(const char* tag = "");
+    void key(int type, int keySym, int mod) override;
 
 private:
     static Lamure* plugin;
@@ -190,6 +221,18 @@ private:
     float                               _speed = 1.0f;
     bool                                measurement_running = 0;
     bool                                prov_valid;
+
+
+    std::bitset<512> m_keyDown_;
+
+    static inline int  clampKeyIndex(int sym)         { return (sym & 0x1FF); }
+    inline bool        held(int sym)            const { return m_keyDown_.test(clampKeyIndex(sym)); }
+    inline bool        anyHeld(std::initializer_list<int> syms) const {
+        for (int s : syms) if (held(s)) return true; return false;
+    }
+
+    std::vector<LamureMeasurement::Segment> parseMeasurementSegments(const std::string& cfg) const;
+    std::string buildMeasurementOutputPath() const;
 };
 
 #endif

@@ -7,10 +7,7 @@ layout(binding = 2) uniform sampler2D in_vs_position_texture; // rgb:  Σ(pos_vs
 layout(location = 0) out vec4 out_color;
 
 uniform vec3 background_color;
-uniform bool show_normals;
-uniform bool show_accuracy;
-uniform bool show_radius_deviation;
-uniform bool show_output_sensitivity;
+uniform bool lighting;
 
 in VsOut {
     vec2 uv;  // 0..1
@@ -37,9 +34,7 @@ void main()
     vec3 pos_vs    = accumulated_pos_vs     / max(sum_w, 1e-8);
 
     // Debug-Modi umgehen Beleuchtung
-    vec3 shaded = (show_normals || show_accuracy || show_radius_deviation || show_output_sensitivity)
-                  ? albedo
-                  : shade_blinn_phong(pos_vs, normal_vs, albedo);
+    vec3 shaded = (lighting) ? shade_blinn_phong(pos_vs, normal_vs, albedo) : albedo;
 
     // Voll deckende Ausgabe (keine Transparenz, kein Blend nötig)
     out_color = vec4(shaded, 1.0);

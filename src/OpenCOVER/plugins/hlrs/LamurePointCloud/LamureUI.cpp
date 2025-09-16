@@ -1,4 +1,4 @@
-#include "LamureUI.h"
+﻿#include "LamureUI.h"
 #include "Lamure.h"
 #include <filesystem>
 #include <lamure/ren/policy.h>
@@ -23,7 +23,6 @@ void LamureUI::setupUi() {
     m_lamure_menu->allowRelayout(true);
 
     // --- Rendering ---
-
     m_rendering_group = new opencover::ui::Group(m_lamure_menu, "Rendering");
 
     m_pointcloud_button  = new opencover::ui::Button(m_rendering_group, "Pointcloud");
@@ -36,8 +35,8 @@ void LamureUI::setupUi() {
     m_frustum_button->setShared(true);
     m_text_button->setShared(true);
 
-    // --- Misc ---
 
+    // --- Misc ---
     m_misc_group = new opencover::ui::Group(m_lamure_menu, "Misc");
 
     m_sync_button        = new opencover::ui::Button(m_misc_group, "Sync");
@@ -50,7 +49,6 @@ void LamureUI::setupUi() {
 
 
     // --- Measurement ---
-
     m_measure_group = new opencover::ui::Group(m_lamure_menu, "Measurement");
 
     m_measure_button = new opencover::ui::Button(m_measure_group, "run_measurement");
@@ -65,7 +63,24 @@ void LamureUI::setupUi() {
         });
 
 
-    m_model_menu = new opencover::ui::Menu(m_lamure_menu, "Model");
+    m_primitives_group = new opencover::ui::Group(m_lamure_menu, "Primitives");
+
+    m_point_button = new opencover::ui::Button(m_primitives_group, "point_button");
+    m_point_button->setText("Point");
+    m_point_button->setShared(true);
+
+    m_surfel_button = new opencover::ui::Button(m_primitives_group, "surfel_button");
+    m_surfel_button->setText("Surfel");
+    m_surfel_button->setShared(true);
+    m_surfel_button->setState(m_plugin->getSettings().surfel);
+
+    m_splat_button = new opencover::ui::Button(m_primitives_group, "splat_button");
+    m_splat_button->setText("Splatting");
+    m_splat_button->setShared(true);
+    m_splat_button->setState(m_plugin->getSettings().splatting);
+
+
+    m_model_menu = new opencover::ui::Menu(m_lamure_menu, "Models");
 
     m_model_buttons.clear();
     m_model_visible.clear();
@@ -87,39 +102,9 @@ void LamureUI::setupUi() {
         file_button->setCallback([this, m_id](bool state) { m_model_visible[m_id] = state; });
     }
 
-    m_point_size_menu = new opencover::ui::Menu(m_lamure_menu, "PointCloud");
-
-    m_min_radius_slider = new opencover::ui::Slider(m_point_size_menu, "min_radius");
-    m_min_radius_slider->setText("Min. Radius");
-    m_min_radius_slider->setBounds(0.0, m_plugin->getSettings().max_radius);
-    m_min_radius_slider->setValue(m_plugin->getSettings().min_radius);
-    m_min_radius_slider->setShared(true);
-    m_min_radius_slider->setCallback([this](double value, bool /*released*/) {
-        m_plugin->getSettings().min_radius = static_cast<float>(value);
-        });
-
-    m_max_radius_slider = new opencover::ui::Slider(m_point_size_menu, "max_radius");
-    m_max_radius_slider->setText("Max. Radius");
-    m_max_radius_slider->setBounds(0.0, std::max(5.0f * m_plugin->getSettings().max_radius, 1.0f));
-    m_max_radius_slider->setValue(m_plugin->getSettings().max_radius);
-    m_max_radius_slider->setShared(true);
-    m_max_radius_slider->setCallback([this](double value, bool released)
-        { m_plugin->getSettings().max_radius = static_cast<float>(value); });
-
-    m_scale_radius_slider = new opencover::ui::Slider(m_point_size_menu, "scale_radius");
-    m_scale_radius_slider->setText("Scale Radius");
-    m_scale_radius_slider->setBounds(0.0001, m_plugin->getSettings().scale_radius * 5.0f);
-    m_scale_radius_slider->setScale(opencover::ui::Slider::Logarithmic);
-    m_scale_radius_slider->setBounds(0.0, 8.0f);
-    m_scale_radius_slider->setValue(m_plugin->getSettings().scale_radius);
-    m_scale_radius_slider->setShared(true);
-    m_scale_radius_slider->setCallback([this](double value, bool released)
-        { m_plugin->getSettings().scale_radius = static_cast<float>(value); });
-
-
     m_lod_menu = new opencover::ui::Menu(m_lamure_menu, "LOD");
 
-    m_lod_button = new opencover::ui::Button(m_lod_menu, "lod");
+    m_lod_button = new opencover::ui::Button(m_lod_menu, "LOD");
     m_lod_button->setText("LOD");
     m_lod_button->setShared(true);
     m_lod_button->setState(m_plugin->getSettings().lod_update);
@@ -127,102 +112,224 @@ void LamureUI::setupUi() {
         m_plugin->getSettings().lod_update = state;
         });
 
-    m_lod_error_slider = new opencover::ui::Slider(m_lod_menu, "lod_error");
+    m_lod_group = new opencover::ui::Group(m_lod_menu, "");
+
+    m_lod_error_slider = new opencover::ui::Slider(m_lod_group, "lod_error");
     m_lod_error_slider->setText("LOD Error");
     m_lod_error_slider->setBounds(LAMURE_MIN_THRESHOLD, LAMURE_MAX_THRESHOLD);
     m_lod_error_slider->setValue(m_plugin->getSettings().lod_error);
     m_lod_error_slider->setShared(true);
-    m_lod_error_slider->setCallback([this](double value, bool /*released*/) {
+    m_lod_error_slider->setCallback([this](double value, bool released) {
         m_plugin->getSettings().lod_error = static_cast<float>(value);
         });
 
-    m_shader_choice = new opencover::ui::SelectionList(m_lamure_menu, "shader");
-    m_shader_choice->setText("Shader");
-    m_shader_choice->setShared(true);
 
-    const auto& all_shaders = m_plugin->getRenderer()->getPclShader();
-    bool prov_available = m_plugin->getSettings().provenance;
+    m_point_size_menu = new opencover::ui::Menu(m_lamure_menu, "Scaling");
 
-    std::vector<LamureRenderer::ShaderInfo> available_shaders;
-    std::vector<std::string> ui_items;
+    m_scale_radius_slider = new opencover::ui::Slider(m_point_size_menu, "scale_radius");
+    m_scale_radius_slider->setText("Scale Radius");
+    m_scale_radius_slider->setBounds(0.0001f, 1.0f);
+    m_scale_radius_slider->setScale(opencover::ui::Slider::Logarithmic);
+    //m_scale_radius_slider->setBounds(0.0f, 3.0f);
+    m_scale_radius_slider->setValue(
+        m_plugin->getSettings().scale_radius
+    );
+    m_scale_radius_slider->setShared(true);
+    m_scale_radius_slider->setCallback([this](double value, bool released)
+        { m_plugin->getSettings().scale_radius = static_cast<float>(value); });
 
-    for (const auto& info : all_shaders) {
-        if (info.name.find("Prov") == std::string::npos || prov_available) {
-            available_shaders.push_back(info);
-            ui_items.push_back(info.name);
+    m_scale_radius_gamma_slider = new opencover::ui::Slider(m_point_size_menu, "scale_radius_gamma");
+    m_scale_radius_gamma_slider->setText("Scale Gamma");
+    m_scale_radius_gamma_slider->setBounds(0.0f, 1.0f);
+    m_scale_radius_gamma_slider->setValue(m_plugin->getSettings().scale_radius_gamma);
+    m_scale_radius_gamma_slider->setShared(true);
+    m_scale_radius_gamma_slider->setCallback([this](double value, bool released)
+        { m_plugin->getSettings().scale_radius_gamma = static_cast<float>(value); });
+
+    m_max_radius_cut_slider = new opencover::ui::Slider(m_point_size_menu, "max_radius_cut");
+    m_max_radius_cut_slider->setText("Cut Radius (world)");
+    m_max_radius_cut_slider->setBounds(0.0f, std::max(m_plugin->getSettings().max_radius_cut, 10.0f));
+    m_max_radius_cut_slider->setValue(m_plugin->getSettings().max_radius_cut);
+    m_max_radius_cut_slider->setShared(true);
+    m_max_radius_cut_slider->setCallback([this](double value, bool released)
+        { m_plugin->getSettings().max_radius_cut = static_cast<float>(value); });
+
+    m_max_radius_slider = new opencover::ui::Slider(m_point_size_menu, "max_radius");
+    m_max_radius_slider->setText("Max. Radius (world)");
+    m_max_radius_slider->setBounds(0.0f, std::max(m_plugin->getSettings().max_radius, 3.0f));
+    m_max_radius_slider->setValue(m_plugin->getSettings().max_radius);
+    m_max_radius_slider->setShared(true);
+    m_max_radius_slider->setCallback([this](double value, bool released)
+        { m_plugin->getSettings().max_radius = static_cast<float>(value); });
+
+    m_min_radius_slider = new opencover::ui::Slider(m_point_size_menu, "min_radius");
+    m_min_radius_slider->setText("Min. Radius (world)");
+    m_min_radius_slider->setBounds(0.0f, std::max(m_plugin->getSettings().min_radius, 0.5f));
+    m_min_radius_slider->setValue(m_plugin->getSettings().min_radius);
+    m_min_radius_slider->setShared(true);
+    m_min_radius_slider->setCallback([this](double value, bool /*released*/) {
+        m_plugin->getSettings().min_radius = static_cast<float>(value);
+        });
+
+    m_max_screen_size_slider = new opencover::ui::Slider(m_point_size_menu, "max_screen_size");
+    m_max_screen_size_slider->setText("Max. Radius (screen)");
+    m_max_screen_size_slider->setBounds(1.0f, std::max(m_plugin->getSettings().max_screen_size, 10000.0f));
+    m_max_screen_size_slider->setScale(opencover::ui::Slider::Logarithmic);
+    m_max_screen_size_slider->setValue(m_plugin->getSettings().max_screen_size);
+    m_max_screen_size_slider->setShared(true);
+    m_max_screen_size_slider->setCallback([this](double value, bool released)
+        { m_plugin->getSettings().max_screen_size = static_cast<float>(value); });
+
+    m_min_screen_size_slider = new opencover::ui::Slider(m_point_size_menu, "min_screen_size");
+    m_min_screen_size_slider->setText("Min. Radius (screen)");
+    m_min_screen_size_slider->setBounds(0.0f, std::max(m_plugin->getSettings().min_screen_size, 10.0f));
+    m_min_screen_size_slider->setValue(m_plugin->getSettings().min_screen_size);
+    m_min_screen_size_slider->setShared(true);
+    m_min_screen_size_slider->setCallback([this](double value, bool /*released*/) {
+        m_plugin->getSettings().min_screen_size = static_cast<float>(value);
+        });
+
+    m_scale_surfel_slider = new opencover::ui::Slider(m_point_size_menu, "scale_surfel");
+    m_scale_surfel_slider->setText("Surfel Scale Multiplier");
+    m_scale_surfel_slider->setBounds(0.1f, 5.0f);
+    m_scale_surfel_slider->setValue(m_plugin->getSettings().scale_surfel);
+    m_scale_surfel_slider->setShared(true);
+    m_scale_surfel_slider->setCallback([this](double value, bool released)
+        { m_plugin->getSettings().scale_surfel = static_cast<float>(value); });
+
+    // --- Multi-Pass Blending Sliders ---
+    m_depth_range_slider = new opencover::ui::Slider(m_point_size_menu, "depth_range");
+    m_depth_range_slider->setText("Depth Range");
+    m_depth_range_slider->setBounds(0.0f, 10.0f);
+    m_depth_range_slider->setValue(m_plugin->getSettings().depth_range);
+    m_depth_range_slider->setShared(true);
+    m_depth_range_slider->setCallback([this](double value, bool released) {
+        m_plugin->getSettings().depth_range = static_cast<float>(value);
+        });
+
+    m_flank_lift_slider = new opencover::ui::Slider(m_point_size_menu, "flank_lift");
+    m_flank_lift_slider->setText("Flank Lift");
+    m_flank_lift_slider->setBounds(0.0f, 1.0f);
+    m_flank_lift_slider->setValue(m_plugin->getSettings().flank_lift);
+    m_flank_lift_slider->setShared(true);
+    m_flank_lift_slider->setCallback([this](double value, bool released) {
+        m_plugin->getSettings().flank_lift = static_cast<float>(value);
+        });
+
+
+    m_coloring_menu = new opencover::ui::Menu(m_lamure_menu, "Coloring");
+    m_coloring_button = new opencover::ui::Button(m_coloring_menu, "coloring_button");
+    m_coloring_button->setText("Coloring");
+    m_coloring_button->setShared(true);
+    m_coloring_button->setState(m_plugin->getSettings().coloring);
+
+    //m_mode_choice = new opencover::ui::SelectionList(m_coloring_menu, "Mode");
+    //m_mode_choice->setShared(true);
+
+    m_mode_group = new opencover::ui::Group(m_coloring_menu, "Modes");
+
+    m_mode_normals_btn = new opencover::ui::Button(m_mode_group, "Normals");
+    m_mode_accuracy_btn = new opencover::ui::Button(m_mode_group, "Accuracy");
+    m_mode_radius_dev_btn = new opencover::ui::Button(m_mode_group, "RadiusDeviation");
+    m_mode_output_sens_btn = new opencover::ui::Button(m_mode_group, "OutputSensitivity");
+
+    m_mode_normals_btn->setShared(true);
+    m_mode_accuracy_btn->setShared(true);
+    m_mode_radius_dev_btn->setShared(true);
+    m_mode_output_sens_btn->setShared(true);
+
+    // Helper für exklusives Umschalten (UI + Settings)
+    auto selectMode = [this](int idx){
+        auto &st = m_plugin->getSettings();
+        st.show_normals            = (idx == 0);
+        st.show_accuracy           = (idx == 1);
+        st.show_radius_deviation   = (idx == 2);
+        st.show_output_sensitivity = (idx == 3);
+
+        // UI spiegeln
+        if (m_mode_normals_btn)      m_mode_normals_btn->setState(idx == 0);
+        if (m_mode_accuracy_btn)     m_mode_accuracy_btn->setState(idx == 1);
+        if (m_mode_radius_dev_btn)   m_mode_radius_dev_btn->setState(idx == 2);
+        if (m_mode_output_sens_btn)  m_mode_output_sens_btn->setState(idx == 3);
+        };
+
+    // Initialzustand aus Settings (Fallback: Normals)
+    auto &s = m_plugin->getSettings();
+    int initial_mode_idx = 0;
+    if      (s.show_accuracy)           initial_mode_idx = 1;
+    else if (s.show_radius_deviation)   initial_mode_idx = 2;
+    else if (s.show_output_sensitivity) initial_mode_idx = 3;
+    selectMode(initial_mode_idx);
+
+    // Callbacks (Radio-Verhalten: ein Button immer aktiv)
+    m_mode_normals_btn->setCallback([this, selectMode](bool on){
+        auto &st = m_plugin->getSettings();
+        if (!on) { // verhindern, dass gar nichts aktiv ist
+            if (!st.show_accuracy && !st.show_radius_deviation && !st.show_output_sensitivity)
+                m_mode_normals_btn->setState(true);
+            return;
         }
-    }
-    m_shader_choice->setList(ui_items);
+        selectMode(0);
+        });
 
-    // Preselect per String (Settings::shader), falls gesetzt
-    int selected_idx = -1;
-    {
-        const auto& want = m_plugin->getSettings().shader; // z.B. "Surfel Multipass"
-        if (!want.empty()) {
-            auto itn = std::find_if(available_shaders.begin(), available_shaders.end(),
-                [&](const LamureRenderer::ShaderInfo& info){
-                    return info.name == want; // bei Bedarf auf case-insensitive erweitern
-                });
-            if (itn != available_shaders.end()) {
-                selected_idx = static_cast<int>(std::distance(available_shaders.begin(), itn));
-                // Typ synchronisieren
-                m_plugin->getSettings().shader_type = itn->type;
-                m_shader_choice->select(selected_idx);
-            }
+    m_mode_accuracy_btn->setCallback([this, selectMode](bool on){
+        auto &st = m_plugin->getSettings();
+        if (!on) {
+            if (!st.show_normals && !st.show_radius_deviation && !st.show_output_sensitivity)
+                m_mode_accuracy_btn->setState(true);
+            return;
         }
-    }
+        selectMode(1);
+        });
 
-    // Fallback: vorhandenen shader_type verwenden
-    if (selected_idx < 0) {
-        auto current_type = m_plugin->getSettings().shader_type;
-        auto it = std::find_if(available_shaders.begin(), available_shaders.end(),
-            [current_type](const LamureRenderer::ShaderInfo& info){ return info.type == current_type; });
-
-        if (it != available_shaders.end()) {
-            selected_idx = static_cast<int>(std::distance(available_shaders.begin(), it));
-            m_shader_choice->select(selected_idx);
-            // String nachziehen, falls leer
-            if (m_plugin->getSettings().shader.empty())
-                m_plugin->getSettings().shader = it->name;
-        } else if (!available_shaders.empty()) {
-            // finaler Fallback: erstes Element
-            selected_idx = 0;
-            m_plugin->getSettings().shader_type = available_shaders[0].type;
-            m_plugin->getSettings().shader      = available_shaders[0].name;
-            m_shader_choice->select(0);
+    m_mode_radius_dev_btn->setCallback([this, selectMode](bool on){
+        auto &st = m_plugin->getSettings();
+        if (!on) {
+            if (!st.show_normals && !st.show_accuracy && !st.show_output_sensitivity)
+                m_mode_radius_dev_btn->setState(true);
+            return;
         }
-    }
+        selectMode(2);
+        });
 
-    // UI-Callback: String + Typ synchron halten
-    m_shader_choice->setCallback([this, available_shaders](int idx) {
-        if (idx >= 0 && static_cast<size_t>(idx) < available_shaders.size()) {
-            const auto& chosen = available_shaders[idx];
-            m_plugin->getSettings().shader_type = chosen.type;
-            m_plugin->getSettings().shader      = chosen.name;
+    m_mode_output_sens_btn->setCallback([this, selectMode](bool on){
+        auto &st = m_plugin->getSettings();
+        if (!on) {
+            if (!st.show_normals && !st.show_accuracy && !st.show_radius_deviation)
+                m_mode_output_sens_btn->setState(true);
+            return;
         }
+        selectMode(3);
         });
 
     m_lighting_menu = new opencover::ui::Menu(m_lamure_menu, "Lighting");
 
-    m_ambient_light_slider = new opencover::ui::Slider(m_lighting_menu, "ambient_intensity");
-    m_ambient_light_slider->setText("Ambient Light");
-    m_ambient_light_slider->setBounds(0.0, 1.0);
-    m_ambient_light_slider->setValue(m_plugin->getSettings().ambient_intensity);
-    m_ambient_light_slider->setShared(true);
-    m_ambient_light_slider->setCallback([this](double value, bool) {
+    m_lighting_button = new opencover::ui::Button(m_lighting_menu, "lighting_button");
+    m_lighting_button->setText("Lighting");
+    m_lighting_button->setShared(true);
+    m_lighting_button->setState(m_plugin->getSettings().lighting);
+
+    m_lighting_group = new opencover::ui::Group(m_lighting_menu, "Lighting");
+
+    m_point_light_intensity_slider = new opencover::ui::Slider(m_lighting_group, "point_light_intensity");
+    m_point_light_intensity_slider->setText("Point Light Intensity");
+    m_point_light_intensity_slider->setBounds(0, 1.0);
+    m_point_light_intensity_slider->setValue(m_plugin->getSettings().point_light_intensity);
+    m_point_light_intensity_slider->setShared(true);
+    m_point_light_intensity_slider->setCallback([this](double value, bool) { 
+        m_plugin->getSettings().point_light_intensity = (float)value;
+        });
+
+    m_ambient_intensity_slider = new opencover::ui::Slider(m_lighting_group, "ambient_intensity");
+    m_ambient_intensity_slider->setText("Ambient Light");
+    m_ambient_intensity_slider->setBounds(0.0, 1.0);
+    m_ambient_intensity_slider->setValue(m_plugin->getSettings().ambient_intensity);
+    m_ambient_intensity_slider->setShared(true);
+    m_ambient_intensity_slider->setCallback([this](double value, bool) {
         m_plugin->getSettings().ambient_intensity = (float)value;
         });
 
-    m_light_intensity_slider = new opencover::ui::Slider(m_lighting_menu, "point_light_intensity");
-    m_light_intensity_slider->setText("Point Light Intensity");
-    m_light_intensity_slider->setBounds(0, 1.0);
-    m_light_intensity_slider->setValue(m_plugin->getSettings().point_light_intensity);
-    m_light_intensity_slider->setShared(true);
-    m_light_intensity_slider->setCallback([this](double value, bool) { 
-        m_plugin->getSettings().point_light_intensity = (float)value; 
-        });
-
-    m_specular_intenity_slider = new opencover::ui::Slider(m_lighting_menu, "specular_intensity");
+    m_specular_intenity_slider = new opencover::ui::Slider(m_lighting_group, "specular_intensity");
     m_specular_intenity_slider->setText("Specular Intensity");
     m_specular_intenity_slider->setBounds(0.0, 1.0);
     m_specular_intenity_slider->setValue(m_plugin->getSettings().specular_intensity);
@@ -231,7 +338,7 @@ void LamureUI::setupUi() {
         m_plugin->getSettings().specular_intensity = (float)value;
         });
 
-    m_shininess_slider = new opencover::ui::Slider(m_lighting_menu, "shininess");
+    m_shininess_slider = new opencover::ui::Slider(m_lighting_group, "shininess");
     m_shininess_slider->setText("Shininess");
     m_shininess_slider->setBounds(0.0, 1.0);
     m_shininess_slider->setValue(m_plugin->getSettings().shininess);
@@ -240,7 +347,7 @@ void LamureUI::setupUi() {
         m_plugin->getSettings().shininess = static_cast<float>(value);
         });
 
-    m_gamma_slider = new opencover::ui::Slider(m_lighting_menu, "gamma");
+    m_gamma_slider = new opencover::ui::Slider(m_lighting_group, "gamma");
     m_gamma_slider->setText("Gamma");
     m_gamma_slider->setBounds(0.0, 3.0);
     m_gamma_slider->setValue(m_plugin->getSettings().gamma);
@@ -249,16 +356,8 @@ void LamureUI::setupUi() {
         m_plugin->getSettings().gamma = static_cast<float>(value);
         });
 
-    m_tone_mapping_button = new opencover::ui::Button(m_lighting_menu, "tone_mapping");
-    m_tone_mapping_button->setText("Tone Mapping");
-    m_tone_mapping_button->setShared(true);
-    m_tone_mapping_button->setState(m_plugin->getSettings().use_tone_mapping);
-    m_tone_mapping_button->setCallback([this](bool state) {
-        m_plugin->getSettings().use_tone_mapping = state;
-        });
-
     // Light Position Sliders
-    m_light_pos_x_slider = new opencover::ui::Slider(m_lighting_menu, "light_pos_x");
+    m_light_pos_x_slider = new opencover::ui::Slider(m_lighting_group, "light_pos_x");
     m_light_pos_x_slider->setText("Light Pos X");
     m_light_pos_x_slider->setBounds(-1000.0, 1000.0);
     m_light_pos_x_slider->setValue(m_plugin->getSettings().point_light_pos.x);
@@ -267,7 +366,7 @@ void LamureUI::setupUi() {
         m_plugin->getSettings().point_light_pos.x = static_cast<float>(value);
         });
 
-    m_light_pos_y_slider = new opencover::ui::Slider(m_lighting_menu, "light_pos_y");
+    m_light_pos_y_slider = new opencover::ui::Slider(m_lighting_group, "light_pos_y");
     m_light_pos_y_slider->setText("Light Pos Y");
     m_light_pos_y_slider->setBounds(-1000.0, 1000.0);
     m_light_pos_y_slider->setValue(m_plugin->getSettings().point_light_pos.y);
@@ -276,7 +375,7 @@ void LamureUI::setupUi() {
         m_plugin->getSettings().point_light_pos.y = static_cast<float>(value);
         });
 
-    m_light_pos_z_slider = new opencover::ui::Slider(m_lighting_menu, "light_pos_z");
+    m_light_pos_z_slider = new opencover::ui::Slider(m_lighting_group, "light_pos_z");
     m_light_pos_z_slider->setText("Light Pos Z");
     m_light_pos_z_slider->setBounds(-1000.0, 1000.0);
     m_light_pos_z_slider->setValue(m_plugin->getSettings().point_light_pos.z);
@@ -285,59 +384,158 @@ void LamureUI::setupUi() {
         m_plugin->getSettings().point_light_pos.z = static_cast<float>(value);
         });
 
-    m_mode_choice = new opencover::ui::SelectionList(m_lamure_menu, "Mode");
-    m_mode_choice->setText("Mode");
-    m_mode_choice->setShared(true);
-
-    std::vector<std::string> modes = {
-        "Color",
-        "Normals",
-        "Accuracy",
-        "Radius Deviation",
-        "Output Sensitivity"
-    };
-    if (prov_available) {
-        for (int i = 1; i <= 6; ++i) {
-            modes.push_back("prov" + std::to_string(i));
-        }
-    }
-    m_mode_choice->setList(modes);
-
-    auto &s = m_plugin->getSettings();
-    int initial_mode_idx = 0;
-    if (s.show_normals) {
-        initial_mode_idx = 1;
-    } else if (s.show_accuracy) {
-        initial_mode_idx = 2;
-    } else if (s.show_radius_deviation) {
-        initial_mode_idx = 3;
-    } else if (s.show_output_sensitivity) {
-        initial_mode_idx = 4;
-    } else if (s.channel >= 1 && s.channel <= 6) {
-        if (prov_available) {
-            initial_mode_idx = 5 + s.channel;
-        }
-    }
-    m_mode_choice->select(initial_mode_idx);
-    m_mode_choice->setCallback([this](int idx){
-        auto &st = m_plugin->getSettings();
-        st.show_normals            = false;
-        st.show_accuracy           = false;
-        st.show_radius_deviation   = false;
-        st.show_output_sensitivity = false;
-        st.channel                 = 0;
-        switch (idx) {
-        case 0: /* Color */                        break;
-        case 1: st.show_normals            = true; break;
-        case 2: st.show_accuracy           = true; break;
-        case 3: st.show_radius_deviation   = true; break;
-        case 4: st.show_output_sensitivity = true; break;
-        default:
-            st.channel = idx - 4;
-            break;
-        }
+    m_tone_mapping_button = new opencover::ui::Button(m_lighting_group, "tone_mapping");
+    m_tone_mapping_button->setText("Tone Mapping");
+    m_tone_mapping_button->setShared(true);
+    m_tone_mapping_button->setState(m_plugin->getSettings().use_tone_mapping);
+    m_tone_mapping_button->setCallback([this](bool state) {
+        m_plugin->getSettings().use_tone_mapping = state;
         });
 
+    {
+        auto &st = m_plugin->getSettings();
+        if (!st.point && !st.surfel && !st.splatting)
+            st.point = true;
+
+        if (st.splatting)        { st.point = false; st.surfel = false; }
+        else if (st.surfel)      { st.point = false; st.splatting = false; }
+        else /* point selected */{ st.surfel = false; st.splatting = false; }
+
+        m_point_button ->setState(st.point);
+        m_surfel_button->setState(st.surfel);
+        m_splat_button ->setState(st.splatting);
+
+        if (st.coloring && !st.lighting) { m_coloring_button->setState(true);  m_lighting_button->setState(false); }
+        else if (!st.coloring && st.lighting) { m_coloring_button->setState(false); m_lighting_button->setState(true);  }
+        else { 
+            st.coloring = false; m_coloring_button->setState(false);
+            st.lighting = false; m_lighting_button->setState(false);
+        }
+    }
+
+
+    //std::vector<std::string> modes = {
+    //    "Normals",
+    //    "Accuracy",
+    //    "Radius Deviation",
+    //    "Output Sensitivity"
+    //};
+    //m_mode_choice->setList(modes);
+    //auto setMode = [this](int idx) {
+    //    auto &st = m_plugin->getSettings();
+    //    st.show_normals            = (idx == 0);
+    //    st.show_accuracy           = (idx == 1);
+    //    st.show_radius_deviation   = (idx == 2);
+    //    st.show_output_sensitivity = (idx == 3);
+    //    };
+
+    //auto &s = m_plugin->getSettings();
+    //int initial_mode_idx = -1;
+    //if      (s.show_normals)            initial_mode_idx = 0;
+    //else if (s.show_accuracy)           initial_mode_idx = 1;
+    //else if (s.show_radius_deviation)   initial_mode_idx = 2;
+    //else if (s.show_output_sensitivity) initial_mode_idx = 3;
+
+    //if (initial_mode_idx < 0) initial_mode_idx = 0;
+    //m_mode_choice->select(initial_mode_idx);
+    //setMode(initial_mode_idx);
+    //m_mode_choice->setCallback([this, setMode](int idx){
+    //    if (idx < 0 || idx > 3) idx = 0;
+    //    setMode(idx);
+    //    });
+
+
+    const auto &available_shaders = m_plugin->getRenderer()->getPclShader();
+
+    auto applyShader = [this, &available_shaders](LamureRenderer::ShaderType t) {
+        auto &st = m_plugin->getSettings();
+        st.shader_type = t;
+        std::string name;
+        for (const auto &si : available_shaders) {
+            if (si.type == t) { name = si.name; break; }
+        }
+        st.shader = name;
+    };
+
+    m_point_button->setCallback([this, applyShader](bool on) {
+        auto &st = m_plugin->getSettings();
+        if (!on) {
+            if (!st.surfel && !st.splatting) m_point_button->setState(true);
+            return;
+        }
+        st.point = true; st.surfel = false; st.splatting = false;
+        if (m_surfel_button) m_surfel_button->setState(false);
+        if (m_splat_button)  m_splat_button ->setState(false);
+
+        applyShader(st.lighting ? LamureRenderer::ShaderType::PointColorLighting
+                 : (st.coloring ? LamureRenderer::ShaderType::PointColor
+                                : LamureRenderer::ShaderType::Point));
+        //st.scale_element = st.scale_point;
+        });
+
+    // SURFEL
+    m_surfel_button->setCallback([this, applyShader](bool on) {
+        auto &st = m_plugin->getSettings();
+        if (!on) {
+            if (!st.point && !st.splatting) m_surfel_button->setState(true);
+            return;
+        }
+        st.point = false; st.surfel = true; st.splatting = false;
+        if (m_point_button) m_point_button->setState(false);
+        if (m_splat_button) m_splat_button->setState(false);
+        applyShader(   st.lighting ? LamureRenderer::ShaderType::SurfelColorLighting
+                    : (st.coloring ? LamureRenderer::ShaderType::SurfelColor
+                                   : LamureRenderer::ShaderType::Surfel));
+        st.scale_element = st.scale_surfel;
+        });
+
+    // SPLAT
+    m_splat_button->setCallback([this, applyShader](bool on) {
+        auto &st = m_plugin->getSettings();
+        if (!on) {
+            if (!st.point && !st.surfel) m_splat_button->setState(true);
+            return;
+        }
+        st.point = false; st.surfel = false; st.splatting = true;
+        if (m_point_button)  m_point_button ->setState(false);
+        if (m_surfel_button) m_surfel_button->setState(false);
+        applyShader(LamureRenderer::ShaderType::SurfelMultipass);
+        st.scale_element = st.scale_surfel;
+        });
+
+    // COLORING
+    m_coloring_button->setCallback([this, applyShader](bool on) {
+        auto &st = m_plugin->getSettings();
+        st.coloring = on;
+        if (on && m_lighting_button && m_lighting_button->state()) {
+            st.lighting = false; m_lighting_button->setState(false);
+        }
+        LamureRenderer::ShaderType t;
+        if (st.splatting) t = LamureRenderer::ShaderType::SurfelMultipass;
+        else if (st.surfel) t = st.lighting ? LamureRenderer::ShaderType::SurfelColorLighting
+                             : (st.coloring ? LamureRenderer::ShaderType::SurfelColor
+                                            : LamureRenderer::ShaderType::Surfel);
+        else  t = st.lighting ? LamureRenderer::ShaderType::PointColorLighting
+               : (st.coloring ? LamureRenderer::ShaderType::PointColor
+                              : LamureRenderer::ShaderType::Point);
+        applyShader(t); 
+        });
+
+    // LIGHTING
+    m_lighting_button->setCallback([this, applyShader](bool on) {
+        auto &st = m_plugin->getSettings();
+        st.lighting = on;
+        if (on && m_coloring_button && m_coloring_button->state()) {
+            st.coloring = false; m_coloring_button->setState(false);
+        }
+        LamureRenderer::ShaderType t;
+        if (st.splatting)   t = LamureRenderer::ShaderType::SurfelMultipass;
+        else if (st.surfel) t = st.lighting ? LamureRenderer::ShaderType::SurfelColorLighting
+                             : (st.coloring ? LamureRenderer::ShaderType::SurfelColor
+                                            : LamureRenderer::ShaderType::Surfel);
+        else t = st.lighting ? LamureRenderer::ShaderType::PointColorLighting
+              : (st.coloring ? LamureRenderer::ShaderType::PointColor
+                             : LamureRenderer::ShaderType::Point);
+        applyShader(t);
+        });
 }
-
-

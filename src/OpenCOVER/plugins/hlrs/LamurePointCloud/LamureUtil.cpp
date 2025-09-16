@@ -121,6 +121,12 @@ scm::math::mat3f matConv4to3F(scm::math::mat4d& m) {
 	);
 }
 
+bool LamureUtil::readIndexedMatrix(const std::string& in, osg::Matrixd& M){
+	std::string s=in; for(char& c: s) if(c=='['||c==']'||c==','||c==';') c=' ';
+	std::istringstream is(s); double v[16]; for(int i=0;i<16;++i){ if(!(is>>v[i])) return false; }
+	M=osg::Matrixd(v[0],v[1],v[2],v[3], v[4],v[5],v[6],v[7], v[8],v[9],v[10],v[11], v[12],v[13],v[14],v[15]); return true;
+}
+
 
 std::string LamureUtil::getConfigEntry(std::string scope) {
 	std::cout << "getConfigEntry(scope): ";
@@ -166,7 +172,7 @@ void printChildNodes(osg::Node* node, int depth)
 		}
 	}
 }
-scm::math::mat4d loadMatrix(const std::string& filename) {
+scm::math::mat4d loadMatrixFromFile(const std::string& filename) {
 	std::ifstream file(filename.c_str());
 	if (!file.is_open()) {
 		std::cerr << "Unable to open transformation file: \""
@@ -182,6 +188,48 @@ scm::math::mat4d loadMatrix(const std::string& filename) {
 	file.close();
 	return scm::math::transpose(mat);
 }
+
+osg::Matrixd loadMatrix(const std::string &value) {
+	std::string s = value;
+	// Entferne Klammern und Semikolons durch Leerzeichen ersetzen
+	s.erase(std::remove(s.begin(), s.end(), '['), s.end());
+	s.erase(std::remove(s.begin(), s.end(), ']'), s.end());
+	std::replace(s.begin(), s.end(), ';', ' ');
+
+	std::istringstream iss(s);
+	std::vector<double> numbers{std::istream_iterator<double>(iss), std::istream_iterator<double>()};
+
+	osg::Matrixd mat;
+	if(numbers.size() == 16) {
+		// OpenSceneGraph erwartet Spalten-major (wie OpenGL)
+		mat.set(numbers[0], numbers[1], numbers[2], numbers[3],
+			numbers[4], numbers[5], numbers[6], numbers[7],
+			numbers[8], numbers[9], numbers[10], numbers[11],
+			numbers[12], numbers[13], numbers[14], numbers[15]);
+	} else {
+		// Fallback: Identität
+		mat.makeIdentity();
+		std::cerr << "LamureUtil::loadMatrix: expected 16 values, got " << numbers.size() << " -> using identity\n";
+	}
+	return mat;
+}
+
+
+std::vector<std::string> splitSemicolons(const std::string &s) {
+	std::vector<std::string> out;
+	std::string cur;
+	std::istringstream ss(s);
+	while (std::getline(ss, cur, ';')) {
+		// trim leading/trailing whitespace
+		auto b = cur.find_first_not_of(" \t\r\n");
+		auto e = cur.find_last_not_of(" \t\r\n");
+		if (b != std::string::npos) {
+			out.emplace_back(cur.substr(b, e - b + 1));
+		}
+	}
+	return out;
+}
+
 bool parsePrefix(std::string& in_string, std::string const& prefix) {
 	uint32_t num_prefix_characters = prefix.size();
 	bool prefix_found

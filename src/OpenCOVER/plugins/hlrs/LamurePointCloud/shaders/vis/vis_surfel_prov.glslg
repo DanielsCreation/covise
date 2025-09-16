@@ -1,17 +1,15 @@
-// vis_surfel_prov.glslg (Geometry Shader)
 #version 420 core
 
 layout(points) in;
 layout(triangle_strip, max_vertices = 4) out;
 
-// Input von Vertex Shader
 in VertexData {
     vec3  pass_ms_u;
     vec3  pass_ms_v;
     vec3  pass_point_color;
     vec3  pass_world_pos;
     vec3  pass_normal_ws;
-    float pass_radius_ws;
+    float pass_radius_ws; // Radius (WS)
     float pass_prov1;
     float pass_prov2;
     float pass_prov3;
@@ -21,30 +19,31 @@ in VertexData {
 } VertexIn[];
 
 uniform mat4  mvp_matrix;
-uniform vec2  viewport; // (Breite,Höhe) in Pixeln
+uniform vec2  viewport;        // bleibt für Konsistenz, hier nicht benötigt
+uniform float min_screen_size;   // Pixel-Radius min
+uniform float max_screen_size;   // Pixel-Radius max
+uniform float scale_projection;
 
-// Ausgabe an Fragment Shader
 out FS_IN {
     vec3  pass_point_color;
     vec2  pass_uv_coords;
     vec3  pass_world_pos;
     vec3  pass_normal_ws;
-    float pass_radius_ws;
+    float pass_radius_ws;     // Radius (WS) NACH Pixel-Clamp
     float pass_prov1;
     float pass_prov2;
     float pass_prov3;
     float pass_prov4;
     float pass_prov5;
     float pass_prov6;
-    float pass_screen_size;
+    float pass_screen_size;   // Pixel-Radius NACH Clamp
 } gOut;
 
 void main() {
-    // 1. Direktes Weiterreichen
+    // Weiterreichen
     gOut.pass_point_color = VertexIn[0].pass_point_color;
     gOut.pass_world_pos   = VertexIn[0].pass_world_pos;
     gOut.pass_normal_ws   = VertexIn[0].pass_normal_ws;
-    gOut.pass_radius_ws   = VertexIn[0].pass_radius_ws;
     gOut.pass_prov1       = VertexIn[0].pass_prov1;
     gOut.pass_prov2       = VertexIn[0].pass_prov2;
     gOut.pass_prov3       = VertexIn[0].pass_prov3;
@@ -52,10 +51,24 @@ void main() {
     gOut.pass_prov5       = VertexIn[0].pass_prov5;
     gOut.pass_prov6       = VertexIn[0].pass_prov6;
 
-    // 2. Quad-Eckpunkte in Welt
-    vec3 center   = VertexIn[0].pass_world_pos;
-    vec3 step_u   = VertexIn[0].pass_ms_u;
-    vec3 step_v   = VertexIn[0].pass_ms_v;
+    vec3 center = VertexIn[0].pass_world_pos;
+    vec3 step_u = VertexIn[0].pass_ms_u; // Halbachsen (WS-Radius)
+    vec3 step_v = VertexIn[0].pass_ms_v;
+
+    // Pixel-Radius aus WS-Radius via w-Division
+    float w0  = max(1e-6, abs(gl_in[0].gl_Position.w));
+    float Rpx = (VertexIn[0].pass_radius_ws * scale_projection) / w0;      // Pixel-RADIUS
+    float RpxC = clamp(Rpx, min_screen_size, max_screen_size);                  // Clamp in Pixeln
+    float s = (Rpx > 0.0) ? (RpxC / Rpx) : 1.0;                             // isotrop skalieren
+
+    step_u *= s;
+    step_v *= s;
+
+    // zurück-projizierter WS-Radius nach Clamp + Pixelradius für Debug
+    gOut.pass_radius_ws   = VertexIn[0].pass_radius_ws * s;                 // Radius (WS)
+    gOut.pass_screen_size = RpxC;                                           // Radius (px)
+
+    // Quad-Ecken
     vec3 offs[4] = vec3[4](
         -step_u - step_v,
          step_u - step_v,
@@ -69,17 +82,7 @@ void main() {
         vec2( 1.0,  1.0)
     );
 
-    // 3. Bildschirmgröße des Surfels
-    vec4 ndc_c = mvp_matrix * vec4(center, 1.0); ndc_c /= ndc_c.w;
-    vec4 ndc_u = mvp_matrix * vec4(center + step_u, 1.0); ndc_u /= ndc_u.w;
-    vec4 ndc_v = mvp_matrix * vec4(center + step_v, 1.0); ndc_v /= ndc_v.w;
-    vec2 sc = (ndc_c.xy * 0.5 + 0.5) * viewport;
-    vec2 su = (ndc_u.xy * 0.5 + 0.5) * viewport;
-    vec2 sv = (ndc_v.xy * 0.5 + 0.5) * viewport;
-    gOut.pass_screen_size = max(length(sc - su), length(sc - sv));
-
-    // 4. Quad zeichnen
-    for(int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 4; ++i) {
         gOut.pass_uv_coords = uvs[i];
         gl_Position = mvp_matrix * vec4(center + offs[i], 1.0);
         EmitVertex();

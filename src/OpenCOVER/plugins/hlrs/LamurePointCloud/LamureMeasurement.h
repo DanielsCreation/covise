@@ -83,6 +83,11 @@ public:
         double gpu_mem_used_mb   = 0.0;
         double gpu_mem_total_mb  = 0.0;
 
+        double gpu_mem_used_mb_nvml  = 0.0;
+        double gpu_mem_total_mb_nvml = 0.0;
+        double gpu_mem_used_mb_gl    = 0.0;
+        double gpu_mem_total_mb_gl   = 0.0;
+
         // --- Derived metrics (pro Frame) ---
         double cpu_main_ms         = 0.0;  // cpu_update + cpu_cull + cpu_draw + plugin + isect + opencover
         double cpu_busy_pct_proxy  = 0.0;  // 100 * cpu_main_ms / frame_duration_ms (0..100 geclippt)
@@ -114,6 +119,7 @@ public:
 
     // Optionaler Markdown-Report
     void setReportMarkdown(const std::string& path);
+    void writeLamureConfigMarkdown(std::ostream& md);
 
     // Bequeme Getter für TimeBlock
     unsigned            getTimeBlockFrame(const TimeBlock& tb) const { return tb.frame; }
@@ -135,9 +141,29 @@ private:
     double   m_warnTolMs      = 5.0;     // Debug-Warnschwelle
     unsigned m_gpuBackSearch  = 16;      // größerer Backsearch (GPU/Timing)
     bool     m_exportTimeline = true;    // Timeline-CSV schreiben
+    bool   m_gpu_static_captured = false;
+    bool m_gpu_static_tried = false;
+    double m_gpu_mem_used_mb_static        = 0.0;
+    double m_gpu_mem_total_mb_static       = 0.0;
+    double m_gpu_mem_used_mb_nvml_static   = 0.0;
+    double m_gpu_mem_total_mb_nvml_static  = 0.0;
+    double m_gpu_mem_used_mb_gl_static     = 0.0;
+    double m_gpu_mem_total_mb_gl_static    = 0.0;
+
+    osg::Vec3 m_lastTraApplied{0,0,0};
+    osg::Vec3 m_lastRotApplied{0,0,0};
+    bool      m_havePoseDeltas = false;
+
     std::string m_reportMDPath; // wenn gesetzt, schreibe Markdown-Report am Ende
 
     std::vector<TimeBlock> m_timeline;
+
+    void writeLamureConfigCsv(std::ostream& csv);
+    void cacheStaticGpuInfo();
+
+    bool     m_written{false};
+    bool     m_haveLastQuat{false};
+    osg::Quat m_lastQuat;
 
     // interne Helfer
     bool getAttributeForFrame(osg::Stats* stats,

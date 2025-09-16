@@ -7,7 +7,7 @@ layout(location = 1) in float in_r;
 layout(location = 2) in float in_g;
 layout(location = 3) in float in_b;
 layout(location = 4) in float empty;
-layout(location = 5) in float in_radius;
+layout(location = 5) in float in_radius;   // RAW-RADIUS
 layout(location = 6) in vec3  in_normal;
 
 // Provenance-Inputs
@@ -18,21 +18,23 @@ layout(location = 10) in float in_prov4;
 layout(location = 11) in float in_prov5;
 layout(location = 12) in float in_prov6;
 
-// --- Uniforms (gleiche Skalierung wie Original) ---
+// --- Uniforms ---
 uniform mat4  mvp_matrix;
-uniform float max_radius;
-uniform float min_radius;
-uniform float scale_radius;
-uniform float scale_projection;
+uniform float max_radius;         // WS-CLAMP (Radius)
+uniform float min_radius;         // WS-CLAMP (Radius)
+uniform float min_screen_size;    // Screenspace-CLAMP (Pixel-Durchmesser)
+uniform float max_screen_size;    // Screenspace-CLAMP (Pixel-Durchmesser)
+uniform float scale_radius;       // RAW-Radius -> WS-Radius
+uniform float scale_projection;   // Weltmaß -> Pixel (vor /w)
 
 // --- Outputs an Fragment Shader ---
 out VertexData {
-    vec3  pass_point_color;  // entspricht in_r/g/b
-    vec3  pass_world_pos;   // Position in Welt
-    vec3  pass_normal_ws;   // Normale im World-Space
-    float pass_radius_ws;   // Radius nach clamp
-    float pass_screen_size;  // finale PointSize
-    float pass_prov1;       // Provenance-Kanäle
+    vec3  pass_point_color;   // entspricht in_r/g/b
+    vec3  pass_world_pos;     // Position in Welt
+    vec3  pass_normal_ws;     // Normale im World-Space
+    float pass_radius_ws;     // WS-Radius nach Welt-Clamp
+    float pass_screen_size;   // Pixel-Durchmesser nach Pixel-Clamp (= gl_PointSize)
+    float pass_prov1;         // Provenance-Kanäle
     float pass_prov2;
     float pass_prov3;
     float pass_prov4;
@@ -41,17 +43,49 @@ out VertexData {
 } VertexOut;
 
 void main() {
+    const float EPS = 1e-6;
+
+    // Clip-/Gerätekoordinaten
     vec4 clipPos = mvp_matrix * vec4(in_position, 1.0);
-    gl_Position = clipPos;
+    gl_Position  = clipPos;
 
-    float r = clamp(in_radius * scale_radius, min_radius, max_radius);
-    gl_PointSize = r * scale_projection / abs(clipPos.w);
+    // 1) RAW-Radius (hier ohne Gamma/Cut, da nicht als Uniform vorhanden)
+    float r_raw = max(0.0, in_radius);
 
+    // 2) RAW -> WS-Radius + WORLD-CLAMP (Radien!)
+    float r_ws_u = scale_radius * r_raw;                // ungeclampter WS-Radius
+    float r_ws   = clamp(r_ws_u, min_radius, max_radius);
+
+    // 3) Screenspace-CLAMP auf Pixel-DURCHMESSER (gl_PointSize erwartet Durchmesser)
+    float w     = max(EPS, abs(clipPos.w));
+    float d_px  = (2.0 * r_ws * scale_projection) / w;  // Pixel-Durchmesser
+    float d_pxC = clamp(d_px, min_screen_size, max_screen_size);
+
+    if (d_pxC <= EPS) {
+        gl_PointSize = 0.0;
+        // Outputs (konstant/neutral befüllen)
+        VertexOut.pass_point_color = vec3(0.0);
+        VertexOut.pass_world_pos   = in_position;
+        VertexOut.pass_normal_ws   = normalize((length(in_normal) > EPS) ? in_normal : vec3(0,0,1));
+        VertexOut.pass_radius_ws   = r_ws;
+        VertexOut.pass_screen_size = 0.0;
+        VertexOut.pass_prov1 = in_prov1;
+        VertexOut.pass_prov2 = in_prov2;
+        VertexOut.pass_prov3 = in_prov3;
+        VertexOut.pass_prov4 = in_prov4;
+        VertexOut.pass_prov5 = in_prov5;
+        VertexOut.pass_prov6 = in_prov6;
+        return;
+    }
+
+    gl_PointSize = d_pxC;
+
+    // Outputs
     VertexOut.pass_point_color = vec3(in_r, in_g, in_b);
-    VertexOut.pass_world_pos  = in_position;
-    VertexOut.pass_normal_ws  = normalize(in_normal);
-    VertexOut.pass_radius_ws  = r;
-    VertexOut.pass_screen_size = gl_PointSize;
+    VertexOut.pass_world_pos   = in_position;
+    VertexOut.pass_normal_ws   = normalize((length(in_normal) > EPS) ? in_normal : vec3(0,0,1));
+    VertexOut.pass_radius_ws   = r_ws;    // WS-Radius nach WS-CLAMP
+    VertexOut.pass_screen_size = d_pxC;   // Pixel-Durchmesser nach Pixel-CLAMP
     VertexOut.pass_prov1 = in_prov1;
     VertexOut.pass_prov2 = in_prov2;
     VertexOut.pass_prov3 = in_prov3;

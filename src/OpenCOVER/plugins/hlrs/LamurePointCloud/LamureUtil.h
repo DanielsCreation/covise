@@ -50,10 +50,12 @@ scm::math::mat3f matConv4to3F(scm::math::mat4d& m);
 scm::math::mat3d matConv4to3D(scm::math::mat4d& m);
 
 std::string getConfigEntry(std::string scope, std::string name);
+bool readIndexedMatrix(const std::string& in, osg::Matrixd& M);
 std::string getConfigEntry(std::string scope);
 
 std::string const stripWhitespace(std::string const& in_string);
-scm::math::mat4d loadMatrix(const std::string& filename);
+scm::math::mat4d loadMatrixFromFile(const std::string& filename);
+osg::Matrixd loadMatrix(const std::string &value);
 bool parsePrefix(std::string& in_string, std::string const& prefix);
 void printNodePath(osg::ref_ptr<osg::Node> pointer);
 void printChildNodes(osg::Node * node, int depth);
@@ -64,6 +66,7 @@ float* gl_mat_to_array(GLdouble mat[16]);
 scm::math::mat4d gl_mat(GLdouble mat[16]);
 std::vector<float> getBoxCorners(scm::gl::boxf box);
 std::vector<std::vector<float>> getSerializedBvhMinMax(const std::vector<scm::gl::boxf>& bounding_boxes);
+std::vector<std::string> splitSemicolons(const std::string& s);
 } // namespace LamureUtil
 
 #endif // _LAMURE_UTIL_H

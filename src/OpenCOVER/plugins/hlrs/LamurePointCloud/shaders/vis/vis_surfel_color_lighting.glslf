@@ -1,3 +1,4 @@
+// ===================== Fragment Shader =====================
 #version 420 core
 
 in FS_IN {
@@ -13,30 +14,15 @@ in FS_IN {
 layout(location = 0) out vec4 out_color;
 
 INCLUDE ../common/shading/lighting.glsl
-INCLUDE vis_color_no_prov.glsl
 
 void main() {
-    if (length(fsIn.pass_uv_coords) > 1.0) { discard; }
+    if (length(fsIn.pass_uv_coords) > 1.0) discard;
 
-    vec3 modeColor = get_color(
-        fsIn.pass_world_pos,
-        fsIn.pass_vs_normal,
-        fsIn.pass_point_color,
-        fsIn.pass_radius_ws,
-        fsIn.pass_screen_size
-    );
-
-    vec3 finalColor;
-
-    if (show_normals || show_radius_deviation || show_output_sensitivity || show_accuracy) {
-        finalColor = modeColor;
-    } else {
-        finalColor = shade_blinn_phong(
+    vec3 finalColor = shade_blinn_phong(
             fsIn.pass_vs_pos,
             fsIn.pass_vs_normal,
-            modeColor
-        );
-    }
+            fsIn.pass_point_color
+    );
 
     out_color = vec4(finalColor, 1.0);
 }

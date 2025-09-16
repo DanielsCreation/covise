@@ -35,10 +35,10 @@ vec3 prov_to_color(float prov_value) {
 }
 
 vec3 get_output_sensitivity_color(float screen_size) {
-    float min_screen_size = 0.0;
-    float max_screen_size = 10.0;
-    float val = clamp(screen_size, min_screen_size, max_screen_size);
-    return data_value_to_rainbow(val, min_screen_size, max_screen_size);
+    float min_size = 0.0;
+    float max_size = 10.0;
+    float val = clamp(screen_size, min_size, max_size);
+    return data_value_to_rainbow(val, min_size, max_size);
 }
 
 vec3 get_color(in vec3 position,

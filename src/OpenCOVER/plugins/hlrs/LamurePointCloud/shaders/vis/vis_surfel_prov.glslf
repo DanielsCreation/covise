@@ -5,14 +5,14 @@ in FS_IN {
     vec2  pass_uv_coords;
     vec3  pass_world_pos;
     vec3  pass_normal_ws;
-    float pass_radius_ws;
+    float pass_radius_ws;     // Radius (WS) nach Clamp
     float pass_prov1;
     float pass_prov2;
     float pass_prov3;
     float pass_prov4;
     float pass_prov5;
     float pass_prov6;
-    float pass_screen_size;
+    float pass_screen_size;   // Pixel-Radius nach Clamp
 } fsIn;
 
 layout(location = 0) out vec4 out_color;
@@ -20,9 +20,8 @@ layout(location = 0) out vec4 out_color;
 INCLUDE vis_color_prov.glsl
 
 void main() {
-    // Kreis-Maske
-    if (length(fsIn.pass_uv_coords) > 1.0)
-        discard;
+    // Kreismaske
+    if (length(fsIn.pass_uv_coords) > 1.0) discard;
 
     vec3 col = get_color(
         fsIn.pass_world_pos,

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Bauhaus-Universitaet Weimar
+﻿// Copyright (c) 2014-2018 Bauhaus-Universitaet Weimar
 // This Software is distributed under the Modified BSD License, see license.txt.
 //
 // Virtual Reality and Visualization Research Group 
@@ -1381,47 +1381,111 @@ const bool cut_update_pool::is_no_node_in_frustum(const view_t view_id, const mo
     return true;
 }
 
-const float cut_update_pool::calculate_node_error(const view_t view_id, const model_t model_id, const node_t node_id)
+const float cut_update_pool::calculate_node_error(const view_t view_id, const model_t model_id, const node_t  node_id)
 {
     model_database *database = model_database::get_instance();
     auto bvh = database->get_model(model_id)->get_bvh();
 
     const scm::math::mat4f &model_matrix = model_transforms_[model_id];
-    const scm::math::mat4f &view_matrix = user_cameras_[view_id].get_view_matrix();
+    const scm::math::mat4f &view_matrix  = user_cameras_[view_id].get_view_matrix();
 
-    float radius_scaling = scm::math::length(model_matrix * scm::math::vec4f(1.0f, 0.f, 0.f, 0.f));
+    // --- robuste Radius-Skalierung (max. Achsenscale; w=0, reine Richtung) ---
+    const float sx = scm::math::length(model_matrix * scm::math::vec4f(1.f, 0.f, 0.f, 0.f));
+    const float sy = scm::math::length(model_matrix * scm::math::vec4f(0.f, 1.f, 0.f, 0.f));
+    const float sz = scm::math::length(model_matrix * scm::math::vec4f(0.f, 0.f, 1.f, 0.f));
+    float radius_scaling = std::max(sx, std::max(sy, sz));
     float representative_radius = bvh->get_avg_primitive_extent(node_id) * radius_scaling;
 
+    // (bb wird aktuell nicht verwendet; belassen für spätere Erweiterungen / Debug)
     auto bb = bvh->get_bounding_boxes()[node_id];
 
 #if 1
+    // ===== Original-Formel (SSE in Pixel) – korrigiert & stabil =====
+    // View-Position unbedingt mit w=1 transformieren (Translation berücksichtigen).
+    // ===== Original-Formel (SSE in Pixel) – korrigiert & stabil =====
+    const scm::math::vec4f c_ws4(bvh->get_centroids()[node_id], 1.0f);
+    const scm::math::vec4f vpos4 = view_matrix * (model_matrix * c_ws4);
+    const float z_view = vpos4.z;
 
-    // original error computation
-    scm::math::vec3f view_position = view_matrix * model_matrix * bvh->get_centroids()[node_id];
+    // Hinter / auf Kameraebene → kein Split erzwingen
+    if (z_view >= -1e-6f) {
+        return std::numeric_limits<float>::infinity();
+    }
+
     float near_plane = user_cameras_[view_id].near_plane_value();
     float height_divided_by_top_minus_bottom = height_divided_by_top_minus_bottoms_[view_id];
-    float error = std::abs(2.0f * representative_radius * (near_plane / -view_position.z) * height_divided_by_top_minus_bottom);
+
+    // Gemeinsamer Projektionsfaktor (spart Rechenarbeit)
+    const float proj_scale = (near_plane / -z_view) * height_divided_by_top_minus_bottom;
+
+    // Roh-Fehler (Pixel-Durchmesser)
+    float error = std::abs(2.0f * representative_radius * proj_scale);
+
+#ifdef LAMURE_DEBUG_NODE_ERROR
+    std::cout << "lamure: " << scm::math::vec3f(vpos4.x, vpos4.y, vpos4.z)
+        << " ,,,, " << error << std::endl;
+#endif
+
+    // ================== Coverage-Dämpfung (ohne Clamps) ==================
+    // Knoten-"Radius" in Model-Units (Bounding-Sphere aus AABB-Diagonale)
+    const scm::math::vec3f diag = bb.max_vertex() - bb.min_vertex();
+    const float R_node_model = 0.5f * scm::math::length(diag);
+
+    // In Welt-Units skaliert: benutze dieselbe radius_scaling wie oben
+    const float R_node_world = R_node_model * radius_scaling;
+
+    // Pixel-Radien (HALBER Durchmesser, konsistent zum Fehlermaß)
+    const float r_px      = std::abs(representative_radius * proj_scale);
+    const float R_node_px = std::abs(R_node_world       * proj_scale);
+
+    const float eps = 1e-6f;
+    const size_t surfels_per_node = database->get_primitives_per_node();
+
+    // Coverage ≈ N_node * (r_px / R_node_px)^2
+    const float coverage = (R_node_px > eps)
+        ? float(surfels_per_node) * (r_px / R_node_px) * (r_px / R_node_px)
+        : std::numeric_limits<float>::infinity();
+
+    // Sanfte Dämpfung ab "satter" Abdeckung – ohne harte Schwellwerte
+    const float coverage_cap = 1.25f; // 1.1–1.5 testen
+    if (coverage > coverage_cap) {
+        const float damp = coverage_cap / coverage; // in (0,1]
+        error *= damp;
+    }
+
+    #ifdef LAMURE_DEBUG_NODE_ERROR
+        std::cout << "lamure: " << scm::math::vec3f(vpos4.x, vpos4.y, vpos4.z)
+            << " ,,,, " << error << std::endl;
+    #endif
 
 #else
-
+    // ===== Alternative: „projected distance“ – pixelkalibriert =====
+    // Liefert denselben Maßstab (Pixel) wie oben, vermeidet Near/Frustum-Mismatch.
     const scm::math::mat4f &proj_matrix = user_cameras_[view_id].get_projection_matrix();
 
-    scm::math::mat4 cm = scm::math::inverse(view_matrix);
-    scm::math::vec3f position = model_matrix * bvh->centroids()[node_id];
-    scm::math::vec3 u = scm::math::vec3(cm[0], cm[1], cm[2]);
-    scm::math::vec3 perimeter = position + (scm::math::normalize(u) * representative_radius);
+    const scm::math::vec4f c_ws4(bvh->get_centroids()[node_id], 1.0f);
+    const scm::math::vec4f c_vs = view_matrix * (model_matrix * c_ws4);
 
-    // project the position and the perimeter point, take their distance
-    scm::math::mat4 view_projection = proj_matrix * view_matrix;
-    scm::math::vec4 view_position = view_projection * position;
-    scm::math::vec4 view_perimeter = view_projection * perimeter;
-    float error = scm::math::length(view_position / view_position.w - view_perimeter / view_perimeter.w);
-// std::cout << "lamure: " << view_position << "  ----  " << view_perimeter << " ,,,, " << error << std::endl;
+    // Offset im View-Space (x-Richtung genügt, View ist orthonormal)
+    const scm::math::vec4f p_vs = c_vs + scm::math::vec4f(representative_radius, 0.f, 0.f, 0.f);
+
+    const scm::math::vec4f c_cs = proj_matrix * c_vs;
+    const scm::math::vec4f p_cs = proj_matrix * p_vs;
+
+    if (std::abs(c_cs.w) < 1e-8f || std::abs(p_cs.w) < 1e-8f) {
+        return std::numeric_limits<float>::infinity();
+    }
+
+    const scm::math::vec2f c_ndc = scm::math::vec2f(c_cs.x, c_cs.y) / c_cs.w;
+    const scm::math::vec2f p_ndc = scm::math::vec2f(p_cs.x, p_cs.y) / p_cs.w;
+
+    const float window_height = /* TODO: echte Höhe hier injizieren */ 
+        height_divided_by_top_minus_bottom; // Fallback: skaliert proportional
+    float error = scm::math::length(c_ndc - p_ndc) * (0.5f * window_height);
 #endif
 
     return error;
 }
-
 } // namespace ren
 
 } // namespace lamure

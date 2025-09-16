@@ -66,7 +66,11 @@ private:
         GLint  mvp_matrix_loc{-1};
         GLint  max_radius_loc{-1};
         GLint  min_radius_loc{-1};
+        GLint  max_screen_size_loc{-1};
+        GLint  min_screen_size_loc{-1};
         GLint  scale_radius_loc{-1};
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
         GLint  scale_projection_loc{-1};
     };
     PointShader m_point_shader;
@@ -74,8 +78,14 @@ private:
     struct PointColorShader {
         GLuint program{0};
         GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
+        GLint view_matrix_loc           {-1}; // mat4 view_matrix
+        GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
         GLint max_radius_loc            {-1}; // float max_radius
         GLint min_radius_loc            {-1}; // float min_radius
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
         GLint scale_radius_loc          {-1}; // float scale_radius
         GLint scale_projection_loc      {-1}; // float scale_projection
         GLint show_normals_loc          {-1}; // bool  show_normals
@@ -91,9 +101,13 @@ private:
         GLuint program{0};
         GLint mvp_matrix_loc            {-1};
         GLint view_matrix_loc           {-1};
-        GLint normal_matrix_loc    {-1};
+        GLint normal_matrix_loc         {-1};
         GLint max_radius_loc            {-1};
         GLint min_radius_loc            {-1};
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
         GLint scale_radius_loc          {-1};
         GLint scale_projection_loc      {-1};
         // --- Unified float-based lighting uniforms ---
@@ -117,8 +131,14 @@ private:
     struct PointProvShader {
         GLuint program{0};
         GLint mvp_matrix_loc            {-1};
+        GLint view_matrix_loc           {-1}; // mat4 view_matrix
+        GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
         GLint max_radius_loc            {-1};
         GLint min_radius_loc            {-1};
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
         GLint scale_radius_loc          {-1};
         GLint scale_projection_loc      {-1};
         GLint show_normals_loc          {-1}; // bool  show_normals
@@ -142,15 +162,26 @@ private:
         GLint  mvp_matrix_loc{-1};
         GLint  max_radius_loc{-1};
         GLint  min_radius_loc{-1};
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
         GLint  scale_radius_loc{-1};
+        GLint scale_projection_loc      {-1};
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
     };
     SurfelShader m_surfel_shader;
 
     struct SurfelColorShader {
         GLuint program{0};
         GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
-        GLint max_radius_loc            {-1}; // float max_radius
+        GLint view_matrix_loc           {-1}; // mat4 view_matrix
+        GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
         GLint min_radius_loc            {-1}; // float min_radius
+        GLint max_radius_loc            {-1}; // float max_radius
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
         GLint scale_radius_loc          {-1}; // float scale_radius
         GLint viewport_loc              {-1};
         GLint show_normals_loc          {-1}; // bool  show_normals
@@ -159,18 +190,24 @@ private:
         GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
         GLint accuracy_loc              {-1}; // float accuracy
         GLint average_radius_loc        {-1}; // float average_radius
+        GLint scale_projection_loc      {-1};
     };
     SurfelColorShader m_surfel_color_shader;
 
     struct SurfelColorLightingShader {
         GLuint program{0};
         GLint mvp_matrix_loc            {-1}; // mat4 mvp_matrix
-        GLint max_radius_loc            {-1}; // float max_radius
-        GLint min_radius_loc            {-1}; // float min_radius
-        GLint scale_radius_loc          {-1}; // float scale_radius
-        GLint viewport_loc              {-1}; // vec2 viewport
         GLint view_matrix_loc           {-1}; // mat4 view_matrix
         GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
+        GLint max_radius_loc            {-1}; // float max_radius
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint min_radius_loc            {-1}; // float min_radius
+        GLint scale_radius_loc          {-1}; // float scale_radius
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
+        GLint viewport_loc              {-1}; // vec2 viewport
+        GLint scale_projection_loc      {-1};
         GLint show_normals_loc          {-1}; // bool  show_normals
         GLint show_accuracy_loc         {-1}; // bool  show_accuracy
         GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
@@ -192,10 +229,17 @@ private:
     struct SurfelProvShader {
         GLuint program{0};
         GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
-        GLint max_radius_loc            {-1}; // float max_radius
+        GLint view_matrix_loc           {-1}; // mat4 view_matrix
+        GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
         GLint min_radius_loc            {-1}; // float min_radius
+        GLint max_radius_loc            {-1}; // float max_radius
+        GLint min_screen_size_loc         {-1};
+        GLint max_screen_size_loc         {-1};
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
         GLint scale_radius_loc          {-1}; // float scale_radius
         GLint viewport_loc              {-1};
+        GLint scale_projection_loc      {-1};
         GLint show_normals_loc          {-1}; // bool  show_normals
         GLint show_accuracy_loc         {-1}; // bool  show_accuracy
         GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
@@ -222,9 +266,14 @@ private:
         GLint near_plane_loc{-1};           // float near_plane
         GLint far_plane_loc{-1};            // float far_plane
         GLint viewport_loc {-1};
+        GLint scale_projection_loc      {-1};
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
 
         GLint max_radius_loc{-1};           // float max_radius
         GLint min_radius_loc{-1};           // float min_radius
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
         GLint scale_radius_loc{-1};         // float scale_radius
     };
     SurfelPass1Shader m_surfel_pass1_shader;
@@ -244,10 +293,15 @@ private:
         GLint far_plane_loc{-1};
         GLint near_plane_loc{-1};
         GLint viewport_loc {-1};
+        GLint scale_projection_loc      {-1};
         // Scaling uniforms (from VS)
         GLint max_radius_loc{-1};
         GLint min_radius_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint max_screen_size_loc{-1};
         GLint scale_radius_loc{-1};
+        GLint scale_radius_gamma_loc    {-1};
+        GLint max_radius_cut_loc        {-1};
         // Visualization uniforms (from vis_color.glsl)
         GLint show_normals_loc{-1};
         GLint show_accuracy_loc{-1};
@@ -264,6 +318,13 @@ private:
         GLint heatmap_max_color_loc{-1};
         GLint edge_profile_loc{-1};
         GLint depth_epsilon_vs_loc{-1};
+
+        // Blending uniforms
+        GLint depth_range_loc{-1};
+        GLint flank_lift_loc{-1};
+
+
+        GLint coloring_loc {-1};
     };
     SurfelPass2Shader m_surfel_pass2_shader;
 
@@ -301,21 +362,11 @@ private:
         GLint show_output_sensitivity_loc{-1};
         GLint accuracy{-1};
         GLint average_radius{-1};
+
+        GLint lighting_loc {-1};
+
     };
     SurfelPass3Shader m_surfel_pass3_shader;
-
-    struct DebugShader {
-        GLuint program{0};
-        GLint debug_mode_loc{-1};
-        GLint texture_depth_loc{-1};
-        GLint texture_color_loc{-1};
-        GLint texture_normal_loc{-1};
-        GLint texture_position_loc{-1};
-        GLint near_plane_loc{-1};
-        GLint far_plane_loc{-1};
-    };
-    DebugShader m_debug_shader;
-
 
     struct LineShader {
         GLuint program;
@@ -542,6 +593,7 @@ public:
     void initSchismObjects();
     void initUniforms();
     void initPclResources();
+    bool ensurePclFboSizeUpToDate();
     void initPclResources(bool use_msaa, int msaa_samples);
     void initPclResources(int msaaSamples);
 
@@ -595,7 +647,8 @@ public:
         {ShaderType::SurfelMultipass,       "Surfel Multipass"}
     };
 
-    ShaderType m_active_shader_type = ShaderType::SurfelColor;
+    ShaderType m_active_shader_type = ShaderType::Point;
+    void setActiveShaderType(ShaderType t) { m_active_shader_type = t; }
 
     const std::vector<ShaderInfo>& getPclShader() const { return pcl_shader; }
 
@@ -619,7 +672,6 @@ public:
     const SurfelPass1Shader&            getSurfelPass1Shader()          const { return m_surfel_pass1_shader; }
     const SurfelPass2Shader&            getSurfelPass2Shader()          const { return m_surfel_pass2_shader; }
     const SurfelPass3Shader&            getSurfelPass3Shader()          const { return m_surfel_pass3_shader; }
-    const DebugShader&                  getDebugShader()                const { return m_debug_shader; }
 
     const LineShader&                   getLineShader()                 const { return m_line_shader; }
 

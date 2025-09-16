@@ -11,11 +11,28 @@
 #include <algorithm> // for std::clamp, std::min
 #include <locale>
 #include <unordered_map>
+#include <cover/coVRPluginSupport.h>
+#include <map>
+#include <set>
+#include <filesystem>
+#include <system_error>
 
 #include "Lamure.h"
 
 #ifdef _WIN32
 #include <windows.h>
+
+#ifndef LM_STR_HELPER
+#define LM_STR_HELPER(x) #x
+#define LM_STR(x) LM_STR_HELPER(x)
+#endif
+
+// --- GL_NVX_gpu_memory_info (für VRAM der *aktuellen* GL-GPU) ---
+#ifndef GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX
+#define GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX      0x9048
+#define GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX    0x9049
+#endif
+
 // --- NVML dynamic loader ---
 struct NvmlLoader {
     HMODULE h = nullptr; bool ok = false; void* dev = nullptr;
@@ -52,6 +69,7 @@ static bool nvmlPoll(NvmlLoader& nv, double& gpuUtilPct, double& memUsedMB, doub
     return true;
 }
 #endif
+
 
 namespace {
     static bool getF(osg::Stats* s, unsigned f, const std::string& key, double& out)
@@ -108,6 +126,38 @@ namespace {
 
         return f;
     }
+
+    inline void ensureParentDir(const std::filesystem::path& p) {
+        const auto dir = p.has_filename() ? p.parent_path() : p;
+        if (dir.empty()) return;
+        std::error_code ec;
+        (void)std::filesystem::create_directories(dir, ec);
+        if (ec) {
+            std::cerr << "[Measurement] create_directories failed for "
+                << dir.string() << ": " << ec.message() << "\n";
+        }
+    }
+
+    inline bool openCsv(std::ofstream& out, const std::filesystem::path& p) {
+        ensureParentDir(p);
+        // Unicode-sicher öffnen (C++17: ofstream::open(path) ist überladen)
+        out.open(p, std::ios::out | std::ios::trunc);
+        if (!out.is_open()) {
+            std::error_code ec;
+            auto abs = std::filesystem::absolute(p, ec);
+            std::filesystem::path cwd;
+            std::error_code ec2;
+            cwd = std::filesystem::current_path(ec2);
+            std::cerr << "[Measurement] Failed to open for write: "
+                << (ec ? p.string() : abs.string())
+                << " | cwd=" << (ec2 ? std::string("<unk>") : cwd.string())
+                << "\n";
+            return false;
+        }
+        out.imbue(std::locale::classic());
+        out << std::fixed << std::setprecision(4);
+        return true;
+    }
 }
 
 
@@ -122,10 +172,10 @@ LamureMeasurement::LamureMeasurement(
     , m_logfile(logfile)
 {
     m_timeline.clear();
-    m_verbose = false;       // true, wenn du alle N Frames eine Konsole willst
+    m_verbose = false;
     m_logEveryN = 60;
     m_dumpAttrs = false;
-    m_gpuBackSearch = 16;    // ggf. 24–32 bei stärkerem Lag
+    m_gpuBackSearch = 16;
     m_exportTimeline = true;
     m_exportReport = true;
     m_running = true;
@@ -160,10 +210,13 @@ LamureMeasurement::LamureMeasurement(
             // cs->collectStats("scene",  true); // optional
         }
 
-    // Logging-Defaults (kannst du nach Bedarf umschalten)
     m_verbose   = false; // kein Konsolen-Spam
     m_logEveryN = 30;
     m_dumpAttrs = false;
+    m_gpu_static_captured = false;
+    m_gpu_mem_used_mb_static = m_gpu_mem_total_mb_static = 0.0;
+    m_gpu_mem_used_mb_nvml_static = m_gpu_mem_total_mb_nvml_static = 0.0;
+    m_gpu_mem_used_mb_gl_static = m_gpu_mem_total_mb_gl_static = 0.0;
 
     std::cout << "[Measurement] Measurement started\n";
 }
@@ -189,9 +242,60 @@ void LamureMeasurement::initCallbacks()
     cam->setPostDrawCallback(m_postCB);
 }
 
-
-/* removed: hasStatAttribute(...) — no longer used */
-
+void LamureMeasurement::cacheStaticGpuInfo()
+{
+    if (m_gpu_static_captured)
+        return;
+    double used_nvml = 0.0, total_nvml = 0.0;
+    double used_gl   = 0.0, total_gl   = 0.0;
+    bool haveNvml = false, haveGl = false;
+#ifdef _WIN32
+    {
+        static NvmlLoader g_nvml_once;
+        double util = 0.0, used = 0.0, total = 0.0;
+        if (nvmlPoll(g_nvml_once, util, used, total)) {
+            used_nvml  = used;
+            total_nvml = total;
+            haveNvml   = true;
+        }
+    }
+#endif
+    if (glewIsSupported("GL_NVX_gpu_memory_info")) {
+        GLint totalKB = 0, freeKB = 0;
+        glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX,   &totalKB);
+        glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &freeKB);
+        if (totalKB > 0 && freeKB >= 0) {
+            total_gl = totalKB / 1024.0;
+            const double free_gl = freeKB / 1024.0;
+            used_gl   = std::max(0.0, total_gl - free_gl);
+            haveGl    = true;
+        }
+    }
+    if (haveNvml) {
+        m_gpu_mem_used_mb_nvml_static  = used_nvml;
+        m_gpu_mem_total_mb_nvml_static = total_nvml;
+    }
+    if (haveGl) {
+        m_gpu_mem_used_mb_gl_static    = used_gl;
+        m_gpu_mem_total_mb_gl_static   = total_gl;
+    }
+    if (haveNvml) {
+        m_gpu_mem_used_mb_static  = m_gpu_mem_used_mb_nvml_static;
+        m_gpu_mem_total_mb_static = m_gpu_mem_total_mb_nvml_static;
+    } else if (haveGl) {
+        m_gpu_mem_used_mb_static  = m_gpu_mem_used_mb_gl_static;
+        m_gpu_mem_total_mb_static = m_gpu_mem_total_mb_gl_static;
+    } else {
+        m_gpu_mem_used_mb_static  = 0.0;
+        m_gpu_mem_total_mb_static = 0.0;
+    }
+    m_gpu_static_captured = true;
+    std::cout << "[Measurement] Cached static GPU memory: primary used/total="
+        << m_gpu_mem_used_mb_static << "/"
+        << m_gpu_mem_total_mb_static << " MB"
+        << (haveNvml ? " (NVML)" : (haveGl ? " (GL_NVX)" : " (none)"))
+        << "\n";
+}
 
 bool LamureMeasurement::getTimeTakenMsBacksearch(
     osg::Stats* s,
@@ -299,13 +403,18 @@ void LamureMeasurement::drawIncrement(bool preDraw, const osg::FrameStamp* frame
 
     if (!frameStamp) return;
 
-    // Sammeln (gedrosseltes Debug)
+    if (!preDraw && !m_gpu_static_tried) {
+        cacheStaticGpuInfo();    // probiert NVML/GL_NVX genau einmal
+        m_gpu_static_tried = true;
+    }
+
+    // --- Stats sammeln ---
     FrameStats s;
     const bool dbg = (m_verbose && (frameStamp->getFrameNumber() % m_logEveryN == 0));
     if (collectFrameStats(m_viewer, frameStamp, s, dbg))
         m_stats.push_back(s);
 
-    // Segmente etc. (unverändert)
+    // --- Segment-Fortschritt ---
     osg::Timer_t now2 = osg::Timer::instance()->tick();
     double dt = osg::Timer::instance()->delta_s(m_lastFrameTick, now2);
     m_segmentTime += dt;
@@ -313,10 +422,10 @@ void LamureMeasurement::drawIncrement(bool preDraw, const osg::FrameStamp* frame
     while (m_currentSegment < m_segments.size())
     {
         const auto& seg = m_segments[m_currentSegment];
-        float dist = seg.tra.length();
+        float  dist     = seg.tra.length();
         double transDur = seg.transSpeed > 0.f ? dist / seg.transSpeed : 0.0;
-        float maxAngle = std::max({ std::abs(seg.rot.x()), std::abs(seg.rot.y()), std::abs(seg.rot.z()) });
-        double rotDur = seg.rotSpeed > 0.f ? maxAngle / seg.rotSpeed : 0.0;
+        float  maxAngle = std::max({ std::abs(seg.rot.x()), std::abs(seg.rot.y()), std::abs(seg.rot.z()) });
+        double rotDur   = seg.rotSpeed > 0.f ? maxAngle / seg.rotSpeed : 0.0;
         double segDuration = std::max(transDur, rotDur);
 
         if (m_segmentTime < segDuration) break;
@@ -329,15 +438,14 @@ void LamureMeasurement::drawIncrement(bool preDraw, const osg::FrameStamp* frame
 
     if (m_currentSegment >= m_segments.size()) {
         m_running = false;
-        writeLogAndStop();
         return;
     }
 
     const auto& seg = m_segments[m_currentSegment];
-    float dist = seg.tra.length();
+    float  dist     = seg.tra.length();
     double transDur = seg.transSpeed > 0.f ? dist / seg.transSpeed : 0.0;
-    float maxAngle = std::max({ std::abs(seg.rot.x()), std::abs(seg.rot.y()), std::abs(seg.rot.z()) });
-    double rotDur = seg.rotSpeed > 0.f ? maxAngle / seg.rotSpeed : 0.0;
+    float  maxAngle = std::max({ std::abs(seg.rot.x()), std::abs(seg.rot.y()), std::abs(seg.rot.z()) });
+    double rotDur   = seg.rotSpeed > 0.f ? maxAngle / seg.rotSpeed : 0.0;
     double segDuration = std::max(transDur, rotDur);
     double frac = segDuration > 0.0 ? std::min(m_segmentTime / segDuration, 1.0) : 1.0;
 
@@ -346,11 +454,8 @@ void LamureMeasurement::drawIncrement(bool preDraw, const osg::FrameStamp* frame
     updateCamera(tra, rot);
 }
 
-
 bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
-    const osg::FrameStamp* fs,
-    FrameStats& stats,
-    bool debugPrint)
+    const osg::FrameStamp* fs, FrameStats& stats, bool debugPrint)
 {
     if (!viewer) return false;
 
@@ -471,36 +576,47 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
     stats.cpu_draw_ms = sumDraw_ms;
     stats.gpu_time_ms = sumGpu_ms;
 
-    // Viewer-GPU Telemetrie (falls vorhanden)
     double v=0.0;
     if (viewerStats && viewerStats->getAttribute(f, "GPU Clock MHz", v))      stats.gpu_clock = v;
     if (viewerStats && viewerStats->getAttribute(f, "GPU Mem Clock MHz", v))  stats.gpu_mem_clock = v;
     if (viewerStats && viewerStats->getAttribute(f, "GPU Utilization", v))    stats.gpu_util = v;
     if (viewerStats && viewerStats->getAttribute(f, "GPU PCIe rx KB/s", v))   stats.gpu_pci = v;
 
-#ifdef _WIN32
-    // NVML (optional, leise wenn nicht vorhanden)
-    static NvmlLoader g_nvml;
-    static unsigned nvmlCounter = 0;
-    if ((nvmlCounter++ % 15) == 0) {
-        double util=0, used=0, total=0;
-        if (nvmlPoll(g_nvml, util, used, total)) {
-            stats.gpu_util         = util;
-            stats.gpu_mem_total_mb = total;
-            stats.gpu_mem_used_mb  = used;
-        }
-    }
-#endif
+    cacheStaticGpuInfo();
 
-    // Pose
-    if (!cams.empty() && cams.front()) {
-        osg::Matrixd vm = cams.front()->getViewMatrix();
-        stats.position    = vm.getTrans();
-        stats.orientation = vm.getRotate();
-    } else {
-        osg::Matrixd vm = m_viewer->getCamera()->getViewMatrix();
-        stats.position    = vm.getTrans();
-        stats.orientation = vm.getRotate();
+    // Aus Cache in die pro-Frame Stats schreiben (Schema bleibt gleich, aber ohne per-Frame Poll)
+    //stats.gpu_mem_used_mb_nvml   = m_gpu_mem_used_mb_nvml_static;
+    //stats.gpu_mem_total_mb_nvml  = m_gpu_mem_total_mb_nvml_static;
+    //stats.gpu_mem_used_mb_gl     = m_gpu_mem_used_mb_gl_static;
+    //stats.gpu_mem_total_mb_gl    = m_gpu_mem_total_mb_gl_static;
+    //stats.gpu_mem_used_mb        = m_gpu_mem_used_mb_static;   // primär (NVML>GL)
+    //stats.gpu_mem_total_mb       = m_gpu_mem_total_mb_static;  // primär (NVML>GL)
+
+    // ---- Pose (Welt) aus inverse(base * view) mit stabilisiertem Quaternion ----
+    const osg::Camera* camPose = (!cams.empty() && cams.front())
+        ? cams.front()
+        : (m_viewer ? m_viewer->getCamera() : nullptr);
+
+    if (camPose) {
+        const osg::Matrixd worldToView = opencover::cover->getBaseMat() * camPose->getViewMatrix();
+        osg::Matrixd viewToWorld;
+        if (viewToWorld.invert(worldToView)) {
+            osg::Vec3d T, S;
+            osg::Quat  R, SO;
+            viewToWorld.decompose(T, R, S, SO);
+
+            // Quaternion-Vorzeichen stabilisieren
+            if (m_haveLastQuat) {
+                const double dot = R.x()*m_lastQuat.x() + R.y()*m_lastQuat.y()
+                    + R.z()*m_lastQuat.z() + R.w()*m_lastQuat.w();
+                if (dot < 0.0) R.set(-R.x(), -R.y(), -R.z(), -R.w());
+            }
+            m_lastQuat     = R;
+            m_haveLastQuat = true;
+
+            stats.position    = T;
+            stats.orientation = R;
+        }
     }
 
     // Plugin-Infos
@@ -529,21 +645,18 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
 
     // ----- Derived metrics per frame -----
     {
-        // Basiszeit: Framezeit; falls 0, auf rendering_traversals_ms zurückfallen
         const double ft = (stats.frame_duration_ms > 0.0)
             ? stats.frame_duration_ms
             : stats.rendering_traversals_ms;
 
-        // CPU-Main-Thread-Anteile zusammenfassen
         const double cpu_main =
-              stats.cpu_update_ms
+            stats.cpu_update_ms
             + stats.cpu_cull_ms
             + stats.cpu_draw_ms
             + stats.plugin_ms
             + stats.isect_ms
             + stats.opencover_ms;
 
-        // typische Wartezeiten
         const double waits = stats.sync_time_ms + stats.swap_time_ms + stats.finish_ms;
 
         stats.cpu_main_ms = cpu_main;
@@ -560,7 +673,6 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
             stats.wait_frac_pct      = 0.0;
         }
 
-        // Grobe Boundness-Heuristik
         auto isNa = [](double v){ return !(v==v); };
         if (ft <= 0.0 || isNa(stats.cpu_busy_pct_proxy) || isNa(stats.gpu_busy_pct_proxy)) {
             stats.boundness = "unknown";
@@ -579,27 +691,77 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
 }
 
 
-void LamureMeasurement::updateCamera(const osg::Vec3& tra, const osg::Vec3& rot)
+
+//void LamureMeasurement::updateCamera(const osg::Vec3& tra, const osg::Vec3& rot)
+//{
+//    double rx = osg::DegreesToRadians(rot.x());
+//    double ry = osg::DegreesToRadians(rot.y());
+//    double rz = osg::DegreesToRadians(rot.z());
+//
+//    osg::Matrix mrx, mry, mrz;
+//    mrx.makeRotate(rx, 1, 0, 0);
+//    mry.makeRotate(ry, 0, 1, 0);
+//    mrz.makeRotate(rz, 0, 0, 1);
+//    osg::Matrix rotMat = mrx * mry * mrz;
+//
+//    osg::Matrix dcs;
+//    dcs.postMult(rotMat);
+//
+//    osg::Vec3 vp = opencover::cover->getViewerMat().getTrans();
+//
+//    dcs.postMult(osg::Matrix::translate(-vp));
+//    dcs.postMult(osg::Matrix::translate(tra));
+//    dcs.postMult(osg::Matrix::translate(vp));
+//
+//    opencover::cover->setXformMat(dcs);
+//}
+
+void LamureMeasurement::updateCamera(const osg::Vec3& traAbs, const osg::Vec3& rotAbsDeg)
 {
-    double rx = osg::DegreesToRadians(rot.x());
-    double ry = osg::DegreesToRadians(rot.y());
-    double rz = osg::DegreesToRadians(rot.z());
+    // 1) Beim ersten Aufruf nur Basis setzen, noch nichts bewegen.
+    if (!m_havePoseDeltas) {
+        m_lastTraApplied = traAbs;
+        m_lastRotApplied = rotAbsDeg;
+        m_havePoseDeltas = true;
+        return;
+    }
 
-    osg::Matrix mrx, mry, mrz;
-    mrx.makeRotate(rx, 1, 0, 0);
-    mry.makeRotate(ry, 0, 1, 0);
-    mrz.makeRotate(rz, 0, 0, 1);
-    osg::Matrix rotMat = mrx * mry * mrz;
+    // 2) Deltas (Seit dem letzten Frame)
+    const osg::Vec3 dTra = traAbs - m_lastTraApplied;   // lokal: (rechts, vor, hoch)
+    const osg::Vec3 dRot = rotAbsDeg - m_lastRotApplied; // Grad-Deltas (pitch=x, roll=y, yaw=z)
 
-    osg::Matrix dcs;
-    dcs.postMult(rotMat);
+    m_lastTraApplied = traAbs;
+    m_lastRotApplied = rotAbsDeg;
 
-    osg::Vec3 vp = opencover::cover->getViewerMat().getTrans();
+    // 3) Rotationsdeltas in Radiant
+    const double dPitch = osg::DegreesToRadians(dRot.x()); // X
+    const double dRoll  = osg::DegreesToRadians(dRot.y()); // Y
+    const double dYaw   = osg::DegreesToRadians(dRot.z()); // Z
 
-    dcs.postMult(osg::Matrix::translate(-vp));
-    dcs.postMult(osg::Matrix::translate(tra));
-    dcs.postMult(osg::Matrix::translate(vp));
+    // 4) aktuelles DCS holen (wie im Framework-Beispiel)
+    osg::Matrix dcs = opencover::cover->getXformMat();
 
+    // Drehzentrum = aktuelle Viewer-Position (eigene Achse)
+    const osg::Vec3 viewerPos = opencover::cover->getViewerMat().getTrans();
+
+    // --- Rotation um eigene Achse (Drive-Stil) ---
+    // Yaw um lokale "Up"-Achse, neutralisiert durch Pitch-Sandwich (wie im Snippet)
+    dcs.postMult(osg::Matrix::translate(-viewerPos));
+    dcs.postMult(osg::Matrix::rotate(dPitch, osg::Vec3(1.0f, 0.0f, 0.0f)));
+    dcs.postMult(osg::Matrix::rotate(dYaw,   osg::Vec3(0.0f, 0.0f, 1.0f)));
+    dcs.postMult(osg::Matrix::rotate(-dPitch,osg::Vec3(1.0f, 0.0f, 0.0f)));
+
+    // Optional: Roll um lokale Vorwärtsachse (hier: Y) — falls du Roll möchtest
+    if (std::abs(dRoll) > 0.0)
+        dcs.postMult(osg::Matrix::rotate(dRoll, osg::Vec3(0.0f, 1.0f, 0.0f)));
+
+    dcs.postMult(osg::Matrix::translate(viewerPos));
+
+    // --- Lokale Translation in alle Richtungen ---
+    // (rechts/links = X, vor/zurück = Y, hoch/runter = Z), wie im Framework.
+    dcs.postMult(osg::Matrix::translate(dTra.x(), dTra.y(), dTra.z()));
+
+    // Anwenden
     opencover::cover->setXformMat(dcs);
 }
 
@@ -660,164 +822,229 @@ void LamureMeasurement::printDebugStats(unsigned int num)
             print_frame(m_stats[i], static_cast<int>(i + 1));
         }
     }
-
     std::cout << "-------------------------------" << std::endl;
+}
+
+static inline std::string csvQuote(const std::string& s) {
+    if (s.find_first_of(",;\t\" \n\r") == std::string::npos) return s;
+    std::string r; r.reserve(s.size()+8);
+    r.push_back('"');
+    for (char c : s) r += (c=='"') ? std::string("\"\"") : std::string(1,c);
+    r.push_back('"');
+    return r;
+}
+
+void LamureMeasurement::writeTimelineCSV(const std::string& path)
+{
+    // Ordner sicherstellen
+    try {
+        std::filesystem::path p(path);
+        if (p.has_parent_path())
+            std::filesystem::create_directories(p.parent_path());
+    } catch (...) {
+        // ignorieren – wir versuchen einfach zu schreiben
+    }
+
+    cacheStaticGpuInfo();
+
+    std::ofstream out(path, std::ios::out | std::ios::trunc);
+    if (!out) {
+        std::cerr << "[Measurement] Failed to open timeline CSV: " << path << "\n";
+        return;
+    }
+
+    out.setf(std::ios::fixed);
+    out << std::setprecision(3);
+
+    std::vector<TimeBlock> blocks = m_timeline;
+    std::sort(blocks.begin(), blocks.end(), [](const TimeBlock& a, const TimeBlock& b){
+        if (a.src_frame != b.src_frame) return a.src_frame < b.src_frame;
+        if (a.begin_ms  != b.begin_ms)  return a.begin_ms  < b.begin_ms;
+        if (a.camIndex  != b.camIndex)  return a.camIndex  < b.camIndex;
+        return a.name < b.name;
+        });
+
+    out << "frame;src_frame;cam;scope;name;begin_ms;end_ms;taken_ms;used_offset\n";
+
+    for (const auto& b : blocks) {
+        out << b.frame << ';'
+            << b.src_frame << ';'
+            << b.camIndex << ';'
+            << csvQuote(b.scope) << ';'
+            << csvQuote(b.name)  << ';'
+            << b.begin_ms << ';'
+            << b.end_ms   << ';'
+            << b.taken_ms << ';'
+            << b.used_offset
+            << '\n';
+    }
+
+    out.flush();
+    std::cout << "[Measurement] Timeline CSV written: " << path << " (" << blocks.size() << " rows)\n";
 }
 
 
 void LamureMeasurement::writeLogAndStop()
 {
-    if (m_stats.empty())
+    if (m_written) {
+        std::cerr << "[Measurement] writeLogAndStop() already executed, skipping.\n";
         return;
+    }
+    m_written = true;
 
-    std::string base_path = m_logfile;
-    if (auto pos = base_path.find_last_of("."); pos != std::string::npos)
-        base_path = base_path.substr(0, pos);
+    cacheStaticGpuInfo();
 
-    const std::string frames_path   = base_path + "_frames.csv";
-    const std::string summary_path  = base_path + "_summary.csv";
-    const std::string timeline_path = base_path + "_timeline.csv";
+    std::filesystem::path base_path(m_logfile);
+    if (base_path.empty()) {
+        base_path = std::filesystem::path("lamure_measurement");
+    }
+    if (base_path.has_extension())
+        base_path.replace_extension();
 
-    // --- GPU-Zeit je Frame aus der Timeline aggregieren (nach assigned_frame = tb.frame) ---
-    std::unordered_map<unsigned /*assigned_frame*/, double /*gpu_ms*/> gpuMsByFrame;
+    const std::filesystem::path frames_path   = base_path.string() + "_frames.csv";
+    const std::filesystem::path summary_path  = base_path.string() + "_summary.csv";
+    const std::filesystem::path timeline_path = base_path.string() + "_timeline.csv";
+    const std::filesystem::path md_path       = base_path.string() + "_report.md";
+    m_reportMDPath = md_path.string();
+
+    // GPU-Zeit je Frame aus Timeline aggregieren
+    std::unordered_map<unsigned, double> gpuMsByFrame;
     gpuMsByFrame.reserve(m_timeline.size());
     for (const auto &tb : m_timeline) {
-        // nur GPU-Blöcke aufsummieren (Name enthält "GPU", z. B. "GPU draw", "GPU time")
         if (tb.name.find("GPU") != std::string::npos) {
             gpuMsByFrame[tb.frame] += tb.taken_ms;
         }
     }
 
-    // Frames CSV
+    // --- Frames CSV ---
     {
-        std::ofstream frames_out(frames_path);
-        if (!frames_out) {
-            std::cerr << "[Measurement] Fehler beim Öffnen von " << frames_path << "\n";
-        } else {
-            frames_out.imbue(std::locale::classic());
-            frames_out << std::fixed << std::setprecision(4);
+        std::ofstream frames_out;
+        if (!openCsv(frames_out, frames_path)) {
+            return;
+        }
+
+        frames_out
+            << "frame_number;"
+            << "frame_rate;"
+            << "frame_time_ms;"
+            << "cpu_known_sum_ms;"
+            << "residual_time_ms;"
+            << "rendering_traversals_ms;"
+            << "cpu_update_ms;"
+            << "cpu_cull_ms;"
+            << "cpu_draw_ms;"
+            << "gpu_time_ms;"
+            << "gpu_clock;"
+            << "gpu_mem_clock;"
+            << "gpu_util;"
+            << "gpu_pci;"
+            //<< "gpu_mem_used_mb;"
+            //<< "gpu_mem_total_mb;"
+            //<< "gpu_mem_used_mb_nvml;"
+            //<< "gpu_mem_total_mb_nvml;"
+            //<< "gpu_mem_used_mb_gl;"
+            //<< "gpu_mem_total_mb_gl;"
+            << "sync_time_ms;"
+            << "swap_time_ms;"
+            << "finish_ms;"
+            << "isect_ms;"
+            << "plugin_ms;"
+            << "opencover_ms;"
+            << "cpu_main_ms;"
+            << "cpu_busy_pct_proxy;"
+            << "gpu_busy_pct_proxy;"
+            << "wait_ms;"
+            << "wait_frac_pct;"
+            << "boundness;"
+            << "rendered_splats;"
+            << "rendered_nodes;"
+            << "rendered_bounding_boxes;"
+            << "pos_x;pos_y;pos_z;"
+            << "quat_x;quat_y;quat_z;quat_w;"
+            << "backoff_cull;backoff_draw;backoff_gpu"
+            << "\n";
+
+        std::map<unsigned, FrameStats> statsByFrame;
+        for (const auto &ms : m_stats) {
+            statsByFrame.emplace(ms.frame_number, ms);
+        }
+
+        std::set<unsigned> frameIds;
+        for (const auto &kv : statsByFrame)  frameIds.insert(kv.first);
+        for (const auto &kv : gpuMsByFrame)  frameIds.insert(kv.first);
+
+        for (unsigned fid : frameIds) {
+            FrameStats s{};
+            if (auto itS = statsByFrame.find(fid); itS != statsByFrame.end()) {
+                s = itS->second;
+            } else {
+                s.frame_number = fid;
+            }
+
+            const double gpu_ms_for_frame = [&](){
+                auto it = gpuMsByFrame.find(fid);
+                return (it != gpuMsByFrame.end()) ? it->second : 0.0;
+                }();
+
+            const double cpu_known_sum_ms =
+                s.cpu_update_ms + s.cpu_cull_ms + s.cpu_draw_ms +
+                s.sync_time_ms + s.swap_time_ms + s.finish_ms +
+                s.isect_ms + s.plugin_ms + s.opencover_ms;
+
+            double residual_time_ms = s.frame_duration_ms - cpu_known_sum_ms;
+            if (residual_time_ms < 0.0) residual_time_ms = 0.0;
 
             frames_out
-                << "frame_number;"
-                << "frame_rate;"
-                << "frame_time_ms;"
-                << "cpu_known_sum_ms;"
-                << "residual_time_ms;"
-                << "rendering_traversals_ms;"
-                << "cpu_update_ms;"
-                << "cpu_cull_ms;"
-                << "cpu_draw_ms;"
-                << "gpu_time_ms;"
-                << "gpu_clock;"
-                << "gpu_mem_clock;"
-                << "gpu_util;"
-                << "gpu_pci;"
-                << "gpu_mem_used_mb;"
-                << "gpu_mem_total_mb;"
-                << "sync_time_ms;"
-                << "swap_time_ms;"
-                << "finish_ms;"
-                << "isect_ms;"
-                << "plugin_ms;"
-                << "opencover_ms;"
-                << "cpu_main_ms;"
-                << "cpu_busy_pct_proxy;"
-                << "gpu_busy_pct_proxy;"
-                << "wait_ms;"
-                << "wait_frac_pct;"
-                << "boundness;"
-                << "rendered_splats;"
-                << "rendered_nodes;"
-                << "rendered_bounding_boxes;"
-                << "pos_x;pos_y;pos_z;"
-                << "quat_x;quat_y;quat_z;quat_w;"
-                << "backoff_cull;backoff_draw;backoff_gpu"
+                << fid << ";"
+                << s.frame_rate << ";"
+                << s.frame_duration_ms << ";"
+                << cpu_known_sum_ms << ";"
+                << residual_time_ms << ";"
+                << s.rendering_traversals_ms << ";"
+                << s.cpu_update_ms << ";"
+                << s.cpu_cull_ms << ";"
+                << s.cpu_draw_ms << ";"
+                << gpu_ms_for_frame << ";"
+                << s.gpu_clock << ";"
+                << s.gpu_mem_clock << ";"
+                << s.gpu_util << ";"
+                << s.gpu_pci << ";"
+                //<< s.gpu_mem_used_mb << ";"
+                //<< s.gpu_mem_total_mb << ";"
+                //<< s.gpu_mem_used_mb_nvml << ";"
+                //<< s.gpu_mem_total_mb_nvml << ";"
+                //<< s.gpu_mem_used_mb_gl << ";"
+                //<< s.gpu_mem_total_mb_gl << ";"
+                << s.sync_time_ms << ";"
+                << s.swap_time_ms << ";"
+                << s.finish_ms << ";"
+                << s.isect_ms << ";"
+                << s.plugin_ms << ";"
+                << s.opencover_ms << ";"
+                << s.cpu_main_ms << ";"
+                << s.cpu_busy_pct_proxy << ";"
+                << s.gpu_busy_pct_proxy << ";"
+                << s.wait_ms << ";"
+                << s.wait_frac_pct << ";"
+                << s.boundness << ";"
+                << s.rendered_splats << ";"
+                << s.rendered_nodes << ";"
+                << s.rendered_bounding_boxes << ";"
+                << s.position.x() << ";" << s.position.y() << ";" << s.position.z() << ";"
+                << s.orientation.x() << ";" << s.orientation.y() << ";" << s.orientation.z() << ";" << s.orientation.w() << ";"
+                << s.backoff_cull << ";" << s.backoff_draw << ";" << s.backoff_gpu
                 << "\n";
-
-            // --- Reindex: Mess-Stats je Frame ---
-            std::map<unsigned, FrameStats> statsByFrame;
-            for (const auto &ms : m_stats) {
-                statsByFrame.emplace(ms.frame_number, ms);
-            }
-
-            // --- Frame-IDs: Vereinigung aus Mess-Frames und Timeline-Frames (assigned) ---
-            std::set<unsigned> frameIds;
-            for (const auto &kv : statsByFrame)  frameIds.insert(kv.first);
-            for (const auto &kv : gpuMsByFrame)  frameIds.insert(kv.first);
-
-            // --- Schreiben in aufsteigender Frame-Reihenfolge (assigned frame) ---
-            for (unsigned fid : frameIds) {
-                // Basis-Stats: falls keine Messung in diesem Frame, Dummy-Stats mit Frame-Nummer
-                FrameStats s{};
-                if (auto itS = statsByFrame.find(fid); itS != statsByFrame.end()) {
-                    s = itS->second;
-                } else {
-                    s.frame_number = fid;
-                }
-
-                // GPU pro assigned frame NUR aus Timeline beziehen:
-                const double gpu_ms_for_frame = [&](){
-                    auto it = gpuMsByFrame.find(fid);
-                    return (it != gpuMsByFrame.end()) ? it->second : 0.0;
-                }() ;
-
-                const double cpu_known_sum_ms =
-                    s.cpu_update_ms + s.cpu_cull_ms + s.cpu_draw_ms +
-                    s.sync_time_ms + s.swap_time_ms + s.finish_ms +
-                    s.isect_ms + s.plugin_ms + s.opencover_ms;
-
-                double residual_time_ms = s.frame_duration_ms - cpu_known_sum_ms;
-                if (residual_time_ms < 0.0) residual_time_ms = 0.0;
-
-                frames_out
-                    << fid << ";"
-                    << s.frame_rate << ";"
-                    << s.frame_duration_ms << ";"
-                    << cpu_known_sum_ms << ";"
-                    << residual_time_ms << ";"
-                    << s.rendering_traversals_ms << ";"
-                    << s.cpu_update_ms << ";"
-                    << s.cpu_cull_ms << ";"
-                    << s.cpu_draw_ms << ";"
-                    << gpu_ms_for_frame << ";"
-                    << s.gpu_clock << ";"
-                    << s.gpu_mem_clock << ";"
-                    << s.gpu_util << ";"
-                    << s.gpu_pci << ";"
-                    << s.gpu_mem_used_mb << ";"
-                    << s.gpu_mem_total_mb << ";"
-                    << s.sync_time_ms << ";"
-                    << s.swap_time_ms << ";"
-                    << s.finish_ms << ";"
-                    << s.isect_ms << ";"
-                    << s.plugin_ms << ";"
-                    << s.opencover_ms << ";"
-                    << s.cpu_main_ms << ";"
-                    << s.cpu_busy_pct_proxy << ";"
-                    << s.gpu_busy_pct_proxy << ";"
-                    << s.wait_ms << ";"
-                    << s.wait_frac_pct << ";"
-                    << s.boundness << ";"
-                    << s.rendered_splats << ";"
-                    << s.rendered_nodes << ";"
-                    << s.rendered_bounding_boxes << ";"
-                    << s.position.x() << ";" << s.position.y() << ";" << s.position.z() << ";"
-                    << s.orientation.x() << ";" << s.orientation.y() << ";" << s.orientation.z() << ";" << s.orientation.w() << ";"
-                    << s.backoff_cull << ";" << s.backoff_draw << ";" << s.backoff_gpu
-                    << "\n";
-            }
         }
+        frames_out.flush();
     }
 
-    // Summary CSV (wie gehabt; optional)
+    // --- Summary CSV ---
     {
-        std::ofstream summary_out(summary_path);
-        if (!summary_out) {
-            std::cerr << "[Measurement] Fehler beim Öffnen von " << summary_path << "\n";
+        std::ofstream summary_out;
+        if (!openCsv(summary_out, summary_path)) {
+            std::cerr << "[Measurement] Could not write summary to "
+                << summary_path.string() << "\n";
         } else {
-            summary_out.imbue(std::locale::classic());
-            summary_out << std::fixed << std::setprecision(4);
-
             size_t n = m_stats.size();
             double total_duration_ms = 0, total_rate = 0;
             uint64_t total_splats = 0, total_nodes = 0, total_boxes = 0;
@@ -834,12 +1061,8 @@ void LamureMeasurement::writeLogAndStop()
                 total_cpu_update  += s.cpu_update_ms;
                 total_cpu_cull    += s.cpu_cull_ms;
                 total_cpu_draw    += s.cpu_draw_ms;
-                // GPU aus Timeline-Map (assigned_frame) – verhindert 1-Frame-Shift
-                {
-                    auto it = gpuMsByFrame.find(s.frame_number);
-                    const double gpu_ms_for_frame = (it != gpuMsByFrame.end()) ? it->second : 0.0;
-                    total_gpu += gpu_ms_for_frame;
-                }
+                auto it = gpuMsByFrame.find(s.frame_number);
+                total_gpu         += (it != gpuMsByFrame.end()) ? it->second : 0.0;
                 total_sync        += s.sync_time_ms;
                 total_swap        += s.swap_time_ms;
                 total_isect       += s.isect_ms;
@@ -848,11 +1071,12 @@ void LamureMeasurement::writeLogAndStop()
                 total_finish      += s.finish_ms;
                 total_cpu_main    += s.cpu_main_ms;
                 total_wait_ms     += s.wait_ms;
-                total_cpu_busy_pct   += s.cpu_busy_pct_proxy;
-                total_gpu_busy_pct   += s.gpu_busy_pct_proxy;
-                total_wait_frac_pct  += s.wait_frac_pct;
+                total_cpu_busy_pct+= s.cpu_busy_pct_proxy;
+                total_gpu_busy_pct+= s.gpu_busy_pct_proxy;
+                total_wait_frac_pct+= s.wait_frac_pct;
             }
 
+            summary_out << std::fixed << std::setprecision(4);
             summary_out << "Metric;Value\n";
             summary_out << "Total Frames;" << n << "\n";
             summary_out << "Total Time (s);" << total_duration_ms / 1000.0 << "\n";
@@ -876,18 +1100,50 @@ void LamureMeasurement::writeLogAndStop()
             summary_out << "Avg GPU Busy Proxy (%);"      << (n ? total_gpu_busy_pct / n : 0.0) << "\n";
             summary_out << "Avg Wait (ms);"               << (n ? total_wait_ms / n : 0.0) << "\n";
             summary_out << "Avg Wait Fraction Proxy (%);" << (n ? total_wait_frac_pct / n : 0.0) << "\n";
+
+            // --- POLICY Budgets & Provenance in Summary-CSV ---
+            if (auto* pol = lamure::ren::policy::get_instance()) {
+                summary_out << "Policy max_upload_budget_in_mb;"  << pol->max_upload_budget_in_mb()  << "\n";
+                summary_out << "Policy render_budget_in_mb;"      << pol->render_budget_in_mb()      << "\n";
+                summary_out << "Policy out_of_core_budget_in_mb;" << pol->out_of_core_budget_in_mb() << "\n";
+                summary_out << "Policy size_of_provenance;"       << pol->size_of_provenance()       << "\n";
+                const bool provenance_enabled = (pol->size_of_provenance() > 0);
+                summary_out << "Policy provenance_enabled;"        << (provenance_enabled ? 1 : 0)    << "\n";
+            }
+
+            // --- GPU Memory (static once) ---
+            summary_out << "GPU Mem Used MB (primary);"  << m_gpu_mem_used_mb_static  << "\n";
+            summary_out << "GPU Mem Total MB (primary);" << m_gpu_mem_total_mb_static << "\n";
+            summary_out << "GPU Mem Used MB (NVML);"     << m_gpu_mem_used_mb_nvml_static  << "\n";
+            summary_out << "GPU Mem Total MB (NVML);"    << m_gpu_mem_total_mb_nvml_static << "\n";
+            summary_out << "GPU Mem Used MB (GL_NVX);"   << m_gpu_mem_used_mb_gl_static    << "\n";
+            summary_out << "GPU Mem Total MB (GL_NVX);"  << m_gpu_mem_total_mb_gl_static   << "\n";
+
+            // --- Compile-time Config als Key;Value ---
+            writeLamureConfigCsv(summary_out);
+
+            summary_out.flush();
         }
     }
 
-    if (m_exportTimeline)
-        writeTimelineCSV(timeline_path);
+    // --- Timeline CSV ---
+    if (m_exportTimeline) {
+        std::ofstream out;
+        if (openCsv(out, timeline_path)) {
+            writeTimelineCSV(timeline_path.string());
+        } else {
+            std::cerr << "[Measurement] Could not write timeline to "
+                << timeline_path.string() << "\n";
+        }
+    }
 
-    // Optional: Markdown-Report
-    if (!m_reportMDPath.empty())
+    // --- Markdown-Report ---
     {
-        std::ofstream md(m_reportMDPath);
-        if (md) {
-            md.imbue(std::locale::classic());
+        std::ofstream md;
+        if (!openCsv(md, md_path)) {
+            std::cerr << "[Measurement] Konnte Markdown-Report nicht schreiben: "
+                << md_path.string() << "\n";
+        } else {
             md << "# Measurement Report\n\n";
             md << "- Frames: " << m_stats.size() << "\n";
             size_t n = m_stats.size();
@@ -920,11 +1176,35 @@ void LamureMeasurement::writeLogAndStop()
             md << "- Wait/Sync-bound: " << cnt_wait << "\n";
             md << "- mixed: "           << cnt_mixed << "\n";
             md << "- unknown: "         << cnt_unknown << "\n";
-        } else {
-            std::cerr << "[Measurement] Konnte Markdown-Report nicht schreiben: " << m_reportMDPath << "\n";
+
+            // --- Policy Budgets ---
+            if (auto* pol = lamure::ren::policy::get_instance()) {
+                md << "\n## Policy Budgets\n";
+                md << "- max_upload_budget_in_mb: "  << pol->max_upload_budget_in_mb()  << "\n";
+                md << "- render_budget_in_mb: "      << pol->render_budget_in_mb()      << "\n";
+                md << "- out_of_core_budget_in_mb: " << pol->out_of_core_budget_in_mb() << "\n";
+                md << "- size_of_provenance: "       << pol->size_of_provenance()       << "\n";
+                const bool provenance_enabled = (pol->size_of_provenance() > 0);
+                md << "- provenance_enabled: "       << (provenance_enabled ? "true" : "false") << "\n";
+            }
+
+            // --- GPU Memory (static) ---
+            md << "\n## GPU Memory (static)\n";
+            md << "- Primary used/total (MB): "
+                << m_gpu_mem_used_mb_static << " / " << m_gpu_mem_total_mb_static << "\n";
+            md << "- NVML used/total (MB):   "
+                << m_gpu_mem_used_mb_nvml_static << " / " << m_gpu_mem_total_mb_nvml_static << "\n";
+            md << "- GL_NVX used/total (MB): "
+                << m_gpu_mem_used_mb_gl_static << " / " << m_gpu_mem_total_mb_gl_static << "\n";
+
+            // --- Compile-time Config in Markdown ---
+            writeLamureConfigMarkdown(md);
+
+            md.flush();
         }
     }
 
+    // Cleanup
     m_stats.clear();
     m_timeline.clear();
     m_segmentTime = 0.0;
@@ -933,83 +1213,452 @@ void LamureMeasurement::writeLogAndStop()
 }
 
 
+void LamureMeasurement::writeLamureConfigMarkdown(std::ostream& md) {
+    md << "\n## Lamure Config (compile-time)\n";
 
-void LamureMeasurement::setReportMarkdown(const std::string& path)
-{
-    m_reportMDPath = path;
+#ifdef LAMURE_ENABLE_INFO
+    md << "- LAMURE_ENABLE_INFO: ON\n";
+#else
+    md << "- LAMURE_ENABLE_INFO: OFF\n";
+#endif
+
+#ifdef LAMURE_RENDERING_USE_SPLIT_SCREEN
+    md << "- LAMURE_RENDERING_USE_SPLIT_SCREEN: ON\n";
+#else
+    md << "- LAMURE_RENDERING_USE_SPLIT_SCREEN: OFF\n";
+#endif
+
+#ifdef LAMURE_RENDERING_ENABLE_MULTI_VIEW_TEST
+    md << "- LAMURE_RENDERING_ENABLE_MULTI_VIEW_TEST: ON\n";
+#else
+    md << "- LAMURE_RENDERING_ENABLE_MULTI_VIEW_TEST: OFF\n";
+#endif
+
+#ifdef LAMURE_RENDERING_ENABLE_LAZY_MODELS_TEST
+    md << "- LAMURE_RENDERING_ENABLE_LAZY_MODELS_TEST: ON\n";
+#else
+    md << "- LAMURE_RENDERING_ENABLE_LAZY_MODELS_TEST: OFF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_MEASURE_SYSTEM_PERFORMANCE
+    md << "- LAMURE_CUT_UPDATE_ENABLE_MEASURE_SYSTEM_PERFORMANCE: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_ENABLE_MEASURE_SYSTEM_PERFORMANCE: OFF\n";
+#endif
+
+#ifdef LAMURE_DEFAULT_COLOR_R
+    md << "- LAMURE_DEFAULT_COLOR_R: " << LAMURE_DEFAULT_COLOR_R << "\n";
+#else
+    md << "- LAMURE_DEFAULT_COLOR_R: UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_COLOR_G
+    md << "- LAMURE_DEFAULT_COLOR_G: " << LAMURE_DEFAULT_COLOR_G << "\n";
+#else
+    md << "- LAMURE_DEFAULT_COLOR_G: UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_COLOR_B
+    md << "- LAMURE_DEFAULT_COLOR_B: " << LAMURE_DEFAULT_COLOR_B << "\n";
+#else
+    md << "- LAMURE_DEFAULT_COLOR_B: UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_MODEL_TIMEOUT
+    md << "- LAMURE_CUT_UPDATE_ENABLE_MODEL_TIMEOUT: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_ENABLE_MODEL_TIMEOUT: OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_MAX_MODEL_TIMEOUT
+    md << "- LAMURE_CUT_UPDATE_MAX_MODEL_TIMEOUT: " << LAMURE_CUT_UPDATE_MAX_MODEL_TIMEOUT << "\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_MAX_MODEL_TIMEOUT: UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_CUT_UPDATE_EXPERIMENTAL_MODE
+    md << "- LAMURE_CUT_UPDATE_ENABLE_CUT_UPDATE_EXPERIMENTAL_MODE: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_ENABLE_CUT_UPDATE_EXPERIMENTAL_MODE: OFF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_NUM_CUT_UPDATE_THREADS
+    md << "- LAMURE_CUT_UPDATE_NUM_CUT_UPDATE_THREADS: " << LAMURE_CUT_UPDATE_NUM_CUT_UPDATE_THREADS << "\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_NUM_CUT_UPDATE_THREADS: UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_SHOW_OOC_CACHE_USAGE
+    md << "- LAMURE_CUT_UPDATE_ENABLE_SHOW_OOC_CACHE_USAGE: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_ENABLE_SHOW_OOC_CACHE_USAGE: OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_ENABLE_SHOW_GPU_CACHE_USAGE
+    md << "- LAMURE_CUT_UPDATE_ENABLE_SHOW_GPU_CACHE_USAGE: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_ENABLE_SHOW_GPU_CACHE_USAGE: OFF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_REPEAT_MODE
+    md << "- LAMURE_CUT_UPDATE_ENABLE_REPEAT_MODE: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_ENABLE_REPEAT_MODE: OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME
+    md << "- LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME: " << LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME << "\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME: UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_SPLIT_AGAIN_MODE
+    md << "- LAMURE_CUT_UPDATE_ENABLE_SPLIT_AGAIN_MODE: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_ENABLE_SPLIT_AGAIN_MODE: OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_MUST_COLLAPSE_OUTSIDE_FRUSTUM
+    md << "- LAMURE_CUT_UPDATE_MUST_COLLAPSE_OUTSIDE_FRUSTUM: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_MUST_COLLAPSE_OUTSIDE_FRUSTUM: OFF\n";
+#endif
+
+#ifdef LAMURE_DATABASE_SAFE_MODE
+    md << "- LAMURE_DATABASE_SAFE_MODE: ON\n";
+#else
+    md << "- LAMURE_DATABASE_SAFE_MODE: OFF\n";
+#endif
+
+#ifdef LAMURE_DEFAULT_IMPORTANCE
+    md << "- LAMURE_DEFAULT_IMPORTANCE: " << LAMURE_DEFAULT_IMPORTANCE << "\n";
+#else
+    md << "- LAMURE_DEFAULT_IMPORTANCE: UNDEF\n";
+#endif
+#ifdef LAMURE_MIN_IMPORTANCE
+    md << "- LAMURE_MIN_IMPORTANCE: " << LAMURE_MIN_IMPORTANCE << "\n";
+#else
+    md << "- LAMURE_MIN_IMPORTANCE: UNDEF\n";
+#endif
+#ifdef LAMURE_MAX_IMPORTANCE
+    md << "- LAMURE_MAX_IMPORTANCE: " << LAMURE_MAX_IMPORTANCE << "\n";
+#else
+    md << "- LAMURE_MAX_IMPORTANCE: UNDEF\n";
+#endif
+
+#ifdef LAMURE_DEFAULT_THRESHOLD
+    md << "- LAMURE_DEFAULT_THRESHOLD: " << LAMURE_DEFAULT_THRESHOLD << "\n";
+#else
+    md << "- LAMURE_DEFAULT_THRESHOLD: UNDEF\n";
+#endif
+#ifdef LAMURE_MIN_THRESHOLD
+    md << "- LAMURE_MIN_THRESHOLD: " << LAMURE_MIN_THRESHOLD << "\n";
+#else
+    md << "- LAMURE_MIN_THRESHOLD: UNDEF\n";
+#endif
+#ifdef LAMURE_MAX_THRESHOLD
+    md << "- LAMURE_MAX_THRESHOLD: " << LAMURE_MAX_THRESHOLD << "\n";
+#else
+    md << "- LAMURE_MAX_THRESHOLD: UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_PREFETCHING
+    md << "- LAMURE_CUT_UPDATE_ENABLE_PREFETCHING: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_ENABLE_PREFETCHING: OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_PREFETCH_FACTOR
+    md << "- LAMURE_CUT_UPDATE_PREFETCH_FACTOR: " << LAMURE_CUT_UPDATE_PREFETCH_FACTOR << "\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_PREFETCH_FACTOR: UNDEF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_PREFETCH_BUDGET
+    md << "- LAMURE_CUT_UPDATE_PREFETCH_BUDGET: " << LAMURE_CUT_UPDATE_PREFETCH_BUDGET << "\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_PREFETCH_BUDGET: UNDEF\n";
+#endif
+
+#ifdef LAMURE_MIN_UPLOAD_BUDGET
+    md << "- LAMURE_MIN_UPLOAD_BUDGET: " << LAMURE_MIN_UPLOAD_BUDGET << "\n";
+#else
+    md << "- LAMURE_MIN_UPLOAD_BUDGET: UNDEF\n";
+#endif
+#ifdef LAMURE_MIN_VIDEO_MEMORY_BUDGET
+    md << "- LAMURE_MIN_VIDEO_MEMORY_BUDGET: " << LAMURE_MIN_VIDEO_MEMORY_BUDGET << "\n";
+#else
+    md << "- LAMURE_MIN_VIDEO_MEMORY_BUDGET: UNDEF\n";
+#endif
+#ifdef LAMURE_MIN_MAIN_MEMORY_BUDGET
+    md << "- LAMURE_MIN_MAIN_MEMORY_BUDGET: " << LAMURE_MIN_MAIN_MEMORY_BUDGET << "\n";
+#else
+    md << "- LAMURE_MIN_MAIN_MEMORY_BUDGET: UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_UPLOAD_BUDGET
+    md << "- LAMURE_DEFAULT_UPLOAD_BUDGET: " << LAMURE_DEFAULT_UPLOAD_BUDGET << "\n";
+#else
+    md << "- LAMURE_DEFAULT_UPLOAD_BUDGET: UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_VIDEO_MEMORY_BUDGET
+    md << "- LAMURE_DEFAULT_VIDEO_MEMORY_BUDGET: " << LAMURE_DEFAULT_VIDEO_MEMORY_BUDGET << "\n";
+#else
+    md << "- LAMURE_DEFAULT_VIDEO_MEMORY_BUDGET: UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_MAIN_MEMORY_BUDGET
+    md << "- LAMURE_DEFAULT_MAIN_MEMORY_BUDGET: " << LAMURE_DEFAULT_MAIN_MEMORY_BUDGET << "\n";
+#else
+    md << "- LAMURE_DEFAULT_MAIN_MEMORY_BUDGET: UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_SIZE_OF_PROVENANCE
+    md << "- LAMURE_DEFAULT_SIZE_OF_PROVENANCE: " << LAMURE_DEFAULT_SIZE_OF_PROVENANCE << "\n";
+#else
+    md << "- LAMURE_DEFAULT_SIZE_OF_PROVENANCE: UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_NUM_LOADING_THREADS
+    md << "- LAMURE_CUT_UPDATE_NUM_LOADING_THREADS: " << LAMURE_CUT_UPDATE_NUM_LOADING_THREADS << "\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_NUM_LOADING_THREADS: UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_CACHE_MAINTENANCE
+    md << "- LAMURE_CUT_UPDATE_ENABLE_CACHE_MAINTENANCE: ON\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_ENABLE_CACHE_MAINTENANCE: OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER
+    md << "- LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER: " << LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER << "\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER: UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE
+    md << "- LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE: " << LM_STR(LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE) << "\n";
+#else
+    md << "- LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE: UNDEF\n";
+#endif
+
+#ifdef LAMURE_WYSIWYG_SPLAT_SCALE
+    md << "- LAMURE_WYSIWYG_SPLAT_SCALE: " << LAMURE_WYSIWYG_SPLAT_SCALE << "\n";
+#else
+    md << "- LAMURE_WYSIWYG_SPLAT_SCALE: UNDEF\n";
+#endif
+
 }
 
-
-void LamureMeasurement::writeTimelineCSV(const std::string& path)
+void LamureMeasurement::writeLamureConfigCsv(std::ostream& csv)
 {
-    // Chronologisch sortieren: primär nach Startzeit, dann tiebreaker
-    std::stable_sort(m_timeline.begin(), m_timeline.end(),
-        [](const TimeBlock& a, const TimeBlock& b){
-            if (a.begin_ms  != b.begin_ms)  return a.begin_ms  < b.begin_ms; // primär Startzeit
-            if (a.frame     != b.frame)     return a.frame     < b.frame;    // dann Ursprungsframe
-            if (a.camIndex  != b.camIndex)  return a.camIndex  < b.camIndex;
-            if (a.scope     != b.scope)     return a.scope     < b.scope;
-            return a.name < b.name;
-        });
+#ifdef LAMURE_ENABLE_INFO
+    csv << "LAMURE_ENABLE_INFO;ON\n";
+#else
+    csv << "LAMURE_ENABLE_INFO;OFF\n";
+#endif
 
-    // Duplikate filtern
-    std::vector<TimeBlock> deduped;
-    deduped.reserve(m_timeline.size());
-    auto sameKey = [](const TimeBlock& x, const TimeBlock& y){
-        return x.frame==y.frame && x.src_frame==y.src_frame &&
-            x.camIndex==y.camIndex && x.scope==y.scope && x.name==y.name &&
-            x.begin_ms==y.begin_ms && x.end_ms==y.end_ms;
-        };
-    for (const auto& tb : m_timeline) {
-        if (!deduped.empty() && sameKey(deduped.back(), tb)) continue;
-        deduped.push_back(tb);
-    }
+#ifdef LAMURE_RENDERING_USE_SPLIT_SCREEN
+    csv << "LAMURE_RENDERING_USE_SPLIT_SCREEN;ON\n";
+#else
+    csv << "LAMURE_RENDERING_USE_SPLIT_SCREEN;OFF\n";
+#endif
 
-    // FrameTime Lookup
-    std::unordered_map<unsigned,double> frameTimeByFrame;
-    frameTimeByFrame.reserve(m_stats.size());
-    for (const auto& fs : m_stats)
-        frameTimeByFrame[fs.frame_number] = fs.frame_duration_ms;
+#ifdef LAMURE_RENDERING_ENABLE_MULTI_VIEW_TEST
+    csv << "LAMURE_RENDERING_ENABLE_MULTI_VIEW_TEST;ON\n";
+#else
+    csv << "LAMURE_RENDERING_ENABLE_MULTI_VIEW_TEST;OFF\n";
+#endif
 
-    std::ofstream out(path);
-    if (!out) {
-        std::cerr << "[Measurement] Fehler beim Öffnen von " << path << "\n";
-        return;
-    }
-    out.imbue(std::locale::classic());
-    out << std::fixed << std::setprecision(4);
+#ifdef LAMURE_RENDERING_ENABLE_LAZY_MODELS_TEST
+    csv << "LAMURE_RENDERING_ENABLE_LAZY_MODELS_TEST;ON\n";
+#else
+    csv << "LAMURE_RENDERING_ENABLE_LAZY_MODELS_TEST;OFF\n";
+#endif
 
-    // Header: frame_time_ms direkt rechts neben taken_ms
-    out << "assigned_frame;"
-        << "src_frame;"
-        << "cam_index;"
-        << "scope;"
-        << "name;"
-        << "begin_ms;"
-        << "end_ms;"
-        << "taken_ms;"
-        << "frame_time_ms;"
-        << "used_offset;"
-        << "measured_frame"
-        << "\n";
+#ifdef LAMURE_CUT_UPDATE_ENABLE_MEASURE_SYSTEM_PERFORMANCE
+    csv << "LAMURE_CUT_UPDATE_ENABLE_MEASURE_SYSTEM_PERFORMANCE;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_ENABLE_MEASURE_SYSTEM_PERFORMANCE;OFF\n";
+#endif
 
-    for (const auto& tb : deduped)
-    {
-        const double frame_time_ms = [&]{
-            auto it = frameTimeByFrame.find(tb.frame);
-            return (it != frameTimeByFrame.end()) ? it->second : 0.0;
-            }();
-        out << tb.frame << ";"
-            << tb.src_frame << ";"
-            << tb.camIndex << ";"
-            << tb.scope << ";"
-            << tb.name << ";"
-            << tb.begin_ms << ";"
-            << tb.end_ms << ";"
-            << tb.taken_ms << ";"
-            << frame_time_ms << ";"
-            << tb.used_offset << ";"
-            << (tb.frame + tb.used_offset)
-            << "\n";
-    }
+#ifdef LAMURE_DEFAULT_COLOR_R
+    csv << "LAMURE_DEFAULT_COLOR_R;" << LAMURE_DEFAULT_COLOR_R << "\n";
+#else
+    csv << "LAMURE_DEFAULT_COLOR_R;UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_COLOR_G
+    csv << "LAMURE_DEFAULT_COLOR_G;" << LAMURE_DEFAULT_COLOR_G << "\n";
+#else
+    csv << "LAMURE_DEFAULT_COLOR_G;UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_COLOR_B
+    csv << "LAMURE_DEFAULT_COLOR_B;" << LAMURE_DEFAULT_COLOR_B << "\n";
+#else
+    csv << "LAMURE_DEFAULT_COLOR_B;UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_MODEL_TIMEOUT
+    csv << "LAMURE_CUT_UPDATE_ENABLE_MODEL_TIMEOUT;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_ENABLE_MODEL_TIMEOUT;OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_MAX_MODEL_TIMEOUT
+    csv << "LAMURE_CUT_UPDATE_MAX_MODEL_TIMEOUT;" << LAMURE_CUT_UPDATE_MAX_MODEL_TIMEOUT << "\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_MAX_MODEL_TIMEOUT;UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_CUT_UPDATE_EXPERIMENTAL_MODE
+    csv << "LAMURE_CUT_UPDATE_ENABLE_CUT_UPDATE_EXPERIMENTAL_MODE;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_ENABLE_CUT_UPDATE_EXPERIMENTAL_MODE;OFF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_NUM_CUT_UPDATE_THREADS
+    csv << "LAMURE_CUT_UPDATE_NUM_CUT_UPDATE_THREADS;" << LAMURE_CUT_UPDATE_NUM_CUT_UPDATE_THREADS << "\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_NUM_CUT_UPDATE_THREADS;UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_SHOW_OOC_CACHE_USAGE
+    csv << "LAMURE_CUT_UPDATE_ENABLE_SHOW_OOC_CACHE_USAGE;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_ENABLE_SHOW_OOC_CACHE_USAGE;OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_ENABLE_SHOW_GPU_CACHE_USAGE
+    csv << "LAMURE_CUT_UPDATE_ENABLE_SHOW_GPU_CACHE_USAGE;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_ENABLE_SHOW_GPU_CACHE_USAGE;OFF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_REPEAT_MODE
+    csv << "LAMURE_CUT_UPDATE_ENABLE_REPEAT_MODE;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_ENABLE_REPEAT_MODE;OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME
+    csv << "LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME;" << LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME << "\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME;UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_SPLIT_AGAIN_MODE
+    csv << "LAMURE_CUT_UPDATE_ENABLE_SPLIT_AGAIN_MODE;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_ENABLE_SPLIT_AGAIN_MODE;OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_MUST_COLLAPSE_OUTSIDE_FRUSTUM
+    csv << "LAMURE_CUT_UPDATE_MUST_COLLAPSE_OUTSIDE_FRUSTUM;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_MUST_COLLAPSE_OUTSIDE_FRUSTUM;OFF\n";
+#endif
+
+#ifdef LAMURE_DATABASE_SAFE_MODE
+    csv << "LAMURE_DATABASE_SAFE_MODE;ON\n";
+#else
+    csv << "LAMURE_DATABASE_SAFE_MODE;OFF\n";
+#endif
+
+#ifdef LAMURE_DEFAULT_IMPORTANCE
+    csv << "LAMURE_DEFAULT_IMPORTANCE;" << LAMURE_DEFAULT_IMPORTANCE << "\n";
+#else
+    csv << "LAMURE_DEFAULT_IMPORTANCE;UNDEF\n";
+#endif
+#ifdef LAMURE_MIN_IMPORTANCE
+    csv << "LAMURE_MIN_IMPORTANCE;" << LAMURE_MIN_IMPORTANCE << "\n";
+#else
+    csv << "LAMURE_MIN_IMPORTANCE;UNDEF\n";
+#endif
+#ifdef LAMURE_MAX_IMPORTANCE
+    csv << "LAMURE_MAX_IMPORTANCE;" << LAMURE_MAX_IMPORTANCE << "\n";
+#else
+    csv << "LAMURE_MAX_IMPORTANCE;UNDEF\n";
+#endif
+
+#ifdef LAMURE_DEFAULT_THRESHOLD
+    csv << "LAMURE_DEFAULT_THRESHOLD;" << LAMURE_DEFAULT_THRESHOLD << "\n";
+#else
+    csv << "LAMURE_DEFAULT_THRESHOLD;UNDEF\n";
+#endif
+#ifdef LAMURE_MIN_THRESHOLD
+    csv << "LAMURE_MIN_THRESHOLD;" << LAMURE_MIN_THRESHOLD << "\n";
+#else
+    csv << "LAMURE_MIN_THRESHOLD;UNDEF\n";
+#endif
+#ifdef LAMURE_MAX_THRESHOLD
+    csv << "LAMURE_MAX_THRESHOLD;" << LAMURE_MAX_THRESHOLD << "\n";
+#else
+    csv << "LAMURE_MAX_THRESHOLD;UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_PREFETCHING
+    csv << "LAMURE_CUT_UPDATE_ENABLE_PREFETCHING;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_ENABLE_PREFETCHING;OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_PREFETCH_FACTOR
+    csv << "LAMURE_CUT_UPDATE_PREFETCH_FACTOR;" << LAMURE_CUT_UPDATE_PREFETCH_FACTOR << "\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_PREFETCH_FACTOR;UNDEF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_PREFETCH_BUDGET
+    csv << "LAMURE_CUT_UPDATE_PREFETCH_BUDGET;" << LAMURE_CUT_UPDATE_PREFETCH_BUDGET << "\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_PREFETCH_BUDGET;UNDEF\n";
+#endif
+
+#ifdef LAMURE_MIN_UPLOAD_BUDGET
+    csv << "LAMURE_MIN_UPLOAD_BUDGET;" << LAMURE_MIN_UPLOAD_BUDGET << "\n";
+#else
+    csv << "LAMURE_MIN_UPLOAD_BUDGET;UNDEF\n";
+#endif
+#ifdef LAMURE_MIN_VIDEO_MEMORY_BUDGET
+    csv << "LAMURE_MIN_VIDEO_MEMORY_BUDGET;" << LAMURE_MIN_VIDEO_MEMORY_BUDGET << "\n";
+#else
+    csv << "LAMURE_MIN_VIDEO_MEMORY_BUDGET;UNDEF\n";
+#endif
+#ifdef LAMURE_MIN_MAIN_MEMORY_BUDGET
+    csv << "LAMURE_MIN_MAIN_MEMORY_BUDGET;" << LAMURE_MIN_MAIN_MEMORY_BUDGET << "\n";
+#else
+    csv << "LAMURE_MIN_MAIN_MEMORY_BUDGET;UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_UPLOAD_BUDGET
+    csv << "LAMURE_DEFAULT_UPLOAD_BUDGET;" << LAMURE_DEFAULT_UPLOAD_BUDGET << "\n";
+#else
+    csv << "LAMURE_DEFAULT_UPLOAD_BUDGET;UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_VIDEO_MEMORY_BUDGET
+    csv << "LAMURE_DEFAULT_VIDEO_MEMORY_BUDGET;" << LAMURE_DEFAULT_VIDEO_MEMORY_BUDGET << "\n";
+#else
+    csv << "LAMURE_DEFAULT_VIDEO_MEMORY_BUDGET;UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_MAIN_MEMORY_BUDGET
+    csv << "LAMURE_DEFAULT_MAIN_MEMORY_BUDGET;" << LAMURE_DEFAULT_MAIN_MEMORY_BUDGET << "\n";
+#else
+    csv << "LAMURE_DEFAULT_MAIN_MEMORY_BUDGET;UNDEF\n";
+#endif
+#ifdef LAMURE_DEFAULT_SIZE_OF_PROVENANCE
+    csv << "LAMURE_DEFAULT_SIZE_OF_PROVENANCE;" << LAMURE_DEFAULT_SIZE_OF_PROVENANCE << "\n";
+#else
+    csv << "LAMURE_DEFAULT_SIZE_OF_PROVENANCE;UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_NUM_LOADING_THREADS
+    csv << "LAMURE_CUT_UPDATE_NUM_LOADING_THREADS;" << LAMURE_CUT_UPDATE_NUM_LOADING_THREADS << "\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_NUM_LOADING_THREADS;UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_ENABLE_CACHE_MAINTENANCE
+    csv << "LAMURE_CUT_UPDATE_ENABLE_CACHE_MAINTENANCE;ON\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_ENABLE_CACHE_MAINTENANCE;OFF\n";
+#endif
+#ifdef LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER
+    csv << "LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER;" << LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER << "\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER;UNDEF\n";
+#endif
+
+#ifdef LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE
+    csv << "LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE;" << LM_STR(LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE) << "\n";
+#else
+    csv << "LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE;UNDEF\n";
+#endif
+
+#ifdef LAMURE_WYSIWYG_SPLAT_SCALE
+    csv << "LAMURE_WYSIWYG_SPLAT_SCALE;" << LAMURE_WYSIWYG_SPLAT_SCALE << "\n";
+#else
+    csv << "LAMURE_WYSIWYG_SPLAT_SCALE;UNDEF\n";
+#endif
 }

@@ -26,9 +26,9 @@ namespace ren {
 
 //#define LAMURE_CUT_UPDATE_ENABLE_MEASURE_SYSTEM_PERFORMANCE
 
-#define LAMURE_DEFAULT_COLOR_R 0.25f
-#define LAMURE_DEFAULT_COLOR_G 0.25f
-#define LAMURE_DEFAULT_COLOR_B 0.25f
+#define LAMURE_DEFAULT_COLOR_R 1.0f
+#define LAMURE_DEFAULT_COLOR_G 1.0f
+#define LAMURE_DEFAULT_COLOR_B 1.0f
 
 //------------------------------
 //for cut_update_pool:
@@ -47,7 +47,7 @@ namespace ren {
 
 //allow multiple cut updates per frame
 //#define LAMURE_CUT_UPDATE_ENABLE_REPEAT_MODE
-#define LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME 8
+#define LAMURE_CUT_UPDATE_MAX_NUM_UPDATES_PER_FRAME 1
 
 #define LAMURE_CUT_UPDATE_ENABLE_SPLIT_AGAIN_MODE
 
@@ -90,15 +90,15 @@ namespace ren {
 #define LAMURE_CUT_UPDATE_NUM_LOADING_THREADS 8
 //#define LAMURE_CUT_UPDATE_NUM_LOADING_THREADS 24
 
-//#define LAMURE_CUT_UPDATE_ENABLE_CACHE_MAINTENANCE
-#define LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER 500
+#define LAMURE_CUT_UPDATE_ENABLE_CACHE_MAINTENANCE
+#define LAMURE_CUT_UPDATE_CACHE_MAINTENANCE_COUNTER 30
 
 //------------------------------
 //for ooc_pool:
 //------------------------------
 
-#define LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE cache_queue::update_mode::UPDATE_ALWAYS
-//#define LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE cache_queue::update_mode::UPDATE_INCREMENT_ONLY
+//#define LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE cache_queue::update_mode::UPDATE_ALWAYS
+#define LAMURE_CUT_UPDATE_LOADING_QUEUE_MODE cache_queue::update_mode::UPDATE_INCREMENT_ONLY
 
 //------------------------------
 //for bvh_stream: 

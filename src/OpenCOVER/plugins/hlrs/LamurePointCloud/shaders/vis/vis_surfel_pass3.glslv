@@ -1,4 +1,3 @@
-// ---------- vis_fullscreen_quad.glslv ----------
 #version 420 core
 
 layout(location = 0) in vec3 in_position; // NDC-Quad [-1,1]

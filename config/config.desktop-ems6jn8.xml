@@ -11,14 +11,14 @@
       <Multisample value="off" numSamples="4" numBuffers="1" mode="DONT_CARE" />
       <NavigationMode value="XForm" />
       <CollisionDist value="1500" />
-      <Background r="0.5" g="0.5" b="1.0" /> 
+      <Background r="0.5" g="0.5" b="0.5" /> 
       <MultiThreaded value="false" />
       <ShowGeodeName enable="on" value="on"/>
       <LODScale value="1" />
       <RotationSpeed value="1" />
       <REGISTER_RAW_SCENEGRAPH value="off" />
       <ScaleAll value="on" />
-      <CoordAxis value="on" />
+      <CoordAxis value="off" />
       <Freeze value="off" />
       <FPS value="on" />
       <ConstantInteractorSize value="off"/>
@@ -31,7 +31,7 @@
       <RenderOnMaster value="on" />
       <Statistics value="off" />
       <DebugLevel value="2" />
-      <ContinuousRendering value="off" />
+      <ContinuousRendering value="on" />
       <trackedHMD value="off" />
       <HMDMode value="off" />
       <DebugTUI value="off" />
@@ -53,10 +53,10 @@
       <Far value="100000" />
       <SceneSize value="2000" />
       <ViewerPosition x="0.0" y="-2000.0" z="30.0"/>
-      <showRotationPoint value="on"/>
+      <showRotationPoint value="off"/>
       <rotationPointSize value="0.2f"/>
       <DefaultScaleFactor value="200" />
-      <SmallSceneAxis value="on">
+      <SmallSceneAxis value="off">
         <FontSize value="50"/>
       </SmallSceneAxis>
       
@@ -149,7 +149,58 @@
       
       <Plugin>
         <LamurePointCloud>
-          <lmr value="C:/src/covise/src/OpenCOVER/plugins/hlrs/LamurePointCloud/Config.lmr" />
+            <!-- Modelle: Semikolon-getrennte Liste; alternativ ein Ordner -->
+            <!--<models value="C:/data/a.bvh;C:/data/b.bvh"/> -->
+            <!-- <lmr value="C:/src/covise/src/OpenCOVER/plugins/hlrs/LamurePointCloud/Config.lmr" />  -->
+            <data_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_bin"/> <!-- optional: rekursiv .bvh sammeln -->
+            <!-- Auswahl  -->
+            <initial_selection value="0"/>
+            <!-- <json value="C:/data/provenance.json"/> -->
+            <!-- Budgets & LOD -->
+            <frame_div value="1"/>
+            <!-- <vram value="1024"/> -->
+            <!-- <ram value="4096"/> -->
+            <!-- <upload value="32"/> -->
+            <lod_error value="1.0000"/>
+            <!-- Visuals -->
+            <show_pointcloud value="on"/>
+            <show_boundingbox value="off"/>
+            <show_frustum value="off"/>
+            <show_coord value="off"/>
+            <show_text value="off"/>
+            <show_sync value="on"/>
+            <show_notify value="off"/>
+
+            <point_light_intensity value="0.6"/>
+            <ambient_intensity value="0.6"/>
+            <shininess value="0.1"/>
+            <specular_intensity value="0.1"/>
+            <gamma value="1.0"/>
+            <point_light_pos_x value="300"/>
+            <point_light_pos_y value="300"/>
+            <point_light_pos_z value="1000"/>
+
+            <shader value="Point"/>
+
+            <scale_radius value="0.05"/>
+            <scale_radius_gamma value="0.5"/>
+            <max_radius_cut value="1.45"/>
+            <max_radius value="1.0"/>
+            <min_radius value="0.0"/>
+            <max_screen_size value="10000.0"/>
+            <min_screen_size value="1.0"/>
+
+            <!-- Startpose -->
+
+
+            <!-- Measurement Struktur: Segment  = dx,dy,dz | rx,ry,rz | v_trans | v_rot -->
+            <measurement_segments value="
+              0,500,0|0,0,-90|2000|200;
+              0,0,0|0,0,90|0|200;
+              100,0,0|0,0,0|2000|0;
+            "/>
+            <measurement_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Measurement/"/>
+
         </LamurePointCloud>
 
         <AKToolbar value="false" menu="false">
