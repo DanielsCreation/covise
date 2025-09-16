@@ -460,7 +460,7 @@ void Lamure::key(int type, int keySym, int /*mod*/) {
 }
 
 void Lamure::preFrame() {
-    if (_measurement && !_measurement->isRunning()) {
+    if (m_measurement && !m_measurement->isRunning()) {
         stopMeasurement();
     }
     float deltaTime = std::clamp(float(opencover::cover->frameDuration()), 1.0f/60.0f, 1.0f/15.0f);
@@ -490,56 +490,43 @@ void Lamure::startMeasurement() {
     const std::string outFile = buildMeasurementOutputPath();
     std::cout << "[Lamure] Measurement output: " << outFile << std::endl;
 
-    _measurement = std::make_unique<LamureMeasurement>(this, opencover::VRViewer::instance(), m_settings.measurement_segments, outFile);
+    m_measurement = std::make_unique<LamureMeasurement>(this, opencover::VRViewer::instance(), m_settings.measurement_segments, outFile);
 }
 
 
 void Lamure::stopMeasurement() {
 	std::cout << "stopMeasurement(): " << m_ui->getMeasureButton()->state() << std::endl;
-    if (!_measurement) return;
+    if (!m_measurement) return;
     if (opencover::VRViewer::instance() && opencover::VRViewer::instance()->getCamera()) {
         opencover::VRViewer::instance()->getCamera()->setPreDrawCallback(nullptr);
         opencover::VRViewer::instance()->getCamera()->setPostDrawCallback(nullptr);
     }
-    _measurement->stop();
-    _measurement->writeLogAndStop();
-	opencover::VRViewer::instance()->setRunFrameScheme(rendering_scheme);
-	_measurement.reset();
+    m_measurement->stop();
+    m_measurement->writeLogAndStop();
+	m_measurement.reset();
 	m_ui->getMeasureButton()->setState(false);
+
+    opencover::VRViewer::instance()->setRunFrameScheme(rendering_scheme);
 }
 
 
-struct KeyHoldHandler : public osgGA::GUIEventHandler {
-    // ausreichend groß (OSG Keycodes sind < 512)
-    std::bitset<512> down;
+void Lamure::addMarkMs(MarkField f, double ms) noexcept
+{
+    if (!m_measurement) return; // nur akkumulieren, wenn Messung aktiv
 
-    bool handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter&) override {
-        using Key = osgGA::GUIEventAdapter;
-        const int k = ea.getKey();
-
-        // Nur Tastatur-Events behandeln
-        if (ea.getEventType() == Key::KEYDOWN) {
-            down.set(k, true);
-            // Pfeiltasten & Numpad-Kursor vor allen anderen konsumieren
-            if (k == Key::KEY_Left  || k == Key::KEY_Right ||
-                k == Key::KEY_Up    || k == Key::KEY_Down  ||
-                k == Key::KEY_KP_Left  || k == Key::KEY_KP_Right ||
-                k == Key::KEY_KP_Up    || k == Key::KEY_KP_Down)
-                return true; // niemand sonst bekommt die Taste
-        }
-        else if (ea.getEventType() == Key::KEYUP) {
-            down.set(k, false);
-            if (k == Key::KEY_Left  || k == Key::KEY_Right ||
-                k == Key::KEY_Up    || k == Key::KEY_Down  ||
-                k == Key::KEY_KP_Left  || k == Key::KEY_KP_Right ||
-                k == Key::KEY_KP_Up    || k == Key::KEY_KP_Down)
-                return true;
-        }
-        return false; // andere Events nicht blocken
+    switch (f) {
+    case MarkField::DrawCB_Total: m_marks.draw_cb_ms      += ms; break;
+    case MarkField::Dispatch:     m_marks.dispatch_ms     += ms; break;
+    case MarkField::ContextBind:  m_marks.context_bind_ms += ms; break;
+    case MarkField::Estimates:    m_marks.estimates_ms    += ms; break;
+    case MarkField::Pass1:        m_marks.pass1_ms        += ms; break;
+    case MarkField::Pass2:        m_marks.pass2_ms        += ms; break;
+    case MarkField::Pass3:        m_marks.pass3_ms        += ms; break;
+    case MarkField::SinglePass:   m_marks.singlepass_ms   += ms; break;
+    default: break;
     }
+}
 
-    inline bool held(int k) const { return k >= 0 && k < (int)down.size() && down.test(k); }
-};
 
 void Lamure::applyInitialTransforms(){
     auto* viewer = opencover::VRViewer::instance();
@@ -647,4 +634,196 @@ std::string Lamure::buildMeasurementOutputPath() const {
     std::ostringstream num; num << std::setw(4) << std::setfill('0') << next;
     fs::path out = dir / (stem + "_" + num.str() + ext);
     return fs::absolute(out).string();
+}
+
+bool Lamure::writeSettingsJson(const Lamure::Settings& s, const std::string& outPath)
+{
+    namespace fs = std::filesystem;
+
+    // --- kleine Helfer (alles lokal, keine statics) ---
+    auto esc = [](const std::string& str){
+        std::string r; r.reserve(str.size()+8);
+        for(char c: str){
+            switch(c){
+            case '\"': r += "\\\""; break;
+            case '\\': r += "\\\\"; break;
+            case '\n': r += "\\n";  break;
+            case '\r': r += "\\r";  break;
+            case '\t': r += "\\t";  break;
+            default:   r.push_back(c);
+            }
+        }
+        return r;
+        };
+    auto v3f = [](const scm::math::vec3f& v){
+        std::ostringstream o; o<<'['<<v.x<<','<<v.y<<','<<v.z<<']'; return o.str();
+        };
+    auto ov3 = [](const osg::Vec3& v){
+        std::ostringstream o; o<<'['<<v.x()<<','<<v.y()<<','<<v.z()<<']'; return o.str();
+        };
+    auto mat4 = [](const osg::Matrixd& M){
+        std::ostringstream o; o.setf(std::ios::fixed); o.precision(6);
+        o<<"["
+            <<"["<<M(0,0)<<","<<M(0,1)<<","<<M(0,2)<<","<<M(0,3)<<"],"
+            <<"["<<M(1,0)<<","<<M(1,1)<<","<<M(1,2)<<","<<M(1,3)<<"],"
+            <<"["<<M(2,0)<<","<<M(2,1)<<","<<M(2,2)<<","<<M(2,3)<<"],"
+            <<"["<<M(3,0)<<","<<M(3,1)<<","<<M(3,2)<<","<<M(3,3)<<"]"
+            <<"]";
+        return o.str();
+        };
+    auto segs = [](const std::vector<LamureMeasurement::Segment>& S){
+        std::ostringstream o; o.setf(std::ios::fixed); o.precision(6);
+        o<<'[';
+        for(size_t i=0;i<S.size();++i){
+            if(i) o<<',';
+            o<<"{"
+                << "\"tra\":["<<S[i].tra.x()<<','<<S[i].tra.y()<<','<<S[i].tra.z()<<"],"
+                << "\"rot\":["<<S[i].rot.x()<<','<<S[i].rot.y()<<','<<S[i].rot.z()<<"],"
+                << "\"transSpeed\":"<<S[i].transSpeed<<","
+                << "\"rotSpeed\":"  <<S[i].rotSpeed
+                << "}";
+        }
+        o<<']'; return o.str();
+        };
+    auto vecStr = [&](const std::vector<std::string>& v){
+        std::ostringstream o; o<<'[';
+        for(size_t i=0;i<v.size();++i){ if(i) o<<','; o<<'\"'<<esc(v[i])<<'\"'; }
+        o<<']'; return o.str();
+        };
+    auto vecU32 = [&](const std::vector<uint32_t>& v){
+        std::ostringstream o; o<<'[';
+        for(size_t i=0;i<v.size();++i){ if(i) o<<','; o<<v[i]; }
+        o<<']'; return o.str();
+        };
+
+    // Zielordner anlegen
+    try {
+        fs::path p(outPath);
+        if (p.has_parent_path()) {
+            std::error_code ec;
+            fs::create_directories(p.parent_path(), ec);
+            if (ec) {
+                std::cerr << "[LamureUtil] create_directories failed: "
+                    << p.parent_path().string() << " : " << ec.message() << "\n";
+            }
+        }
+    } catch (...) {
+        // non-fatal
+    }
+
+    std::ofstream js(outPath, std::ios::out | std::ios::trunc);
+    if (!js) {
+        std::cerr << "[LamureUtil] Failed to open settings JSON: " << outPath << "\n";
+        return false;
+    }
+
+    js << "{\n";
+
+    // Dateien / Namen
+    js << "  \"measurement_dir\": \""  << esc(s.measurement_dir)  << "\",\n";
+    js << "  \"measurement_name\": \"" << esc(s.measurement_name) << "\",\n";
+
+    // Modelle & Auswahl
+    js << "  \"models\": " << vecStr(s.models) << ",\n";
+    js << "  \"initial_selection\": " << vecU32(s.initial_selection) << ",\n";
+
+    // Budgets / LOD
+    js << "  \"frame_div\": " << s.frame_div << ",\n";
+    js << "  \"vram\": "      << s.vram      << ",\n";
+    js << "  \"ram\": "       << s.ram       << ",\n";
+    js << "  \"upload\": "    << s.upload    << ",\n";
+    js << "  \"lod_error\": " << s.lod_error << ",\n";
+
+    // Flags
+    js << "  \"face_eye\": "             << (s.face_eye ? "true" : "false") << ",\n";
+    js << "  \"pvs_culling\": "          << (s.pvs_culling ? "true" : "false") << ",\n";
+    js << "  \"use_pvs\": "              << (s.use_pvs ? "true" : "false") << ",\n";
+    js << "  \"create_aux_resources\": " << (s.create_aux_resources ? "true" : "false") << ",\n";
+
+    // Aux-Parameter
+    js << "  \"max_brush_size\": "     << s.max_brush_size << ",\n";
+    js << "  \"channel\": "            << s.channel << ",\n";
+    js << "  \"aux_point_size\": "     << s.aux_point_size << ",\n";
+    js << "  \"aux_point_distance\": " << s.aux_point_distance << ",\n";
+    js << "  \"aux_point_scale\": "    << s.aux_point_scale << ",\n";
+    js << "  \"aux_focal_length\": "   << s.aux_focal_length << ",\n";
+
+    // Visual toggles
+    js << "  \"show_pointcloud\": "        << (s.show_pointcloud ? "true":"false") << ",\n";
+    js << "  \"show_boundingbox\": "       << (s.show_boundingbox ? "true":"false") << ",\n";
+    js << "  \"show_frustum\": "           << (s.show_frustum ? "true":"false") << ",\n";
+    js << "  \"show_coord\": "             << (s.show_coord ? "true":"false") << ",\n";
+    js << "  \"show_text\": "              << (s.show_text ? "true":"false") << ",\n";
+    js << "  \"show_sync\": "              << (s.show_sync ? "true":"false") << ",\n";
+    js << "  \"show_notify\": "            << (s.show_notify ? "true":"false") << ",\n";
+    js << "  \"show_normals\": "           << (s.show_normals ? "true":"false") << ",\n";
+    js << "  \"show_accuracy\": "          << (s.show_accuracy ? "true":"false") << ",\n";
+    js << "  \"show_radius_deviation\": "  << (s.show_radius_deviation ? "true":"false") << ",\n";
+    js << "  \"show_output_sensitivity\": "<< (s.show_output_sensitivity ? "true":"false") << ",\n";
+    js << "  \"show_sparse\": "            << (s.show_sparse ? "true":"false") << ",\n";
+    js << "  \"show_views\": "             << (s.show_views ? "true":"false") << ",\n";
+    js << "  \"show_photos\": "            << (s.show_photos ? "true":"false") << ",\n";
+    js << "  \"show_octrees\": "           << (s.show_octrees ? "true":"false") << ",\n";
+    js << "  \"show_bvhs\": "              << (s.show_bvhs ? "true":"false") << ",\n";
+    js << "  \"show_pvs\": "               << (s.show_pvs ? "true":"false") << ",\n";
+
+    // Lighting / ToneMapping
+    js << "  \"point_light_intensity\": " << s.point_light_intensity << ",\n";
+    js << "  \"ambient_intensity\": "     << s.ambient_intensity << ",\n";
+    js << "  \"specular_intensity\": "    << s.specular_intensity << ",\n";
+    js << "  \"shininess\": "             << s.shininess << ",\n";
+    js << "  \"gamma\": "                 << s.gamma << ",\n";
+    js << "  \"use_tone_mapping\": "      << (s.use_tone_mapping ? "true":"false") << ",\n";
+    js << "  \"point_light_pos\": "       << v3f(s.point_light_pos) << ",\n";
+
+    // Heatmap
+    js << "  \"heatmap\": "           << (s.heatmap ? "true":"false") << ",\n";
+    js << "  \"heatmap_min\": "       << s.heatmap_min << ",\n";
+    js << "  \"heatmap_max\": "       << s.heatmap_max << ",\n";
+    js << "  \"heatmap_color_min\": " << v3f(s.heatmap_color_min) << ",\n";
+    js << "  \"heatmap_color_max\": " << v3f(s.heatmap_color_max) << ",\n";
+
+    // Shader / Radii
+    js << "  \"shader\": \""        << esc(s.shader) << "\",\n";
+    js << "  \"min_radius\": "      << s.min_radius << ",\n";
+    js << "  \"max_radius\": "      << s.max_radius << ",\n";
+    js << "  \"min_screen_size\": " << s.min_screen_size << ",\n";
+    js << "  \"max_screen_size\": " << s.max_screen_size << ",\n";
+    js << "  \"scale_radius\": "    << s.scale_radius << ",\n";
+    js << "  \"max_radius_cut\": "  << s.max_radius_cut << ",\n";
+    js << "  \"radius_scale_gamma\": " << s.scale_radius_gamma << ",\n";
+    js << "  \"scale_surfel\": "    << s.scale_surfel << ",\n";
+
+    // Multi-Pass
+    js << "  \"depth_range\": "   << s.depth_range << ",\n";
+    js << "  \"flank_lift\": "    << s.flank_lift << ",\n";
+
+    // Pfade
+    js << "  \"pvs\": \""             << esc(s.pvs) << "\",\n";
+    js << "  \"background_image\": \""<< esc(s.background_image) << "\",\n";
+
+    // Provenance
+    js << "  \"provenance\": " << (s.provenance ? "true":"false") << ",\n";
+    js << "  \"json\": \""     << esc(s.json) << "\",\n";
+
+    // Background color
+    js << "  \"background_color\": " << v3f(s.background_color) << ",\n";
+
+    // Initial Matrices
+    js << "  \"use_initial_navigation\": " << (s.use_initial_navigation ? "true":"false") << ",\n";
+    js << "  \"use_initial_view\": "       << (s.use_initial_view ? "true":"false") << ",\n";
+    js << "  \"initial_navigation\": "     << mat4(s.initial_navigation) << ",\n";
+    js << "  \"initial_view\": "           << mat4(s.initial_view) << ",\n";
+
+    // Segmente
+    js << "  \"measurement_segments\": " << segs(s.measurement_segments) << ",\n";
+
+    // Diverse
+    js << "  \"num_models\": " << s.num_models << "\n";
+
+    js << "}\n";
+    js.flush();
+
+    std::cout << "[LamureUtil] Settings JSON written: " << outPath << "\n";
+    return true;
 }

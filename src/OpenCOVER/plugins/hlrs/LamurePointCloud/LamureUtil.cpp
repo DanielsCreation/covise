@@ -1,4 +1,5 @@
 ﻿#include "LamureUtil.h"
+#include "Lamure.h"               // für LamureSettings (dein Struct)
 #include <iostream>
 #include <scm/gl_core/primitives/box.h>
 #include <config/CoviseConfig.h>
@@ -6,6 +7,7 @@
 //boost
 #include <boost/regex.hpp>
 
+#include <filesystem>
 #include <fstream> // For std::ifstream
 #include <sstream> // For std::stringstream
 #include <iomanip> // For std::setprecision

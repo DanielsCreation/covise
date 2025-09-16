@@ -24,6 +24,11 @@ class LamureMeasurement
 {
 public:
 
+    bool isActive() const noexcept;                 // true, solange m_running
+    void endFrame(uint64_t rendered_nodes,
+        uint64_t rendered_prims);         // 1× pro Frame
+
+
     struct TimeBlock {
         unsigned frame     = 0;   // Basisframe (aus pickStableFrame)
         unsigned src_frame = 0;   // Effektives Stats-Frame (frame - used_offset)
@@ -72,12 +77,55 @@ public:
         double isect_ms            = 0.0;
         double opencover_ms        = 0.0;
 
+        double coverage_proxy       = 0.0;
+        double coverage_node_refs   = 0.0;
+
+        double mark_draw_impl_ms   = 0.0;
+        double mark_pass1_ms       = 0.0;
+        double mark_pass2_ms       = 0.0;
+        double mark_pass3_ms       = 0.0;
+        double mark_singlepass_ms  = 0.0;
+        double mark_dispatch_ms    = 0.0;
+        double mark_context_bind_ms= 0.0;
+        double mark_estimates_ms   = 0.0;
+
+        double est_screen_px      = 0.0;
+        double est_sum_area_px    = 0.0;
+        double est_density        = 0.0;
+
+        double est_coverage       = 0.0;
+        double est_coverage_px    = 0.0;
+        double est_overdraw       = 0.0;
+        
+        float avg_area_px_per_prim = 0.0f;
+
+
+        int   vp_width  = 0;
+        int   vp_height = 0;
+        float cam_near  = 0.f;
+        float cam_far   = 0.f;
+        float cam_H_over_tmb = 0.f; // H / (top-bottom) am Near
+
+        // Lamure/Rendering (roh)
+        std::string primitive; // "point" | "surfel" | "splat"
+        float z_view_est   = 0.f;  // z im Viewspace (negativ vor Kamera)
+        float r_world_est  = 0.f;  // avg primitive extent^gamma
+        float min_px       = 0.f;  // Settings
+        float max_px       = 0.f;  // Settings
+        float scale_radius = 1.f;  // Settings
+
+        // Coverage (erst beim Schreiben gesetzt)
+        double cov_C1   = 0.0;
+        double cov_D    = 0.0;
+        double cov_mult = 0.0;
+
         osg::Vec3d position;
         osg::Quat  orientation;
 
         unsigned backoff_cull = 0;
         unsigned backoff_draw = 0;
         unsigned backoff_gpu  = 0;
+        int      segment_index = -1;
 
         // optional (NVML, Windows/NVIDIA), sonst 0
         double gpu_mem_used_mb   = 0.0;
@@ -153,6 +201,11 @@ private:
     osg::Vec3 m_lastTraApplied{0,0,0};
     osg::Vec3 m_lastRotApplied{0,0,0};
     bool      m_havePoseDeltas = false;
+    double m_segmentStartRefTime{0.0};
+    bool   m_haveSegmentStart{false};
+
+    // interner Helfer (Suche passenden FrameStats-Eintrag)
+    int findStatsIndexForFrame(uint64_t frame_no) const;
 
     std::string m_reportMDPath; // wenn gesetzt, schreibe Markdown-Report am Ende
 
