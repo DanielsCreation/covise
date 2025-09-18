@@ -152,16 +152,19 @@
             <!-- Modelle: Semikolon-getrennte Liste; alternativ ein Ordner -->
             <!--<models value="C:/data/a.bvh;C:/data/b.bvh"/> -->
             <!-- <lmr value="C:/src/covise/src/OpenCOVER/plugins/hlrs/LamurePointCloud/Config.lmr" />  -->
-            <data_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_bin"/> <!-- optional: rekursiv .bvh sammeln -->
+             <!-- <data_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_bin"/> -->
+             <data_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_vis"/>
+            
             <!-- Auswahl  -->
             <initial_selection value="0"/>
-            <!-- <json value="C:/data/provenance.json"/> -->
+            
             <!-- Budgets & LOD -->
             <frame_div value="1"/>
             <!-- <vram value="1024"/> -->
             <!-- <ram value="4096"/> -->
             <!-- <upload value="32"/> -->
-            <lod_error value="1.0000"/>
+            <lod_error value="2.5"/>
+
             <!-- Visuals -->
             <show_pointcloud value="on"/>
             <show_boundingbox value="off"/>
@@ -180,7 +183,12 @@
             <point_light_pos_y value="300"/>
             <point_light_pos_z value="1000"/>
 
-            <shader value="Point"/>
+            <point value="on"/>
+            <surfel value="off"/>
+            <splatting value="off"/>
+            <lighting value="off"/>
+            <color value="off"/>
+            <color_mode value="accuracy"/> <!-- normals, accuracy, derivation, sensitivity -->
 
             <scale_radius value="0.05"/>
             <scale_radius_gamma value="0.5"/>
@@ -189,6 +197,8 @@
             <min_radius value="0.0"/>
             <max_screen_size value="10000.0"/>
             <min_screen_size value="1.0"/>
+            <scale_points value="1.0"/>
+            <scale_surfel value="1.75"/>
 
             <!-- Startpose -->
 
@@ -199,6 +209,7 @@
               15,0,0|0,0,-90|0|22.5;
               0,15,0|0,0,-90|0|22.5;
               -15,0,0|0,0,-90|0|22.5;
+              0,45,-50|90,0,0|0|22.5;
             -->
 
             <measurement_segments value="
@@ -208,7 +219,7 @@
               -15,0,0|0,0,-90|0|22.5;
               0,45,-50|90,0,0|0|22.5;
             "/>
-            <measurement_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Measurement/"/>
+            <measurement_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Measurement/all/"/>
 
         </LamurePointCloud>
 

@@ -48,20 +48,6 @@ void LamureUI::setupUi() {
     m_dump_button->setShared(true);
 
 
-    // --- Measurement ---
-    m_measure_group = new opencover::ui::Group(m_lamure_menu, "Measurement");
-
-    m_measure_button = new opencover::ui::Button(m_measure_group, "run_measurement");
-    m_measure_button->setText("Run Measurement");
-    m_measure_button->setShared(true);
-    m_measure_button->setState(false);
-    m_measure_button->setCallback([this](bool state) {
-        if (state)
-            m_plugin->startMeasurement();
-        else
-            m_plugin->stopMeasurement();
-        });
-
 
     m_primitives_group = new opencover::ui::Group(m_lamure_menu, "Primitives");
 
@@ -194,8 +180,12 @@ void LamureUI::setupUi() {
     m_scale_surfel_slider->setBounds(0.1f, 5.0f);
     m_scale_surfel_slider->setValue(m_plugin->getSettings().scale_surfel);
     m_scale_surfel_slider->setShared(true);
-    m_scale_surfel_slider->setCallback([this](double value, bool released)
-        { m_plugin->getSettings().scale_surfel = static_cast<float>(value); });
+    m_scale_surfel_slider->setCallback([this](double v, bool released) {
+        auto &st = m_plugin->getSettings();
+        st.scale_surfel = static_cast<float>(v);
+        if (st.surfel || st.splatting)
+            st.scale_element = st.scale_surfel;
+        });
 
     // --- Multi-Pass Blending Sliders ---
     m_depth_range_slider = new opencover::ui::Slider(m_point_size_menu, "depth_range");
@@ -412,38 +402,10 @@ void LamureUI::setupUi() {
             st.lighting = false; m_lighting_button->setState(false);
         }
     }
-
-
-    //std::vector<std::string> modes = {
-    //    "Normals",
-    //    "Accuracy",
-    //    "Radius Deviation",
-    //    "Output Sensitivity"
-    //};
-    //m_mode_choice->setList(modes);
-    //auto setMode = [this](int idx) {
-    //    auto &st = m_plugin->getSettings();
-    //    st.show_normals            = (idx == 0);
-    //    st.show_accuracy           = (idx == 1);
-    //    st.show_radius_deviation   = (idx == 2);
-    //    st.show_output_sensitivity = (idx == 3);
-    //    };
-
-    //auto &s = m_plugin->getSettings();
-    //int initial_mode_idx = -1;
-    //if      (s.show_normals)            initial_mode_idx = 0;
-    //else if (s.show_accuracy)           initial_mode_idx = 1;
-    //else if (s.show_radius_deviation)   initial_mode_idx = 2;
-    //else if (s.show_output_sensitivity) initial_mode_idx = 3;
-
-    //if (initial_mode_idx < 0) initial_mode_idx = 0;
-    //m_mode_choice->select(initial_mode_idx);
-    //setMode(initial_mode_idx);
-    //m_mode_choice->setCallback([this, setMode](int idx){
-    //    if (idx < 0 || idx > 3) idx = 0;
-    //    setMode(idx);
-    //    });
-
+    {
+        auto &st = m_plugin->getSettings();
+        st.scale_element = st.point ? st.scale_point : st.scale_surfel;
+    }
 
     const auto &available_shaders = m_plugin->getRenderer()->getPclShader();
 
@@ -457,6 +419,7 @@ void LamureUI::setupUi() {
         st.shader = name;
     };
 
+    // POINT
     m_point_button->setCallback([this, applyShader](bool on) {
         auto &st = m_plugin->getSettings();
         if (!on) {
@@ -467,10 +430,12 @@ void LamureUI::setupUi() {
         if (m_surfel_button) m_surfel_button->setState(false);
         if (m_splat_button)  m_splat_button ->setState(false);
 
+        // statt 1.0f:
+        st.scale_element = st.scale_point;   // <<<< hier anpassen
+
         applyShader(st.lighting ? LamureRenderer::ShaderType::PointColorLighting
-                 : (st.coloring ? LamureRenderer::ShaderType::PointColor
-                                : LamureRenderer::ShaderType::Point));
-        //st.scale_element = st.scale_point;
+            : (st.coloring ? LamureRenderer::ShaderType::PointColor
+                : LamureRenderer::ShaderType::Point));
         });
 
     // SURFEL
@@ -483,10 +448,13 @@ void LamureUI::setupUi() {
         st.point = false; st.surfel = true; st.splatting = false;
         if (m_point_button) m_point_button->setState(false);
         if (m_splat_button) m_splat_button->setState(false);
-        applyShader(   st.lighting ? LamureRenderer::ShaderType::SurfelColorLighting
-                    : (st.coloring ? LamureRenderer::ShaderType::SurfelColor
-                                   : LamureRenderer::ShaderType::Surfel));
+
+        // >> neu/entscheidend:
         st.scale_element = st.scale_surfel;
+
+        applyShader(st.lighting ? LamureRenderer::ShaderType::SurfelColorLighting
+            : (st.coloring ? LamureRenderer::ShaderType::SurfelColor
+                : LamureRenderer::ShaderType::Surfel));
         });
 
     // SPLAT
@@ -499,8 +467,11 @@ void LamureUI::setupUi() {
         st.point = false; st.surfel = false; st.splatting = true;
         if (m_point_button)  m_point_button ->setState(false);
         if (m_surfel_button) m_surfel_button->setState(false);
-        applyShader(LamureRenderer::ShaderType::SurfelMultipass);
+
+        // >> neu/entscheidend:
         st.scale_element = st.scale_surfel;
+
+        applyShader(LamureRenderer::ShaderType::SurfelMultipass);
         });
 
     // COLORING
@@ -538,4 +509,98 @@ void LamureUI::setupUi() {
                              : LamureRenderer::ShaderType::Point);
         applyShader(t);
         });
+
+
+    // --- Measurement ---
+
+    m_measure_menu  = new opencover::ui::Menu (m_lamure_menu, "Measurement");
+    m_measure_group = new opencover::ui::Group(m_measure_menu, "Measurement");
+
+    // --- Settings normalisieren (Priorität: Full > Light > Off)
+    {
+        auto& S = m_plugin->getSettings();
+        if (S.measure_full) {
+            S.measure_full  = true;  S.measure_light = false; S.measure_off = false;
+        } else if (S.measure_light) {
+            S.measure_full  = false; S.measure_light = true;  S.measure_off = false;
+        } else if (S.measure_off) {
+            S.measure_full  = false; S.measure_light = false; S.measure_off = true;
+        } else {
+            // Nichts gesetzt -> Full als Default
+            S.measure_full  = true;  S.measure_light = false; S.measure_off = false;
+        }
+    }
+
+    // Hilfsfunktion: Modus anwenden (Settings + UI-Buttons synchron halten)
+    auto applyMeasure = [this](bool full, bool light, bool off) {
+
+        auto& S = m_plugin->getSettings();
+        S.measure_full  = full;
+        S.measure_light = light;
+        S.measure_off   = off;
+
+        // UI spiegeln
+        m_measure_full->setState (full);
+        m_measure_light->setState(light);
+        m_measure_off->setState  (off);
+
+        };
+
+    // --- Buttons (jedes Element braucht einen eindeutigen Namen!)
+    m_measure_full = new opencover::ui::Button(m_measure_group, "full");
+    m_measure_full->setText("Messung full");
+    m_measure_full->setShared(true);
+
+    m_measure_light = new opencover::ui::Button(m_measure_group, "light");
+    m_measure_light->setText("Messung light");
+    m_measure_light->setShared(true);
+
+    m_measure_off = new opencover::ui::Button(m_measure_group, "off");
+    m_measure_off->setText("Messung off");
+    m_measure_off->setShared(true);
+
+    // Initiale UI-States aus Settings übernehmen
+    {
+        auto& S = m_plugin->getSettings();
+        m_measure_full ->setState(S.measure_full);
+        m_measure_light->setState(S.measure_light);
+        m_measure_off  ->setState(S.measure_off);
+    }
+
+    // Callbacks: Exklusivität erzwingen + aktiven Button nicht ausschalten lassen
+    m_measure_full->setCallback([this, applyMeasure](bool state){
+        if (!state) { m_measure_full->setState(true); return; }
+        applyMeasure(true, false, false);
+        });
+
+    m_measure_light->setCallback([this, applyMeasure](bool state){
+        if (!state) { m_measure_light->setState(true); return; }
+        applyMeasure(false, true, false);
+        });
+
+    m_measure_off->setCallback([this, applyMeasure](bool state){
+        if (!state) { m_measure_off->setState(true); return; }
+        applyMeasure(false, false, true);
+        });
+
+
+    m_measure_sample = new opencover::ui::Slider(m_measure_group, "sampling");
+    m_measure_sample->setText("Sampling");
+    m_measure_sample->setBounds(1, 60);
+    m_measure_sample->setIntegral(true);
+    m_measure_sample->setValue(m_plugin->getSettings().measure_sample);
+    m_measure_sample->setCallback([this](double value, bool released){
+        m_plugin->getSettings().measure_sample = static_cast<float>(value);
+        });
+
+    // Run Measurement (Toggle)
+    m_measure_button = new opencover::ui::Button(m_measure_menu, "run_measurement");
+    m_measure_button->setText("Run Measurement");
+    m_measure_button->setShared(true);
+    m_measure_button->setState(false);
+    m_measure_button->setCallback([this](bool on){
+        if (on) m_plugin->startMeasurement();
+        else    m_plugin->stopMeasurement();
+        });
+
 }

@@ -78,26 +78,29 @@ struct ScopedMark {
     ~ScopedMark();
 };
 
-//#define LM_SCOPE(pluginPtr, FIELD) ::ScopedMark _lm_scope_##FIELD##__LINE__(pluginPtr, MarkField::FIELD)
-// Token-Paste Helfer, damit jede Scope-Variable pro Zeile eindeutig ist
-//#define LM_CAT_IMPL(a,b) a##b
-//#define LM_CAT(a,b) LM_CAT_IMPL(a,b)
 
-// Robustes Scope-Makro: erzeugt eine RAII-Variable mit eindeutigem Namen.
-// Akkumuliert NUR, wenn ein Measurement aktiv ist (das checkt der ScopedMark-Destructor).
-//#define LM_SCOPE(pluginPtr, FIELD) \
-//    ScopedMark LM_CAT(_lm_scope_, __LINE__){ (pluginPtr), MarkField::FIELD }
 
 #define LM_CAT_IMPL(a,b) a##b
 #define LM_CAT(a,b) LM_CAT_IMPL(a,b)
+
+// für „unused“-Warnungen (trotzdem läuft der Destruktor!)
 #if __cplusplus >= 201703L
 #define LM_MAYBE_UNUSED [[maybe_unused]]
 #else
 #define LM_MAYBE_UNUSED
 #endif
-#define LM_SCOPE(pluginPtr, FIELD) \
-    LM_MAYBE_UNUSED ::ScopedMark LM_CAT(_lm_scope_, __LINE__){ (pluginPtr), MarkField::FIELD }
 
+// Einziger öffentliche Entry-Point: erzeugt eine RAII-Variable.
+// Ctor = Begin-Mark, Dtor = End + "time taken" schreiben.
+// Wenn kein Measurement aktiv ist, macht ScopedMark intern nichts.
+#define LM_SCOPE(pluginPtr, FIELD) \
+  LM_MAYBE_UNUSED ::ScopedMark LM_CAT(_lm_scope_, __LINE__){ (pluginPtr), MarkField::FIELD }
+
+// Start-Marke: legt nur eine lokale Tick-Variable an
+#define LM_MARK_BEGIN(VARNAME) \
+    const osg::Timer_t VARNAME = osg::Timer::instance()->tick()
+
+enum class MeasureMode { Off, Lite, Full };
 
 class Lamure : public opencover::coVRPlugin, public opencover::ui::Owner
 {
@@ -195,6 +198,10 @@ public:
         bool point{false};
         bool surfel{false};
         bool splatting{false};
+        bool measure_off{false};
+        bool measure_light{false};
+        bool measure_full{true};                  
+        int32_t measure_sample{1};         
     };
 
     struct ModelInfo
@@ -221,6 +228,7 @@ public:
         float est_overdraw{0.0f};
         float estimates_ms{0.0f};
         float avg_area_px_per_prim{0.0f};
+        float est_density_raw = 0, est_coverage_raw = 0, est_coverage_px_raw = 0, est_overdraw_raw = 0;
         float fps{0.0f};
     };
 
@@ -269,6 +277,7 @@ public:
     void addMarkMs(MarkField f, double ms) noexcept;
     const FrameMarks& getFrameMarks() const noexcept { return m_marks; }
 
+
 private:
     static Lamure* plugin;
 
@@ -288,6 +297,10 @@ private:
     bool                                 measurement_running{false};
     bool                                 prov_valid{false};
     bool                                 m_silenceMeasureToggle{false};
+    float        prev_frame_rate_ = 0.0f;
+    unsigned int prev_vsync_frames_ = 0;
+    bool         fps_cap_modified_ = false;
+    bool         vsync_modified_   = false;
     FrameMarks                           m_marks;
 
     std::bitset<512> m_keyDown_;
@@ -300,6 +313,7 @@ private:
 
     std::vector<LamureMeasurement::Segment> parseMeasurementSegments(const std::string& cfg) const;
     std::string buildMeasurementOutputPath() const;
+    void applyShaderToRendererFromSettings();
 };
 
 inline ScopedMark::~ScopedMark() {

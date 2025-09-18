@@ -23,19 +23,16 @@ void main()
     vec3 accumulated_normal = texture(in_normal_texture,      t).rgb;
     vec3 accumulated_pos_vs = texture(in_vs_position_texture, t).rgb;
 
-    if (accumulated_color.a <= 0.0)
-        discard; // kein Surfel-Beitrag
+    if (accumulated_color.a <= 0.0) discard;
 
-    float sum_w = accumulated_color.a; // Σw
-
-    // Gemittelte Größen (gewichteter Mittelwert)
+    float sum_w = accumulated_color.a;
     vec3 albedo    = accumulated_color.rgb  / max(sum_w, 1e-8);
     vec3 normal_vs = normalize(accumulated_normal / max(sum_w, 1e-8));
     vec3 pos_vs    = accumulated_pos_vs     / max(sum_w, 1e-8);
 
     // Debug-Modi umgehen Beleuchtung
-    vec3 shaded = (lighting) ? shade_blinn_phong(pos_vs, normal_vs, albedo) : albedo;
+    bool debug = (show_normals || show_accuracy || show_radius_deviation || show_output_sensitivity);
+    vec3 shaded = debug ? albedo : shade_blinn_phong(pos_vs, normal_vs, albedo);
 
-    // Voll deckende Ausgabe (keine Transparenz, kein Blend nötig)
     out_color = vec4(shaded, 1.0);
 }

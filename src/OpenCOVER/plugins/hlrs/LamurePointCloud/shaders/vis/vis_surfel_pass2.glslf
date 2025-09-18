@@ -28,8 +28,9 @@ layout(location = 0) out vec4 accumulated_colors;       // rgb = Σ(color*w), a 
 layout(location = 1) out vec3 accumulated_normals;      // Σ(normal*w)
 layout(location = 2) out vec3 accumulated_vs_positions; // Σ(pos_vs*w)
 
-// --- Stability Constant ---
-const float kEpsMin   = 1e-6; // Bleibt als Konstante
+// Konstanten wie in deiner funktionierenden Version
+const float kEpsMin   = 1e-6;
+const float kEpsScale = 2.0;
 
 void main()
 {
@@ -41,20 +42,17 @@ void main()
 
     vec4  clip = projection_matrix * vec4(pos_vs, 1.0);
     float z01  = (clip.z / clip.w) * 0.5 + 0.5;
+
     float z_scene = texelFetch(depth_texture, ivec2(gl_FragCoord.xy), 0).r;
 
-    // 1. Tiefentoleranz berechnen (mit neuem uniform)
-    float eps_ndc = max(kEpsMin, fwidth(z01)) * depth_range;
-    float dz = z01 - z_scene;
-    if (dz > eps_ndc) discard;
+    // identisch zum „guten“ Build
+    float eps_ndc = max(kEpsMin, fwidth(z01)) * kEpsScale;
+    if (z01 > z_scene + eps_ndc) discard;
 
-    // 2. Gewichtung des Punkt-Profils berechnen
-    float r = sqrt(r2);
-    int idx = int(clamp(round(r * 31.0), 0.0, 31.0));
-    float w_gauss = gaussian[idx];
-    float w = mix(w_gauss, 1.0, flank_lift);
+    float r  = sqrt(r2);
+    float dr = fwidth(r);
+    float w  = 1.0 - smoothstep(1.0 - 2.0*dr, 1.0, r);
 
-    // --- Final Output ---
     accumulated_colors       = vec4(fs_in.albedo_rgb * w, w);
     accumulated_normals      = fs_in.vs_normal * w;
     accumulated_vs_positions = pos_vs * w;

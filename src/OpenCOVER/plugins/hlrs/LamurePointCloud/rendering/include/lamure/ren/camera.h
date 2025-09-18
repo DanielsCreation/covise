@@ -73,6 +73,10 @@ class camera
     inline const double near_plane_value() const { return near_; }
     inline const double far_plane_value() const { return far_; }
 
+
+    inline void set_near_plane_value(double near_plane) { near_ = near_plane; }
+    inline void set_far_plane_value(double far_plane) { far_ = far_plane; }
+
     void set_trackball_matrix(scm::math::mat4d const& tb_matrix) { trackball_.set_transform(tb_matrix); }
 
     void set_view_matrix(const scm::math::mat4d &in_view);

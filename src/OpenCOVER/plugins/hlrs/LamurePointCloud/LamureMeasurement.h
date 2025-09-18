@@ -1,196 +1,296 @@
 #pragma once
 
-// Include GLEW first
+// GLEW zuerst (für glGetString, glGetIntegerv, glewIsSupported, GL_* Konstanten)
 #include <GL/glew.h>
 
-// Then other headers
-#include <cover/ui/ButtonGroup.h>
-#include <cover/ui/Button.h>
-#include <cover/coVRTui.h>
+// OSG / OpenCOVER
 #include <cover/VRViewer.h>
-#include <osg/Timer>
-#include <osg/Camera>
-#include <osgViewer/Viewer>
-#include <vector>
-#include <utility>
-#include <string>
 #include <cover/VRSceneGraph.h>
 #include <cover/coVRCollaboration.h>
 #include <cover/coVRPluginSupport.h>
+#include <osg/Timer>
+#include <osg/Camera>
+#include <osg/Matrix>
+#include <osg/Quat>
+#include <osg/Vec3>
+#include <osgViewer/Viewer>
 
-class Lamure; // Forward declaration
+// STL
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <filesystem>
+#include <ostream>
+
+// Fwd
+class Lamure;
+
+// -----------------------------------------------------------------------------
+// Öffentliche Datenstrukturen, die auch in der .cpp verwendet werden
+// -----------------------------------------------------------------------------
+
+struct Synthesis {
+    // Basics
+    size_t nFrames = 0;
+    size_t timelineBlocks = 0;
+    double total_duration_ms = 0.0;
+    double avg_frame_time_ms = 0.0;
+    double avg_cpu_main_ms   = 0.0;
+    double avg_gpu_time_ms   = 0.0;
+    double avg_wait_ms       = 0.0;
+
+    double fps_avg  = 0.0;
+    double fps_p50  = 0.0;
+    double fps_p95  = 0.0;
+    double fps_p99  = 0.0;
+
+    double prims_per_frame_avg = 0.0;
+    double prims_per_frame_p50 = 0.0;
+    double prims_per_frame_p95 = 0.0;
+    double prims_per_frame_p99 = 0.0;
+
+    // Busy / Wait
+    double avg_cpu_busy_pct  = 0.0;
+    double avg_gpu_busy_pct  = 0.0;
+    double avg_wait_frac_pct = 0.0;
+
+    // Perzentile & Stutter
+    double p50 = 0.0, p95 = 0.0, p99 = 0.0, jitter_J = 0.0;
+    int stutter_count_2xmedian = 0;
+    int stutter_count_33ms     = 0;
+
+    // Coverage / Effizienz
+    double avg_rpts_points_per_ms = 0.0;
+    double avg_covC1 = 0.0;
+    double avg_covD  = 0.0;
+
+    // Renderer Estimates (avg)
+    double est_screen_px   = 0.0;
+    double est_sum_area_px = 0.0;
+    double est_density     = 0.0;
+    double est_coverage    = 0.0;
+    double est_coverage_px = 0.0;
+    double est_overdraw    = 0.0;
+    double avg_area_px_per_prim = 0.0;
+
+    // Zeitmarken (avg)
+    double mark_draw_impl_ms=0, mark_pass1_ms=0, mark_pass2_ms=0, mark_pass3_ms=0,
+           mark_dispatch_ms=0, mark_context_bind_ms=0, mark_estimates_ms=0, mark_singlepass_ms=0;
+
+    // Boundness-Zählung
+    size_t cnt_gpu=0, cnt_cpu=0, cnt_wait=0, cnt_mixed=0, cnt_unknown=0;
+};
 
 class LamureMeasurement
 {
 public:
-
-    bool isActive() const noexcept;                 // true, solange m_running
-    void endFrame(uint64_t rendered_nodes,
-        uint64_t rendered_prims);         // 1× pro Frame
-
-
+    // --- Öffentliche Strukturen ---
     struct TimeBlock {
-        unsigned frame     = 0;   // Basisframe (aus pickStableFrame)
-        unsigned src_frame = 0;   // Effektives Stats-Frame (frame - used_offset)
+        unsigned frame     = 0;   // Basierend auf pickStableFrame()
+        unsigned src_frame = 0;   // frame - used_offset
         int      camIndex  = -1;  // -1 = viewer, sonst Kameraindex
         std::string scope;        // "viewer" | "camera"
         std::string name;         // z.B. "Draw traversal", "GPU draw"
-        double begin_ms = 0.0;    // ms (falls vorhanden)
-        double end_ms   = 0.0;    // ms (falls vorhanden)
-        double taken_ms = 0.0;    // ms (immer, wenn time taken verfügbar)
-        unsigned used_offset = 0; // wie viele Frames zurückgegriffen
+        double begin_ms = 0.0;
+        double end_ms   = 0.0;
+        double taken_ms = 0.0;
+        unsigned used_offset = 0;
     };
 
-    struct Segment
-    {
+    struct Segment {
         osg::Vec3 tra;     // Positionsänderung relativ zum Segment-Anfang
         osg::Vec3 rot;     // Drehwinkel-Delta in Grad (Pitch, Yaw, Roll)
-        float     transSpeed;   // Translationstempo in Einheiten/s
-        float     rotSpeed;     // Rotationsgeschwindigkeit in °/s
+        float     transSpeed = 0.f;   // Translationstempo in Einheiten/s
+        float     rotSpeed   = 0.f;   // Rotationsgeschwindigkeit in °/s
     };
 
     struct FrameStats {
-        unsigned int frame_number   = 0;
-        double frame_rate           = 0.0;
-        double frame_duration_ms    = 0.0;
-        double rendering_traversals_ms = 0.0;
-
-        uint64_t rendered_splats    = 0;
-        uint64_t rendered_nodes     = 0;
+        // Ident & Counter
+        unsigned int frame_number = 0;
+        uint64_t rendered_splats = 0;
+        uint64_t rendered_nodes = 0;
         uint64_t rendered_bounding_boxes = 0;
 
-        double cpu_update_ms       = 0.0;
-        double cpu_cull_ms         = 0.0;
-        double cpu_draw_ms         = 0.0;
+        // Frame & CPU times
+        float frame_rate = 0.0f;
+        float frame_duration_ms = 0.0f;
+        float rendering_traversals_ms = 0.0f;
 
-        double gpu_time_ms         = 0.0;
-        double sync_time_ms        = 0.0;
-        double swap_time_ms        = 0.0;
-        double finish_ms           = 0.0;
+        float cpu_update_ms = 0.0f;
+        float cpu_cull_ms   = 0.0f;
+        float cpu_draw_ms   = 0.0f;
 
-        double gpu_clock           = 0.0;
-        double gpu_mem_clock       = 0.0;
-        double gpu_util            = 0.0;
-        double gpu_pci             = 0.0;
+        // GPU Telemetrie (per Frame)
+        float gpu_time_ms   = 0.0f;
+        float gpu_clock     = 0.0f;
+        float gpu_mem_clock = 0.0f;
+        float gpu_util      = 0.0f;
+        float gpu_pci       = 0.0f;
 
-        double plugin_ms           = 0.0;
-        double isect_ms            = 0.0;
-        double opencover_ms        = 0.0;
+        // Weitere Scopes
+        float sync_time_ms  = 0.0f;
+        float swap_time_ms  = 0.0f;
+        float finish_ms     = 0.0f;
+        float plugin_ms     = 0.0f;
+        float isect_ms      = 0.0f;
+        float opencover_ms  = 0.0f;
 
-        double coverage_proxy       = 0.0;
-        double coverage_node_refs   = 0.0;
+        // Renderer Estimates (capped)
+        float est_screen_px    = 0.0f;
+        float est_sum_area_px  = 0.0f;
+        float est_density      = 0.0f;
+        float est_coverage     = 0.0f;
+        float est_coverage_px  = 0.0f;
+        float est_overdraw     = 0.0f;
 
-        double mark_draw_impl_ms   = 0.0;
-        double mark_pass1_ms       = 0.0;
-        double mark_pass2_ms       = 0.0;
-        double mark_pass3_ms       = 0.0;
-        double mark_singlepass_ms  = 0.0;
-        double mark_dispatch_ms    = 0.0;
-        double mark_context_bind_ms= 0.0;
-        double mark_estimates_ms   = 0.0;
+        // Renderer Estimates (raw)
+        float est_density_raw      = 0.0f;
+        float est_coverage_raw     = 0.0f;
+        float est_coverage_px_raw  = 0.0f;
+        float est_overdraw_raw     = 0.0f;
 
-        double est_screen_px      = 0.0;
-        double est_sum_area_px    = 0.0;
-        double est_density        = 0.0;
-
-        double est_coverage       = 0.0;
-        double est_coverage_px    = 0.0;
-        double est_overdraw       = 0.0;
-        
+        // Per-primitive Statistik
         float avg_area_px_per_prim = 0.0f;
 
+        // Zeitmarken
+        float mark_draw_impl_ms    = 0.0f;
+        float mark_pass1_ms        = 0.0f;
+        float mark_pass2_ms        = 0.0f;
+        float mark_pass3_ms        = 0.0f;
+        float mark_singlepass_ms   = 0.0f;
+        float mark_dispatch_ms     = 0.0f;
+        float mark_context_bind_ms = 0.0f;
+        float mark_estimates_ms    = 0.0f;
 
-        int   vp_width  = 0;
-        int   vp_height = 0;
-        float cam_near  = 0.f;
-        float cam_far   = 0.f;
-        float cam_H_over_tmb = 0.f; // H / (top-bottom) am Near
+        // Pose
+        osg::Vec3d position{0.0,0.0,0.0};
+        osg::Quat  orientation{0.0,0.0,0.0,1.0};
 
-        // Lamure/Rendering (roh)
-        std::string primitive; // "point" | "surfel" | "splat"
-        float z_view_est   = 0.f;  // z im Viewspace (negativ vor Kamera)
-        float r_world_est  = 0.f;  // avg primitive extent^gamma
-        float min_px       = 0.f;  // Settings
-        float max_px       = 0.f;  // Settings
-        float scale_radius = 1.f;  // Settings
-
-        // Coverage (erst beim Schreiben gesetzt)
-        double cov_C1   = 0.0;
-        double cov_D    = 0.0;
-        double cov_mult = 0.0;
-
-        osg::Vec3d position;
-        osg::Quat  orientation;
-
+        // Backoffs / Segment
         unsigned backoff_cull = 0;
         unsigned backoff_draw = 0;
         unsigned backoff_gpu  = 0;
         int      segment_index = -1;
 
-        // optional (NVML, Windows/NVIDIA), sonst 0
-        double gpu_mem_used_mb   = 0.0;
-        double gpu_mem_total_mb  = 0.0;
-
-        double gpu_mem_used_mb_nvml  = 0.0;
-        double gpu_mem_total_mb_nvml = 0.0;
-        double gpu_mem_used_mb_gl    = 0.0;
-        double gpu_mem_total_mb_gl   = 0.0;
-
-        // --- Derived metrics (pro Frame) ---
-        double cpu_main_ms         = 0.0;  // cpu_update + cpu_cull + cpu_draw + plugin + isect + opencover
-        double cpu_busy_pct_proxy  = 0.0;  // 100 * cpu_main_ms / frame_duration_ms (0..100 geclippt)
-        double gpu_busy_pct_proxy  = 0.0;  // 100 * min(gpu_time_ms, frame_duration_ms)/frame_duration_ms
-        double wait_ms             = 0.0;  // sync + swap + finish
-        double wait_frac_pct       = 0.0;  // 100 * wait_ms / frame_duration_ms
-        std::string boundness;             // "GPU-bound" | "CPU-bound" | "Wait/Sync-bound" | "mixed" | "unknown"
+        // Abgeleitete Metriken
+        float cpu_main_ms        = 0.0f;
+        float cpu_busy_pct_proxy = 0.0f;
+        float gpu_busy_pct_proxy = 0.0f;
+        float wait_ms            = 0.0f;
+        float wait_frac_pct      = 0.0f;
+        std::string boundness;   // "GPU-bound" | "CPU-bound" | "Wait/Sync-bound" | "mixed" | "unknown"
     };
 
-    bool collectFrameStats(osgViewer::ViewerBase* viewer,
-        const osg::FrameStamp* fs,
-        FrameStats& out,
-        bool debugPrint = false);
-
-    LamureMeasurement(
-        Lamure*                      plugin,
-        opencover::VRViewer*         viewer,
-        const std::vector<Segment>&  segments,
-        const std::string&           logfile
-    );
+public:
+    // --- Lebenszyklus ---
+    LamureMeasurement(Lamure* plugin,
+                      opencover::VRViewer* viewer,
+                      const std::vector<Segment>& segments,
+                      const std::string& logfile);
     ~LamureMeasurement();
 
+    // --- Steuerung / Status ---
+    bool isActive() const noexcept;  // true, solange m_running
     void stop();
-    void writeLogAndStop();
-    bool isRunning() const { return m_running; }
 
-    // Timeline-Zugriff (nur lesen)
+    // --- Sampling / Auswertung ---
+    bool wantsSampling(unsigned frameNo) const noexcept;
+    bool collectFrameStats(osgViewer::ViewerBase* viewer,
+                           const osg::FrameStamp* fs,
+                           FrameStats& out,
+                           bool debugPrint = false);
+
+    // --- Export / Abschluss ---
+    void writeLogAndStop();
+
+    // --- Convenience/Getters ---
+    bool isSampleFrame() const noexcept { return m_sampleThisFrame; }
+    unsigned currentFrameNo() const noexcept { return m_currFrameNo; }
     const std::vector<TimeBlock>& getTimeline() const { return m_timeline; }
 
-    // Optionaler Markdown-Report
-    void setReportMarkdown(const std::string& path);
-    void writeLamureConfigMarkdown(std::ostream& md);
-
-    // Bequeme Getter für TimeBlock
-    unsigned            getTimeBlockFrame(const TimeBlock& tb) const { return tb.frame; }
-    unsigned            getTimeBlockSrcFrame(const TimeBlock& tb) const { return tb.src_frame; }
-    int                 getTimeBlockCamIndex(const TimeBlock& tb) const { return tb.camIndex; }
-    const std::string&  getTimeBlockScope(const TimeBlock& tb) const { return tb.scope; }
-    const std::string&  getTimeBlockName(const TimeBlock& tb) const { return tb.name; }
-    double              getTimeBlockBeginMs(const TimeBlock& tb) const { return tb.begin_ms; }
-    double              getTimeBlockEndMs(const TimeBlock& tb) const { return tb.end_ms; }
-    double              getTimeBlockTakenMs(const TimeBlock& tb) const { return tb.taken_ms; }
-    unsigned            getTimeBlockUsedOffset(const TimeBlock& tb) const { return tb.used_offset; }
+    // Debug-Helfer
+    void printDebugStats(unsigned int num);
 
 private:
-    // Konsolen-/Export-Optionen
-    bool     m_exportReport   = true;
-    bool     m_verbose        = false;   // Konsole drosseln
-    unsigned m_logEveryN      = 50;      // nur jedes N-te Frame loggen
-    bool     m_dumpAttrs      = false;   // Attribute-Dumps aus
-    double   m_warnTolMs      = 5.0;     // Debug-Warnschwelle
-    unsigned m_gpuBackSearch  = 16;      // größerer Backsearch (GPU/Timing)
-    bool     m_exportTimeline = true;    // Timeline-CSV schreiben
+    // --- interne Helfer ---
+    void initCallbacks();
+    void drawIncrement(bool preDraw, const osg::FrameStamp* frameStamp);
+    void updateCamera(const osg::Vec3& traAbs, const osg::Vec3& rotAbsDeg);
+
+    int findStatsIndexForFrame(uint64_t frame_no) const;
+
+    bool getTimeTakenMsBacksearch(osg::Stats* s,
+        unsigned baseFrame, unsigned backSearch,
+        const std::string& timeTakenKey,
+        const std::string& beginKey,
+        const std::string& endKey,
+        double& outMs, unsigned& usedOffset,
+        double* outBeginMs=nullptr, double* outEndMs=nullptr);
+
+    bool tryAddBlock(osg::Stats* stats, unsigned baseFrame, unsigned backsearch,
+        const std::string& statPrefix, const std::string& nameForCSV,
+        const std::string& scope, int camIndex, std::vector<TimeBlock>& localBlocks);
+
+    // Exporter
+    bool writeFramesCSV(const std::filesystem::path& frames_path,
+        bool mode_full, bool mode_light,
+        const std::unordered_map<unsigned,double>& gpuMsByFrame);
+
+    bool writeSummaryJSON(const std::filesystem::path& json_path,
+        const Synthesis& syn, bool mode_full, bool mode_light, bool hasTimeline);
+
+    void writeTimelineCSV(const std::string& path);
+
+    void writeLamureConfigMarkdown(std::ostream& md);
+    void writeLamureConfigCsv(std::ostream& csv);
+    void appendPreprocessBuildLogsMarkdown(std::ostream& md);
+
+    // GPU/VRAM-Infos (static snapshot)
+    void cacheStaticGpuInfo();
+
+private:
+    // --- Konfiguration/Flags ---
+    bool     m_exportReport     = true;
+    bool     m_verbose          = false;
+    unsigned m_logEveryN        = 30;
+    bool     m_dumpAttrs        = false;
+    unsigned m_gpuBackSearch    = 16;
+    bool     m_measure_timeline = true;
+
+    // --- Laufzeitstatus ---
+    bool          m_running          = true;
+    bool          m_written          = false;
+    std::string   m_logfile;
+    std::string   m_reportMDPath;
+
+    // --- Zeit / Frames ---
+    osg::Timer_t  m_startTick{};
+    osg::Timer_t  m_lastFrameTick{};
+    unsigned      m_currFrameNo = 0;
+    bool          m_sampleThisFrame = false;
+
+    // --- Segmente / Pose ---
+    const std::vector<Segment> m_segments;
+    size_t       m_currentSegment{0};
+    bool         m_haveSegmentStart{false};
+    double       m_segmentStartRefTime{0.0};
+    osg::Vec3    m_cumulativeTra{0.0f,0.0f,0.0f};
+    osg::Vec3    m_cumulativeRot{0.0f,0.0f,0.0f};
+
+    osg::Vec3    m_lastTraApplied{0,0,0};
+    osg::Vec3    m_lastRotApplied{0,0,0};
+    bool         m_havePoseDeltas = false;
+
+    osg::Quat    m_lastQuat;
+    bool         m_haveLastQuat{false};
+
+    // --- Datencontainer ---
+    std::vector<FrameStats> m_stats;
+    std::vector<TimeBlock>  m_timeline;
+
+    // --- GPU/VRAM (static snapshot; primary = bevorzugte Quelle (NVML dann GL_NVX)) ---
     bool   m_gpu_static_captured = false;
-    bool m_gpu_static_tried = false;
+    bool   m_gpu_static_tried     = false;
     double m_gpu_mem_used_mb_static        = 0.0;
     double m_gpu_mem_total_mb_static       = 0.0;
     double m_gpu_mem_used_mb_nvml_static   = 0.0;
@@ -198,94 +298,19 @@ private:
     double m_gpu_mem_used_mb_gl_static     = 0.0;
     double m_gpu_mem_total_mb_gl_static    = 0.0;
 
-    osg::Vec3 m_lastTraApplied{0,0,0};
-    osg::Vec3 m_lastRotApplied{0,0,0};
-    bool      m_havePoseDeltas = false;
-    double m_segmentStartRefTime{0.0};
-    bool   m_haveSegmentStart{false};
+    // --- Plugin/Viewer ---
+    Lamure*              m_plugin = nullptr;
+    opencover::VRViewer* m_viewer = nullptr;
 
-    // interner Helfer (Suche passenden FrameStats-Eintrag)
-    int findStatsIndexForFrame(uint64_t frame_no) const;
-
-    std::string m_reportMDPath; // wenn gesetzt, schreibe Markdown-Report am Ende
-
-    std::vector<TimeBlock> m_timeline;
-
-    void writeLamureConfigCsv(std::ostream& csv);
-    void cacheStaticGpuInfo();
-
-    bool     m_written{false};
-    bool     m_haveLastQuat{false};
-    osg::Quat m_lastQuat;
-
-    // interne Helfer
-    bool getAttributeForFrame(osg::Stats* stats,
-        const std::string& attributeName,
-        double& value,
-        unsigned int frameNumber);
-    bool getAttributeForFrame(osg::Stats* stats,
-        const std::string& attributeName,
-        double& value);
-
-    // Backsearch-Helfer: bevorzugt "time taken", fällt auf (end-begin) zurück
-    bool getTimeTakenMsBacksearch(osg::Stats* s,
-        unsigned baseFrame,
-        unsigned backSearch,
-        const std::string& timeTakenKey,
-        const std::string& beginKey,
-        const std::string& endKey,
-        double& outMs,
-        unsigned& usedOffset,
-        double* outBeginMs = nullptr,
-        double* outEndMs   = nullptr);
-
-    // Timeline-Eintrag erzeugen (TimeBlock), trägt auch in m_timeline ein (wenn aktiv)
-    bool tryAddBlock(osg::Stats* stats,
-        unsigned int baseFrame,
-        unsigned int backsearch,
-        const std::string& statPrefix,
-        const std::string& nameForCSV,
-        const std::string& scope,
-        int camIndex,
-        std::vector<TimeBlock>& localBlocks);
-
-    void initCallbacks();
-
-    void drawIncrement(bool preDraw, const osg::FrameStamp* frameStamp);
-
-    void updateCamera(const osg::Vec3& pos, const osg::Vec3& rot);
-
-    // Timeline-Export
-    void writeTimelineCSV(const std::string& path);
-
-    void printDebugStats(unsigned int num);
-
-    int m_originalStatsType = 0;
-
-    Lamure*                           m_plugin;
-    opencover::VRViewer*              m_viewer;
-    const std::vector<Segment>        m_segments;
-    size_t                            m_currentSegment{0};
-    double                            m_segmentTime{0.0};
-    osg::Vec3                         m_cumulativeTra{0.0f,0.0f,0.0f};  // akkumulierte Deltas
-    osg::Vec3                         m_cumulativeRot{0.0f,0.0f,0.0f};
-    osg::Vec3                         m_initialPos;                     // Start-Position der Kamera
-    osg::Matrix                       m_initialXform;
-
-    std::string                       m_logfile;
-    bool                              m_running{false};
-    osg::Timer_t                      m_startTick;
-    osg::Timer_t                      m_lastFrameTick;
-    std::vector<FrameStats>           m_stats;
-
+    // --- Frame-Marks Callback ---
     struct MarkCallback : public osg::Camera::DrawCallback {
-        LamureMeasurement* m_meas;
-        bool         m_pre;
+        LamureMeasurement* m_meas = nullptr;
+        bool               m_pre  = false;
         MarkCallback(LamureMeasurement* m, bool pre) : m_meas(m), m_pre(pre) {}
-        virtual void operator()(osg::RenderInfo& ri) const override {
+        void operator()(osg::RenderInfo& ri) const override {
             m_meas->drawIncrement(m_pre, ri.getState()->getFrameStamp());
         }
     };
-    MarkCallback* m_preCB = nullptr;
-    MarkCallback* m_postCB = nullptr;
+    osg::ref_ptr<MarkCallback> m_preCB;
+    osg::ref_ptr<MarkCallback> m_postCB;
 };

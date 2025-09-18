@@ -32,7 +32,6 @@
 #include <boost/regex.hpp>
 #include <regex>
 
-
 //schism
 #include <scm/core/math.h>
 
@@ -56,6 +55,7 @@
 
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
+#include <cover/coVRNavigationManager.h>
 
 
 #ifdef __cplusplus
@@ -129,19 +129,13 @@ void Lamure::loadSettingsFromCovise(){
     s.upload    = getNum<int>("value", (std::string(root) + ".upload").c_str(),    s.upload);
     s.lod_error = getNum<float>("value", (std::string(root) + ".lod_error").c_str(), s.lod_error);
 
-    // ---- Tuning / Flags, die bisher nur im LMR-Pfad gesetzt wurden ----
-    s.face_eye            = getOn((std::string(root) + ".face_eye").c_str(),            s.face_eye);
-    s.pvs_culling         = getOn((std::string(root) + ".pvs_culling").c_str(),         s.pvs_culling);
-    s.use_pvs             = getOn((std::string(root) + ".use_pvs").c_str(),             s.use_pvs);
-    s.create_aux_resources= getOn((std::string(root) + ".create_aux_resources").c_str(),s.create_aux_resources);
-    s.max_brush_size      = getNum<int>("value", (std::string(root) + ".max_brush_size").c_str(), s.max_brush_size);
-    s.channel             = getNum<int>("value", (std::string(root) + ".channel").c_str(), s.channel);
-
-    // Aux-Parameter (inkl. scale, das im LMR-Parser bisher nicht vorkam)
-    s.aux_point_size      = getNum<float>("value", (std::string(root) + ".aux_point_size").c_str(),     s.aux_point_size);
-    s.aux_point_distance  = getNum<float>("value", (std::string(root) + ".aux_point_distance").c_str(), s.aux_point_distance);
-    s.aux_point_scale     = getNum<float>("value", (std::string(root) + ".aux_point_scale").c_str(),    s.aux_point_scale);
-    s.aux_focal_length    = getNum<float>("value", (std::string(root) + ".aux_focal_length").c_str(),   s.aux_focal_length);
+    // ---- Tuning / Flags ----
+    s.face_eye             = getOn((std::string(root) + ".face_eye").c_str(),             s.face_eye);
+    s.pvs_culling          = getOn((std::string(root) + ".pvs_culling").c_str(),          s.pvs_culling);
+    s.use_pvs              = getOn((std::string(root) + ".use_pvs").c_str(),              s.use_pvs);
+    s.create_aux_resources = getOn((std::string(root) + ".create_aux_resources").c_str(), s.create_aux_resources);
+    s.max_brush_size       = getNum<int>("value", (std::string(root) + ".max_brush_size").c_str(), s.max_brush_size);
+    s.channel              = getNum<int>("value", (std::string(root) + ".channel").c_str(), s.channel);
 
     // ---- Visual toggles ----
     s.show_pointcloud         = getOn((std::string(root) + ".show_pointcloud").c_str(),        s.show_pointcloud);
@@ -151,11 +145,6 @@ void Lamure::loadSettingsFromCovise(){
     s.show_text               = getOn((std::string(root) + ".show_text").c_str(),              s.show_text);
     s.show_sync               = getOn((std::string(root) + ".show_sync").c_str(),              s.show_sync);
     s.show_notify             = getOn((std::string(root) + ".show_notify").c_str(),            s.show_notify);
-
-    s.show_normals            = getOn((std::string(root) + ".show_normals").c_str(),           s.show_normals);
-    s.show_accuracy           = getOn((std::string(root) + ".show_accuracy").c_str(),          s.show_accuracy);
-    s.show_radius_deviation   = getOn((std::string(root) + ".show_radius_deviation").c_str(),  s.show_radius_deviation);
-    s.show_output_sensitivity = getOn((std::string(root) + ".show_output_sensitivity").c_str(),s.show_output_sensitivity);
     s.show_sparse             = getOn((std::string(root) + ".show_sparse").c_str(),            s.show_sparse);
     s.show_views              = getOn((std::string(root) + ".show_views").c_str(),             s.show_views);
     s.show_photos             = getOn((std::string(root) + ".show_photos").c_str(),            s.show_photos);
@@ -179,7 +168,6 @@ void Lamure::loadSettingsFromCovise(){
     s.heatmap     = getOn((std::string(root) + ".heatmap").c_str(),     s.heatmap);
     s.heatmap_min = getNum<float>("value", (std::string(root) + ".heatmap_min").c_str(), s.heatmap_min);
     s.heatmap_max = getNum<float>("value", (std::string(root) + ".heatmap_max").c_str(), s.heatmap_max);
-
     auto clamp255 = [](int v){ return std::max(0, std::min(255, v)); };
     int hmin_r = getNum<int>("value", (std::string(root) + ".heatmap_min_r").c_str(), int(std::round(s.heatmap_color_min.x * 255.f)));
     int hmin_g = getNum<int>("value", (std::string(root) + ".heatmap_min_g").c_str(), int(std::round(s.heatmap_color_min.y * 255.f)));
@@ -190,24 +178,86 @@ void Lamure::loadSettingsFromCovise(){
     s.heatmap_color_min = scm::math::vec3f(clamp255(hmin_r)/255.f, clamp255(hmin_g)/255.f, clamp255(hmin_b)/255.f);
     s.heatmap_color_max = scm::math::vec3f(clamp255(hmax_r)/255.f, clamp255(hmax_g)/255.f, clamp255(hmax_b)/255.f);
 
-    // ---- Shader / Radii ----
-    s.shader       = getStr((std::string(root) + ".shader").c_str(), s.shader);
-    s.min_radius   = getNum<float>("value", (std::string(root) + ".min_radius").c_str(),   s.min_radius);
-    s.max_radius   = getNum<float>("value", (std::string(root) + ".max_radius").c_str(),   s.max_radius);
+    // ---- Radii / Shader-Name (frei) ----
+    s.shader            = getStr((std::string(root) + ".shader").c_str(), s.shader);
+    s.min_radius        = getNum<float>("value", (std::string(root) + ".min_radius").c_str(),        s.min_radius);
+    s.max_radius        = getNum<float>("value", (std::string(root) + ".max_radius").c_str(),        s.max_radius);
     s.min_screen_size   = getNum<float>("value", (std::string(root) + ".min_screen_size").c_str(),   s.min_screen_size);
     s.max_screen_size   = getNum<float>("value", (std::string(root) + ".max_screen_size").c_str(),   s.max_screen_size);
-    s.scale_radius = getNum<float>("value", (std::string(root) + ".scale_radius").c_str(), s.scale_radius);
-    s.max_radius_cut   = getNum<float>("value", (std::string(root) + ".max_radius_cut").c_str(),   s.max_radius_cut);
-    s.scale_radius_gamma = getNum<float>("value", (std::string(root) + ".radius_scale_gamma").c_str(), s.scale_radius_gamma);
+    s.scale_radius      = getNum<float>("value", (std::string(root) + ".scale_radius").c_str(),      s.scale_radius);
+    s.max_radius_cut    = getNum<float>("value", (std::string(root) + ".max_radius_cut").c_str(),    s.max_radius_cut);
+    s.scale_radius_gamma= getNum<float>("value", (std::string(root) + ".radius_scale_gamma").c_str(),s.scale_radius_gamma);
+    s.scale_point  = getNum<float>("value", (std::string(root) + ".scale_point").c_str(),  s.scale_point);
     s.scale_surfel = getNum<float>("value", (std::string(root) + ".scale_surfel").c_str(), s.scale_surfel);
+    s.scale_element = (s.point) ? s.scale_point : s.scale_surfel;
+
+    // ---- Primitive + Modes aus Config ----
+    const bool p0  = getOn((std::string(root)+".point").c_str(),     s.point);
+    const bool sf0 = getOn((std::string(root)+".surfel").c_str(),    s.surfel);
+    const bool sp0 = getOn((std::string(root)+".splatting").c_str(), s.splatting);
+    s.point     = p0; s.surfel = sf0; s.splatting = sp0;
+
+    s.lighting  = getOn((std::string(root)+".lighting").c_str(), s.lighting);
+    s.coloring  = getOn((std::string(root)+".color").c_str(),    s.coloring);
+
+    std::string color_mode = getStr((std::string(root)+".color_mode").c_str(), "normals");
+    for (char &c : color_mode) c = (char)std::tolower((unsigned char)c);
+
+    // ---- Exklusivität ----
+    // Primitive: genau eins. Priorität: Surfel > Splatting > Point.
+    {
+        int prim_count = (s.point?1:0) + (s.surfel?1:0) + (s.splatting?1:0);
+        if (prim_count != 1) {
+            s.point = s.surfel = s.splatting = false;
+            if (sf0) s.surfel = true;
+            else if (sp0) s.splatting = true;
+            else s.point = true;
+        }
+    }
+    // Modes: Lighting > Color
+    if (s.lighting && s.coloring) s.coloring = false;
+
+    // ---- color_mode immer übernehmen (auch wenn coloring=off), UI soll Zustand zeigen ----
+    s.show_normals = s.show_accuracy = s.show_radius_deviation = s.show_output_sensitivity = false;
+    if      (color_mode == "accuracy")    s.show_accuracy = true;
+    else if (color_mode == "derivation")  s.show_radius_deviation = true;   // „derivation“ -> radius deviation
+    else if (color_mode == "sensitivity") s.show_output_sensitivity = true;
+    else                                  s.show_normals = true;
+
+    // ---- ShaderType strikt aus den Booleans ableiten + Namen setzen ----
+    auto decideShaderType = [&](){
+        using ST = LamureRenderer::ShaderType;
+        if (s.splatting) return ST::SurfelMultipass;
+        if (s.surfel)    return s.lighting ? ST::SurfelColorLighting
+            : (s.coloring ? ST::SurfelColor : ST::Surfel);
+        return s.lighting ? ST::PointColorLighting
+            : (s.coloring ? ST::PointColor : ST::Point);
+        };
+    auto typeToName = [](LamureRenderer::ShaderType t)->std::string{
+        switch (t) {
+        case LamureRenderer::ShaderType::Point:               return "Point";
+        case LamureRenderer::ShaderType::PointColor:          return "Point Color";
+        case LamureRenderer::ShaderType::PointColorLighting:  return "Point Color Lighting";
+        case LamureRenderer::ShaderType::PointProv:           return "Point Prov";
+        case LamureRenderer::ShaderType::Surfel:              return "Surfel";
+        case LamureRenderer::ShaderType::SurfelColor:         return "Surfel Color";
+        case LamureRenderer::ShaderType::SurfelColorLighting: return "Surfel Color Lighting";
+        case LamureRenderer::ShaderType::SurfelProv:          return "Surfel Prov";
+        case LamureRenderer::ShaderType::SurfelMultipass:     return "Surfel Multipass";
+        default:                                              return "Point";
+        }
+        };
+    s.shader_type = decideShaderType();
+    s.shader      = typeToName(s.shader_type);
+    if (s.surfel || s.splatting) s.scale_element = s.scale_surfel;
 
     // ---- Multi-Pass Blending ----
     s.depth_range = getNum<float>("value", (std::string(root) + ".depth_range").c_str(), s.depth_range);
-    s.flank_lift            = getNum<float>("value", (std::string(root) + ".flank_lift").c_str(),            s.flank_lift);
+    s.flank_lift  = getNum<float>("value", (std::string(root) + ".flank_lift").c_str(),  s.flank_lift);
 
-    // ---- Dateien / Pfade (Strings) ----
-    s.pvs             = getStr((std::string(root) + ".pvs").c_str(),             s.pvs);
-    s.background_image= getStr((std::string(root) + ".background_image").c_str(),s.background_image);
+    // ---- Dateien / Pfade ----
+    s.pvs              = getStr((std::string(root) + ".pvs").c_str(),              s.pvs);
+    s.background_image = getStr((std::string(root) + ".background_image").c_str(), s.background_image);
 
     // ---- Modelle: models (Semikolon), optional data_dir (rekursiv .bvh) ----
     s.models.clear();
@@ -224,88 +274,61 @@ void Lamure::loadSettingsFromCovise(){
 
     const std::string sel = getStr((std::string(root) + ".initial_selection").c_str(), "");
     auto parseIndices = [&](const std::string& str, size_t N){
-        std::vector<uint32_t> out;
-        if (str.empty()) return out;
-        std::istringstream ss(str);
-        std::string part;
+        std::vector<uint32_t> out; if (str.empty()) return out;
+        std::istringstream ss(str); std::string part;
         auto trim=[&](std::string t){ auto b=t.find_first_not_of(" \t"); auto e=t.find_last_not_of(" \t");
         return (b==std::string::npos)?std::string():t.substr(b,e-b+1); };
         while(std::getline(ss,part,',')){
-            part=trim(part);
-            auto dash=part.find('-');
+            part=trim(part); auto dash=part.find('-');
             if(dash!=std::string::npos){
-                int a=std::stoi(part.substr(0,dash));
-                int b=std::stoi(part.substr(dash+1));
-                if(a>b) std::swap(a,b);
+                int a=std::stoi(part.substr(0,dash)), b=std::stoi(part.substr(dash+1)); if(a>b) std::swap(a,b);
                 for(int i=a;i<=b;++i) if(i>=0 && (size_t)i<N) out.push_back((uint32_t)i);
             } else {
-                int v=std::stoi(part);
-                if(v>=0 && (size_t)v<N) out.push_back((uint32_t)v);
+                int v=std::stoi(part); if(v>=0 && (size_t)v<N) out.push_back((uint32_t)v);
             }
         }
-        std::sort(out.begin(),out.end());
-        out.erase(std::unique(out.begin(),out.end()),out.end());
-        return out;
+        std::sort(out.begin(),out.end()); out.erase(std::unique(out.begin(),out.end()),out.end()); return out;
         };
     s.initial_selection = parseIndices(sel, s.models.size());
 
-    // ---- Initial matrices (one-liners) ----
+    // ---- Initial matrices ----
     {
         const std::string navKey  = std::string(root) + ".initial_navigation";
         const std::string viewKey = std::string(root) + ".initial_view";
-
         const std::string navStr  = getStr(navKey.c_str(),  "");
         const std::string viewStr = getStr(viewKey.c_str(), "");
 
-        std::cout << "[Lamure Debug] navStr from config: \"" << navStr << "\"\n";
-        std::cout << "[Lamure Debug] viewStr from config: \"" << viewStr << "\"\n";
-
+        osg::Matrixd M;
         auto tryParse = [](const std::string& label, const std::string& s, osg::Matrixd& out)->bool{
             if (!LamureUtil::readIndexedMatrix(s, out)) {
-                if (!s.empty()) // Only log error if value was present but malformed
-                    std::cerr << "[Lamure] " << label << " parse failed: " << s << "\n";
+                if (!s.empty()) std::cerr << "[Lamure] " << label << " parse failed: " << s << "\n";
                 return false;
             }
             return true;
             };
+        if (tryParse("initial_navigation", navStr, M)) { s.initial_navigation = M; s.use_initial_navigation = true; }
+        if (tryParse("initial_view",       viewStr, M)) { s.initial_view       = M; s.use_initial_view       = true; }
 
-        osg::Matrixd M;
-
-        if (tryParse("initial_navigation", navStr, M)) {
-            m_settings.initial_navigation = M;
-            m_settings.use_initial_navigation = true;
-            std::cout << "[Lamure] initial_navigation OK\n";
-        }
-        if (tryParse("initial_view", viewStr, M)) {
-            m_settings.initial_view = M;
-            m_settings.use_initial_view = true;
-            std::cout << "[Lamure] initial_view OK\n";
-        }
-
-        // >>> Fallbacks aus aktueller Pose, falls in der Config nichts Gültiges stand
-        if (!m_settings.use_initial_navigation) {
+        if (!s.use_initial_navigation) {
             if (auto* sg = opencover::VRSceneGraph::instance()) {
-                m_settings.initial_navigation = sg->getTransform()->getMatrix();
-                m_settings.use_initial_navigation = true;
-                std::cout << "[Lamure] initial_navigation defaulted from current transform\n";
+                s.initial_navigation = sg->getTransform()->getMatrix();
+                s.use_initial_navigation = true;
             }
         }
-        if (!m_settings.use_initial_view) {
+        if (!s.use_initial_view) {
             if (auto* viewer = opencover::VRViewer::instance()) {
                 if (auto* cam = viewer->getCamera()) {
-                    m_settings.initial_view = cam->getViewMatrix();
-                    m_settings.use_initial_view = true;
-                    std::cout << "[Lamure] initial_view defaulted from current camera view\n";
+                    s.initial_view = cam->getViewMatrix();
+                    s.use_initial_view = true;
                 }
             }
         }
-        // <<< Ende Fallback
     }
 
     s.measurement_dir  = getStr((std::string(root) + ".measurement_dir").c_str(),  s.measurement_dir);
     s.measurement_name = getStr((std::string(root) + ".measurement_name").c_str(), s.measurement_name);
 
-    // --- Measurement-Segmente (geometrischer Pfad) ---
+    // --- Measurement-Segmente ---
     const std::string segs = getStr((std::string(root) + ".measurement_segments").c_str(), "");
     s.measurement_segments = parseMeasurementSegments(segs);
     if (s.measurement_segments.empty()) {
@@ -314,17 +337,12 @@ void Lamure::loadSettingsFromCovise(){
             {{0,0,0},{45,0,360},200.f,30.f},
             {{0,-400,0},{0,0,0},200.f,30.f}
         };
-        std::cout << "[Lamure] measurement_segments: using built-in fallback (3 segments)\n";
     }
 
-    // ---- Provenance & Selektion ----
+    // ---- Provenance & JSON ----
     s.json = getStr((std::string(root) + ".json").c_str(), "");
-    if (!s.json.empty() && !std::filesystem::exists(s.json)) {
-        std::cerr << "[Lamure] config json points to non-existing file: " << s.json << " -> ignore\n";
-        s.json.clear();
-    }
+    if (!s.json.empty() && !std::filesystem::exists(s.json)) { std::cerr << "[Lamure] config json not found: " << s.json << " -> ignore\n"; s.json.clear(); }
 
-    // ---- Provenance-Validierung / JSON-Fallback ----
     bool prov_valid = true; std::string first_json;
     if(!s.models.empty()){
         for(const auto& model_path: s.models){
@@ -342,49 +360,144 @@ void Lamure::loadSettingsFromCovise(){
     for (lamure::model_t mid=0; mid < s.models.size(); ++mid)
         s.transforms[mid] = scm::math::mat4d::identity();
 
-    // ---- Hintergrundfarbe aus COVER ----
+    // ---- Hintergrundfarbe ----
     s.background_color = scm::math::vec3(
         covise::coCoviseConfig::getFloat("r", "COVER.Background", 0.0f),
         covise::coCoviseConfig::getFloat("g", "COVER.Background", 0.0f),
         covise::coCoviseConfig::getFloat("b", "COVER.Background", 0.0f)
     );
-
-    // Debug: Shader-String einmal loggen
-    std::cout << "[Lamure] shader from config: \"" << s.shader << "\"\n";
 }
 
 
 void Lamure::dumpSettings(const char* tag){
-    auto& s = m_settings;
+    const auto& s = m_settings;
     auto b2 = [](bool v){ return v ? "on" : "off"; };
     auto v3 = [](const scm::math::vec3f& v){ std::ostringstream o; o<<v.x<<","<<v.y<<","<<v.z; return o.str(); };
-    auto ov3 = [](const osg::Vec3& v){ std::ostringstream o; o<<v.x()<<","<<v.y()<<","<<v.z(); return o.str(); };
-    auto mat = [](const osg::Matrixd& m){ std::ostringstream o; o.setf(std::ios::fixed); o.precision(3);
-    o<<"["<<m(0,0)<<","<<m(0,1)<<","<<m(0,2)<<","<<m(0,3)<<"; "<<m(1,0)<<","<<m(1,1)<<","<<m(1,2)<<","<<m(1,3)<<"; "<<m(2,0)<<","<<m(2,1)<<","<<m(2,2)<<","<<m(2,3)<<"; "<<m(3,0)<<","<<m(3,1)<<","<<m(3,2)<<","<<m(3,3)<<"]"; return o.str(); };
-    double coverScale = opencover::cover ? (double)opencover::cover->getScale() : (double)covise::coCoviseConfig::getFloat("value","COVER.DefaultScaleFactor",1.0f);
-    std::cout<<"--- Lamure::Settings "<<(tag?tag:"")<<" ---\n";
-    std::cout<<"models.size="<<s.models.size()<<"; num_models="<<s.num_models<<"\n";
-    for(size_t i=0;i<s.models.size();++i) std::cout<<"  ["<<i<<"] "<<s.models[i]<<"\n";
-    if(!s.initial_selection.empty()){ std::cout<<"initial_selection="; for(size_t i=0;i<s.initial_selection.size();++i){ if(i) std::cout<<","; std::cout<<s.initial_selection[i]; } std::cout<<"\n"; }
-    std::cout<<"provenance="<<b2(s.provenance)<<"; json="<<(s.json.empty()?"<empty>":s.json)<<"\n";
-    std::cout<<"shader='"<<s.shader<<"' ("<<(int)s.shader_type<<")\n";
-    std::cout<<"budgets: frame_div="<<s.frame_div<<", vramMB="<<s.vram<<", ramMB="<<s.ram<<", uploadMB="<<s.upload<<", lod_error="<<s.lod_error<<"\n";
-    std::cout<<"visuals: show_pointcloud="<<b2(s.show_pointcloud)<<", show_bbox="<<b2(s.show_boundingbox)<<", show_frustum="<<b2(s.show_frustum)<<", show_coord="<<b2(s.show_coord)<<", show_text="<<b2(s.show_text)<<", show_sync="<<b2(s.show_sync)<<", show_notify="<<b2(s.show_notify)<<"\n";
-    std::cout<<"radii: min="<<s.min_radius<<", max="<<s.max_radius<<", scale="<<s.scale_radius<<"\n";
-    std::cout<<"lighting: ambient="<<s.ambient_intensity<<", point_I="<<s.point_light_intensity<<", specular="<<s.specular_intensity<<", shininess="<<s.shininess<<", gamma="<<s.gamma<<", tone_map="<<b2(s.use_tone_mapping)<<"\n";
-    std::cout<<"light_pos=("<<v3(s.point_light_pos)<<")\n";
-    std::cout<<"heatmap: on="<<b2(s.heatmap)<<", min="<<s.heatmap_min<<", max="<<s.heatmap_max<<", cmin=("<<v3(s.heatmap_color_min)<<"), cmax=("<<v3(s.heatmap_color_max)<<")\n";
-    std::cout<<"background_color=("<<v3(s.background_color)<<")\n";
-    std::cout<<"  cover_scale="<<coverScale<<"\n";
-    std::cout << "  initial_navigation=" << LamureUtil::matConv4F(s.initial_navigation) << "\n";
-    std::cout << "  initial_view=" << LamureUtil::matConv4F(s.initial_view) << "\n";
-    std::cout<<"  initial_view=" << LamureUtil::matConv4F(s.initial_view) << "\n";
-    std::cout<<"transforms: count="<<s.transforms.size()<<"\n";
-    size_t shown=0; for(const auto& kv : s.transforms){ if(shown++>=3){ std::cout<<"  ...\n"; break; } std::cout<<"  ["<<kv.first<<"] scm::mat4d present\n"; }
-    std::cout<<"aux: octrees="<<s.octrees.size()<<", views="<<s.views.size()<<", aux="<<s.aux.size()<<"\n";
-    std::cout << "measurement_dir='" << s.measurement_dir << "' measurement_name='" << s.measurement_name << "'\n";
+
+    auto shaderTypeToStr = [](LamureRenderer::ShaderType t){
+        switch(t){
+        case LamureRenderer::ShaderType::Point:               return "Point";
+        case LamureRenderer::ShaderType::PointColor:          return "PointColor";
+        case LamureRenderer::ShaderType::PointColorLighting:  return "PointColorLighting";
+        case LamureRenderer::ShaderType::PointProv:           return "PointProv";
+        case LamureRenderer::ShaderType::Surfel:              return "Surfel";
+        case LamureRenderer::ShaderType::SurfelColor:         return "SurfelColor";
+        case LamureRenderer::ShaderType::SurfelColorLighting: return "SurfelColorLighting";
+        case LamureRenderer::ShaderType::SurfelProv:          return "SurfelProv";
+        case LamureRenderer::ShaderType::SurfelMultipass:     return "SurfelMultipass";
+        default:                                              return "Point";
+        }
+        };
+
+    // abgeleiteter Color-Mode (nur einer aktiv)
+    auto colorModeStr = [&](){
+        if (s.show_normals)            return "normals";
+        if (s.show_accuracy)           return "accuracy";
+        if (s.show_radius_deviation)   return "deviation";
+        if (s.show_output_sensitivity) return "sensitivity";
+        return "none";
+        };
+
+    // Konsistenzchecks (nur Ausgabe, keine Mutation)
+    int prim_count = (s.point?1:0) + (s.surfel?1:0) + (s.splatting?1:0);
+    bool prim_ok   = (prim_count == 1);
+    bool mode_conflict = (s.coloring && s.lighting);
+
+    double coverScale = opencover::cover
+        ? static_cast<double>(opencover::cover->getScale())
+        : static_cast<double>(covise::coCoviseConfig::getFloat("value","COVER.DefaultScaleFactor",1.0f));
+
+    std::cout << "--- Lamure::Settings " << (tag?tag:"") << " ---\n";
+
+    // Modelle
+    std::cout << "models: " << s.models.size() << " (loaded=" << s.num_models << ")\n";
+    for(size_t i=0;i<std::min<size_t>(s.models.size(),3);++i)
+        std::cout << "  ["<<i<<"] " << s.models[i] << "\n";
+    if (s.models.size() > 3) std::cout << "  ...\n";
+    if(!s.initial_selection.empty()){
+        std::cout << "initial_selection=";
+        for(size_t i=0;i<s.initial_selection.size();++i){
+            if(i) std::cout << ",";
+            std::cout << s.initial_selection[i];
+        }
+        std::cout << "\n";
+    }
+
+    // Provenance
+    std::cout << "provenance=" << b2(s.provenance) << "; json=" << (s.json.empty()?"<empty>":s.json) << "\n";
+
+    // Primitive + Modes
+    std::cout << "primitive: point="<<b2(s.point)
+        << " surfel="<<b2(s.surfel)
+        << " splatting="<<b2(s.splatting)
+        << "  [" << (prim_ok ? "OK" : "INVALID") << "]\n";
+
+    std::cout << "modes: lighting="<<b2(s.lighting)
+        << " color="<<b2(s.coloring)
+        << " color_mode="<< colorModeStr()
+        << (mode_conflict ? "  [CONFLICT: lighting wins]" : "")
+        << "\n";
+
+    // Shader
+    std::cout << "shader: '" << s.shader << "' (" << shaderTypeToStr(s.shader_type) << ")\n";
+
+    // Budgets / LOD
+    std::cout << "budgets: frame_div="<<s.frame_div
+        << " vramMB="<<s.vram
+        << " ramMB="<<s.ram
+        << " uploadMB="<<s.upload
+        << " lod_error="<<s.lod_error << "\n";
+
+    // Radii/Scaling kompakt
+    std::cout << "radii: world[min="<<s.min_radius<<", max="<<s.max_radius<<", cut="<<s.max_radius_cut<<"]"
+        << " screen[min="<<s.min_screen_size<<", max="<<s.max_screen_size<<"]"
+        << " scale_radius="<<s.scale_radius
+        << " gamma="<<s.scale_radius_gamma
+        << " scale_surfel="<<s.scale_surfel << "\n";
+
+    // Lighting kompakt
+    std::cout << "lighting: ambient="<<s.ambient_intensity
+        << " point_I="<<s.point_light_intensity
+        << " specular="<<s.specular_intensity
+        << " shininess="<<s.shininess
+        << " gamma="<<s.gamma
+        << " tone_map="<<b2(s.use_tone_mapping)
+        << " light_pos=("<<v3(s.point_light_pos)<<")\n";
+
+    // Visual toggles
+    std::cout << "visuals: pointcloud="<<b2(s.show_pointcloud)
+        << " bbox="<<b2(s.show_boundingbox)
+        << " frustum="<<b2(s.show_frustum)
+        << " coord="<<b2(s.show_coord)
+        << " text="<<b2(s.show_text)
+        << " sync="<<b2(s.show_sync)
+        << " notify="<<b2(s.show_notify) << "\n";
+
+    // Heatmap
+    std::cout << "heatmap: on="<<b2(s.heatmap)
+        << " range=["<<s.heatmap_min<<","<<s.heatmap_max<<"]"
+        << " cmin=("<<v3(s.heatmap_color_min)<<")"
+        << " cmax=("<<v3(s.heatmap_color_max)<<")\n";
+
+    // Hintergrund / Scale
+    std::cout << "background_color=("<<v3(s.background_color)<<")  cover_scale="<<coverScale << "\n";
+
+    // Initial matrices (einmalig)
+    std::cout << "initial_navigation=" << LamureUtil::matConv4F(s.initial_navigation) << "\n";
+    std::cout << "initial_view="       << LamureUtil::matConv4F(s.initial_view)       << "\n";
+
+    // Transforms (nur Anzahl + kurze Vorschau)
+    std::cout << "transforms: " << s.transforms.size() << " (showing up to 3 keys)\n";
+    size_t shown=0;
+    for(const auto& kv : s.transforms){
+        if(shown++>=3){ std::cout<<"  ...\n"; break; }
+        std::cout << "  [" << kv.first << "] scm::mat4d present\n";
+    }
+
+    // Measurement
+    std::cout << "measurement: dir='"<<s.measurement_dir<<"' name='"<<s.measurement_name<<"'\n";
     if(!s.measurement_segments.empty()){
-        std::cout<<"measurement_segments.count="<<s.measurement_segments.size()<<"\n";
+        std::cout << "measurement_segments.count="<<s.measurement_segments.size()<<"\n";
         const size_t N=std::min<size_t>(s.measurement_segments.size(),3);
         for(size_t i=0;i<N;++i){
             const auto& q=s.measurement_segments[i];
@@ -394,7 +507,8 @@ void Lamure::dumpSettings(const char* tag){
         }
         if(s.measurement_segments.size()>3) std::cout<<"  ...\n";
     }
-    std::cout<<"--- end settings ---\n";
+
+    std::cout << "--- end settings ---\n";
 }
 
 
@@ -442,13 +556,14 @@ bool Lamure::init2() {
 	m_ui->setupUi();
     m_renderer->init();
     opencover::cover->getObjectsRoot()->addChild(m_renderer->getGroup());
-
+    applyShaderToRendererFromSettings();
 	//interactor = new LamurePointCloudInteractor();
 	//osg::ref_ptr<opencover::IntersectionHandler> handler = interactor;
 	//opencover::coIntersection::instance()->addHandler(handler);
     opencover::coVRNavigationManager::instance()->setNavMode("Point");
     if (m_settings.use_initial_view || m_settings.use_initial_navigation)
         plugin->applyInitialTransforms();
+
     return 1;
 }
 
@@ -460,7 +575,7 @@ void Lamure::key(int type, int keySym, int /*mod*/) {
 }
 
 void Lamure::preFrame() {
-    if (m_measurement && !m_measurement->isRunning()) {
+    if (m_measurement && !m_measurement->isActive()) {
         stopMeasurement();
     }
     float deltaTime = std::clamp(float(opencover::cover->frameDuration()), 1.0f/60.0f, 1.0f/15.0f);
@@ -476,26 +591,44 @@ void Lamure::preFrame() {
 
     opencover::VRSceneGraph::instance()->getTransform()->setMatrix(m);
 }
+
+
 void Lamure::startMeasurement() {
     std::cout << "startMeasurement(): " << m_ui->getMeasureButton()->state() << std::endl;
-    if (m_settings.measurement_segments.empty()) { std::cerr << "[Lamure] No measurement segments.\n"; return; }
+    if (m_settings.measurement_segments.empty()) {
+        std::cerr << "[Lamure] No measurement segments.\n";
+        return;
+    }
 
     if (m_settings.use_initial_navigation || m_settings.use_initial_view) {
-        applyInitialTransforms(); // setzt initial_navigation / initial_view, wenn aktiv
+        applyInitialTransforms();
     }
 
     rendering_scheme = opencover::VRViewer::instance()->getRunFrameScheme();
     opencover::VRViewer::instance()->setRunFrameScheme(osgViewer::Viewer::CONTINUOUS);
+    prev_frame_rate_ = opencover::coVRConfig::instance()->frameRate();
+    const float target_unlimited_fps = 1000.0f; // effektiv „keine“ Kappung
+    if (prev_frame_rate_ > 0.f && prev_frame_rate_ < target_unlimited_fps) {
+        opencover::coVRConfig::instance()->setFrameRate(target_unlimited_fps);
+        fps_cap_modified_ = true;
+    } else {
+        fps_cap_modified_ = false;
+    }
 
+    osg::ref_ptr ds = osg::DisplaySettings::instance();
+    prev_vsync_frames_ = ds->getSyncSwapBuffers();
+    if (prev_vsync_frames_ != 0u) {
+        ds->setSyncSwapBuffers(0u);
+        vsync_modified_ = true;
+    } else {
+        vsync_modified_ = false;
+    }
     const std::string outFile = buildMeasurementOutputPath();
-    std::cout << "[Lamure] Measurement output: " << outFile << std::endl;
-
     m_measurement = std::make_unique<LamureMeasurement>(this, opencover::VRViewer::instance(), m_settings.measurement_segments, outFile);
 }
 
-
 void Lamure::stopMeasurement() {
-	std::cout << "stopMeasurement(): " << m_ui->getMeasureButton()->state() << std::endl;
+    std::cout << "stopMeasurement(): " << m_ui->getMeasureButton()->state() << std::endl;
     if (!m_measurement) return;
     if (opencover::VRViewer::instance() && opencover::VRViewer::instance()->getCamera()) {
         opencover::VRViewer::instance()->getCamera()->setPreDrawCallback(nullptr);
@@ -503,10 +636,11 @@ void Lamure::stopMeasurement() {
     }
     m_measurement->stop();
     m_measurement->writeLogAndStop();
-	m_measurement.reset();
-	m_ui->getMeasureButton()->setState(false);
-
+    m_measurement.reset();
+    m_ui->getMeasureButton()->setState(false);
     opencover::VRViewer::instance()->setRunFrameScheme(rendering_scheme);
+    if (fps_cap_modified_) { opencover::coVRConfig::instance()->setFrameRate(prev_frame_rate_); }
+    if (vsync_modified_) { osg::DisplaySettings::instance()->setSyncSwapBuffers(prev_vsync_frames_); }
 }
 
 
@@ -515,16 +649,33 @@ void Lamure::addMarkMs(MarkField f, double ms) noexcept
     if (!m_measurement) return; // nur akkumulieren, wenn Messung aktiv
 
     switch (f) {
-    case MarkField::DrawCB_Total: m_marks.draw_cb_ms      += ms; break;
-    case MarkField::Dispatch:     m_marks.dispatch_ms     += ms; break;
-    case MarkField::ContextBind:  m_marks.context_bind_ms += ms; break;
-    case MarkField::Estimates:    m_marks.estimates_ms    += ms; break;
-    case MarkField::Pass1:        m_marks.pass1_ms        += ms; break;
-    case MarkField::Pass2:        m_marks.pass2_ms        += ms; break;
-    case MarkField::Pass3:        m_marks.pass3_ms        += ms; break;
-    case MarkField::SinglePass:   m_marks.singlepass_ms   += ms; break;
+    case MarkField::DrawCB_Total: m_marks.draw_cb_ms      = ms; break;
+    case MarkField::Dispatch:     m_marks.dispatch_ms     = ms; break;
+    case MarkField::ContextBind:  m_marks.context_bind_ms = ms; break;
+    case MarkField::Estimates:    m_marks.estimates_ms    = ms; break;
+    case MarkField::Pass1:        m_marks.pass1_ms        = ms; break;
+    case MarkField::Pass2:        m_marks.pass2_ms        = ms; break;
+    case MarkField::Pass3:        m_marks.pass3_ms        = ms; break;
+    case MarkField::SinglePass:   m_marks.singlepass_ms   = ms; break;
     default: break;
     }
+}
+
+
+void Lamure::applyShaderToRendererFromSettings() {
+    if (!m_renderer) return;
+    // Falls jemand s.shader_type später überschreibt, hier noch mal robust ableiten:
+    auto& s = m_settings;
+    auto decideShaderType = [&](){
+        using ST = LamureRenderer::ShaderType;
+        if (s.splatting) return ST::SurfelMultipass;
+        if (s.surfel)    return s.lighting ? ST::SurfelColorLighting
+            : (s.coloring ? ST::SurfelColor : ST::Surfel);
+        return s.lighting ? ST::PointColorLighting
+            : (s.coloring ? ST::PointColor : ST::Point);
+        };
+    s.shader_type = decideShaderType();
+    m_renderer->setActiveShaderType(s.shader_type);
 }
 
 
@@ -573,7 +724,7 @@ Lamure::parseMeasurementSegments(const std::string& cfg) const {
         if (segStr.empty()) continue;
         auto parts = split(segStr, '|');
         if (parts.size() != 4) { 
-            std::cerr << "[Lamure] Bad segment (need 4 parts): \"" << segStr << "\"\n"; 
+            std::cerr << "[Lamure] Bad segment (need 4 parts): \"" << segStr << "\"\n";
             continue; 
         }
         osg::Vec3 tra, rot; float vt = 0.f, vr = 0.f;
