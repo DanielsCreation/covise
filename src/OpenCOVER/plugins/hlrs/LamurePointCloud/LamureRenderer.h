@@ -396,13 +396,6 @@ private:
         GLuint texture_position= 0; // GL_COLOR_ATTACHMENT2: akk. View-Space-Position
         GLuint depth_texture   = 0; // GL_DEPTH_ATTACHMENT  : Depth-Textur (z.B. D24)
 
-        int msaa_samples = 0;
-        GLuint msaa_fbo       = 0;
-        GLuint msaa_color_rbo   = 0; // RBO für Farbe (multisampled)
-        GLuint msaa_normal_rbo  = 0; // RBO für Normal (multisampled)
-        GLuint msaa_position_rbo= 0; // RBO für Position (multisampled)
-        GLuint msaa_depth_rbo   = 0; // RBO für Depth (multisampled)
-
         GLuint resolve_fbo     = 0;
         GLuint resolve_color   = 0;
         GLuint resolve_normal  = 0;

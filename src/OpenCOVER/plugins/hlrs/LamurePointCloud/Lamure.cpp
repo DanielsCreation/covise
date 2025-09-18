@@ -516,7 +516,7 @@ bool Lamure::init2() {
 	std::cout << "init2()" << std::endl;
 
     plugin->loadSettingsFromCovise();
-    dumpSettings();
+    //dumpSettings();
 
     if (plugin->m_settings.provenance && plugin->m_settings.json != "") {
         std::cout << "json: " << plugin->m_settings.json << std::endl;

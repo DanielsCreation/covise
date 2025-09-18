@@ -80,7 +80,7 @@ struct InitCullCallback : public osg::Drawable::CullCallback {
 
         _renderer->setModelViewMatrix(LamureUtil::matConv4D(mv_osg));
         _renderer->setProjectionMatrix(LamureUtil::matConv4D(pj_osg));
-        _renderer->ensurePclFboSizeUpToDate();
+        //_renderer->ensurePclFboSizeUpToDate();
 
         // --- H/(t-b) effizient bestimmen (für SSE/LOD)
         float heightDivTB = 1.f;
@@ -648,18 +648,19 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
                 glUseProgram(_renderer->getSurfelPass1Shader().program);
 
+                if (_renderer->getSurfelPass1Shader().projection_matrix_loc >= 0) glUniformMatrix4fv(_renderer->getSurfelPass1Shader().projection_matrix_loc, 1, GL_FALSE, projection_matrix.data_array);
                 if (_renderer->getSurfelPass1Shader().viewport_loc          >= 0) glUniform2f(_renderer->getSurfelPass1Shader().viewport_loc, width, height);
                 if (_renderer->getSurfelPass1Shader().near_plane_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
                 if (_renderer->getSurfelPass1Shader().far_plane_loc         >= 0) glUniform1f(_renderer->getSurfelPass1Shader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
                 if (_renderer->getSurfelPass1Shader().max_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().max_radius_loc,   s.max_radius);
                 if (_renderer->getSurfelPass1Shader().min_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().min_radius_loc,   s.min_radius);
-                if (_renderer->getSurfelPass1Shader().scale_radius_loc      >= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius * s.scale_element);
+                if (_renderer->getSurfelPass1Shader().scale_radius_loc      >= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius/* * s.scale_element*/);
                 if (_renderer->getSurfelPass1Shader().scale_radius_gamma_loc>= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_gamma_loc, s.scale_radius_gamma);
                 if (_renderer->getSurfelPass1Shader().max_radius_cut_loc    >= 0) glUniform1f(_renderer->getSurfelPass1Shader().max_radius_cut_loc, s.max_radius_cut);
-                if (_renderer->getSurfelPass1Shader().projection_matrix_loc >= 0) glUniformMatrix4fv(_renderer->getSurfelPass1Shader().projection_matrix_loc, 1, GL_FALSE, projection_matrix.data_array);
                 if (_renderer->getSurfelPass1Shader().min_screen_size_loc   >= 0) glUniform1f(_renderer->getSurfelPass1Shader().min_screen_size_loc, s.min_screen_size);
                 if (_renderer->getSurfelPass1Shader().max_screen_size_loc   >= 0) glUniform1f(_renderer->getSurfelPass1Shader().max_screen_size_loc, s.max_screen_size);
                 if (_renderer->getSurfelPass1Shader().scale_projection_loc  >= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_projection_loc, opencover::cover->getScale() * height * 0.5f * projection_matrix.data_array[5]);
+
 
                 for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
                     if (!_plugin->getUI()->getModelVisibility()[model_id]) continue;
@@ -691,36 +692,35 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                     }
                 }
             }
-
+            
             {
                 if (fullMode) { LM_SCOPE(_plugin, Pass2); }
+
+                glBindFramebuffer(GL_FRAMEBUFFER, res.fbo);
+                glViewport(0, 0, width, height);
                 GLenum accumBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
                 glDrawBuffers(3, accumBuffers);
                 glClearColor(0.f, 0.f, 0.f, 0.f);
                 glClear(GL_COLOR_BUFFER_BIT);
-
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_ONE, GL_ONE);
                 glDisable(GL_DEPTH_TEST);
                 glDepthMask(GL_FALSE);
                 glDepthFunc(GL_ALWAYS);
-
                 glUseProgram(_renderer->getSurfelPass2Shader().program);
-
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, res.depth_texture);
-                if (_renderer->getSurfelPass2Shader().depth_texture_loc >= 0)
-                    glUniform1i(_renderer->getSurfelPass2Shader().depth_texture_loc, 0);
-
+                if (_renderer->getSurfelPass2Shader().depth_texture_loc      >= 0) glUniform1i(_renderer->getSurfelPass2Shader().depth_texture_loc, 0);
+                if (_renderer->getSurfelPass2Shader().depth_texture_loc      >= 0) glUniform1i(_renderer->getSurfelPass2Shader().depth_texture_loc, 0);
                 if (_renderer->getSurfelPass2Shader().near_plane_loc         >= 0) glUniform1f(_renderer->getSurfelPass2Shader().near_plane_loc, _renderer->getScmCamera()->near_plane_value());
                 if (_renderer->getSurfelPass2Shader().far_plane_loc          >= 0) glUniform1f(_renderer->getSurfelPass2Shader().far_plane_loc, _renderer->getScmCamera()->far_plane_value());
                 if (_renderer->getSurfelPass2Shader().viewport_loc           >= 0) glUniform2f(_renderer->getSurfelPass2Shader().viewport_loc, viewport.x, viewport.y);
                 if (_renderer->getSurfelPass2Shader().max_radius_loc         >= 0) glUniform1f(_renderer->getSurfelPass2Shader().max_radius_loc, s.max_radius);
                 if (_renderer->getSurfelPass2Shader().min_radius_loc         >= 0) glUniform1f(_renderer->getSurfelPass2Shader().min_radius_loc, s.min_radius);
-                if (_renderer->getSurfelPass2Shader().scale_radius_loc       >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_loc, s.scale_radius * s.scale_element);
+                if (_renderer->getSurfelPass2Shader().scale_radius_loc       >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_loc, s.scale_radius/* * s.scale_element*/);
                 if (_renderer->getSurfelPass2Shader().scale_radius_gamma_loc >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_gamma_loc, s.scale_radius_gamma);
                 if (_renderer->getSurfelPass2Shader().max_radius_cut_loc     >= 0) glUniform1f(_renderer->getSurfelPass2Shader().max_radius_cut_loc, s.max_radius_cut);
-                if (_renderer->getSurfelPass2Shader().coloring_loc           >= 0) glUniform1f(_renderer->getSurfelPass2Shader().coloring_loc, s.coloring);
+                if (_renderer->getSurfelPass2Shader().coloring_loc           >= 0) glUniform1i(_renderer->getSurfelPass2Shader().coloring_loc, s.coloring);
                 if (_renderer->getSurfelPass2Shader().show_normals_loc       >= 0) glUniform1i(_renderer->getSurfelPass2Shader().show_normals_loc, s.show_normals);
                 if (_renderer->getSurfelPass2Shader().show_output_sens_loc   >= 0) glUniform1i(_renderer->getSurfelPass2Shader().show_output_sens_loc, s.show_output_sensitivity);
                 if (_renderer->getSurfelPass2Shader().show_radius_dev_loc    >= 0) glUniform1i(_renderer->getSurfelPass2Shader().show_radius_dev_loc, s.show_radius_deviation);
@@ -732,14 +732,12 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 if (_renderer->getSurfelPass2Shader().flank_lift_loc    >= 0) glUniform1f(_renderer->getSurfelPass2Shader().flank_lift_loc, s.flank_lift);
                 if (_renderer->getSurfelPass2Shader().depth_range_loc   >= 0) glUniform1f(_renderer->getSurfelPass2Shader().depth_range_loc, s.depth_range);
 
-
                 const bool needNodeUniforms = (s.show_radius_deviation || s.show_accuracy);
 
                 for (uint16_t model_id = 0; model_id < _plugin->getSettings().num_models; ++model_id) {
                     if (!_plugin->getUI()->getModelVisibility()[model_id]) continue;
 
-                    lamure::ren::cut &cut = cuts->get_cut(context_id,
-                        _renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID(), model_id);
+                    lamure::ren::cut &cut = cuts->get_cut(context_id, _renderer->getOsgCamera()->getGraphicsContext()->getState()->getContextID(), model_id);
                     auto renderable = cut.complete_set();
                     const lamure::ren::bvh *bvh = database->get_model(model_id)->get_bvh();
                     const auto &bbox = bvh->get_bounding_boxes();
@@ -749,10 +747,8 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                     scm::math::mat3 normal_matrix     = scm::math::transpose(scm::math::inverse(LamureUtil::matConv4to3F(model_view_matrix)));
                     scm::gl::frustum frustum          = _renderer->getScmCamera()->get_frustum_by_model(model_matrix);
 
-                    if (_renderer->getSurfelPass2Shader().model_view_matrix_loc >= 0)
-                        glUniformMatrix4fv(_renderer->getSurfelPass2Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
-                    if (_renderer->getSurfelPass2Shader().normal_matrix_loc >= 0)
-                        glUniformMatrix3fv(_renderer->getSurfelPass2Shader().normal_matrix_loc, 1, GL_FALSE, normal_matrix.data_array);
+                    if (_renderer->getSurfelPass2Shader().model_view_matrix_loc >= 0) glUniformMatrix4fv(_renderer->getSurfelPass2Shader().model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
+                    if (_renderer->getSurfelPass2Shader().normal_matrix_loc >= 0) glUniformMatrix3fv(_renderer->getSurfelPass2Shader().normal_matrix_loc, 1, GL_FALSE, normal_matrix.data_array);
 
                     for (auto const &node_slot_aggregate : renderable) {
                         if (_renderer->getScmCamera()->cull_against_frustum(frustum, bbox[node_slot_aggregate.node_id_]) != 1) {
@@ -762,7 +758,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                     }
                 }
             }
-
+            
             {
                 if (fullMode) { LM_SCOPE(_plugin, Pass3); }
                 glBindFramebuffer(GL_READ_FRAMEBUFFER, res.fbo);
@@ -771,28 +767,22 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
                 glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
                 glViewport(prev_viewport[0], prev_viewport[1], prev_viewport[2], prev_viewport[3]);
-
                 glEnable(GL_DEPTH_TEST);
                 glDepthMask(GL_FALSE);
-
                 glDisable(GL_BLEND);
 
                 glUseProgram(_renderer->getSurfelPass3Shader().program);
-
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, res.texture_color);
-                if (_renderer->getSurfelPass3Shader().in_color_texture_loc >= 0)
-                    glUniform1i(_renderer->getSurfelPass3Shader().in_color_texture_loc, 0);
+                if (_renderer->getSurfelPass3Shader().in_color_texture_loc >= 0) glUniform1i(_renderer->getSurfelPass3Shader().in_color_texture_loc, 0);
 
                 glActiveTexture(GL_TEXTURE1);
                 glBindTexture(GL_TEXTURE_2D, res.texture_normal);
-                if (_renderer->getSurfelPass3Shader().in_normal_texture_loc >= 0)
-                    glUniform1i(_renderer->getSurfelPass3Shader().in_normal_texture_loc, 1);
+                if (_renderer->getSurfelPass3Shader().in_normal_texture_loc >= 0) glUniform1i(_renderer->getSurfelPass3Shader().in_normal_texture_loc, 1);
 
                 glActiveTexture(GL_TEXTURE2);
                 glBindTexture(GL_TEXTURE_2D, res.texture_position);
-                if (_renderer->getSurfelPass3Shader().in_vs_position_texture_loc >= 0)
-                    glUniform1i(_renderer->getSurfelPass3Shader().in_vs_position_texture_loc, 2);
+                if (_renderer->getSurfelPass3Shader().in_vs_position_texture_loc >= 0) glUniform1i(_renderer->getSurfelPass3Shader().in_vs_position_texture_loc, 2);
 
                 osg::Matrix base = opencover::VRSceneGraph::instance()->getScaleTransform()->getMatrix();
                 base.postMult(opencover::VRSceneGraph::instance()->getTransform()->getMatrix());
@@ -802,7 +792,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 scm::math::vec4 light_ws(s.point_light_pos[0], s.point_light_pos[1], s.point_light_pos[2], 1.0f);
                 scm::math::vec4 light_vs4 = viewMat * light_ws;
                 scm::math::vec3 light_vs(light_vs4[0], light_vs4[1], light_vs4[2]);
-
+                
                 if (_renderer->getSurfelPass3Shader().background_color_loc        >= 0) glUniform3fv(_renderer->getSurfelPass3Shader().background_color_loc, 1, background_color.data_array);
                 if (_renderer->getSurfelPass3Shader().view_matrix_loc             >= 0) glUniformMatrix4fv(_renderer->getSurfelPass3Shader().view_matrix_loc,  1, GL_FALSE, viewMat.data_array);
                 if (_renderer->getSurfelPass3Shader().point_light_pos_vs_loc      >= 0) glUniform3fv(_renderer->getSurfelPass3Shader().point_light_pos_vs_loc, 1, light_vs.data_array);
@@ -812,12 +802,11 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 if (_renderer->getSurfelPass3Shader().shininess_loc               >= 0) glUniform1f(_renderer->getSurfelPass3Shader().shininess_loc,             s.shininess);
                 if (_renderer->getSurfelPass3Shader().gamma_loc                   >= 0) glUniform1f(_renderer->getSurfelPass3Shader().gamma_loc,                 s.gamma);
                 if (_renderer->getSurfelPass3Shader().use_tone_mapping_loc        >= 0) glUniform1i(_renderer->getSurfelPass3Shader().use_tone_mapping_loc,      s.use_tone_mapping ? 1 : 0);
-                if (_renderer->getSurfelPass3Shader().lighting_loc                >= 0) glUniform1f(_renderer->getSurfelPass3Shader().lighting_loc, s.lighting);
+                if (_renderer->getSurfelPass3Shader().lighting_loc                >= 0) glUniform1i(_renderer->getSurfelPass3Shader().lighting_loc, s.lighting);
 
                 glBindVertexArray(res.screen_quad_vao);
                 glDrawArrays(GL_TRIANGLES, 0, 6);
                 glBindVertexArray(0);
-
                 glActiveTexture(GL_TEXTURE0);
             }
         } else {
@@ -854,6 +843,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             }
         }
 
+       
         // Basis-Zähler
         auto& ri = _plugin->getRenderInfo();
         ri.rendered_primitives = rendered_primitives;
@@ -1039,6 +1029,10 @@ void LamureRenderer::init()
 void LamureRenderer::initUniforms() 
 {
     cout << "[Notify] initUniforms()" << endl;
+    auto guard_use = [](GLuint prog, const char* name)->bool{
+        if (!prog) { std::cerr << "[Lamure] Program '" << name << "' is 0 (compile/link failed) - skip uniforms.\n"; return false; }
+    glUseProgram(prog); return true;
+    };
 
     glUseProgram(m_point_shader.program);
     m_point_shader.mvp_matrix_loc   = glGetUniformLocation(m_point_shader.program, "mvp_matrix");
@@ -1255,7 +1249,6 @@ void LamureRenderer::initUniforms()
     m_surfel_pass2_shader.inv_mv_matrix_loc          = glGetUniformLocation(m_surfel_pass2_shader.program, "inv_mv_matrix");
     m_surfel_pass2_shader.model_to_screen_matrix_loc = glGetUniformLocation(m_surfel_pass2_shader.program, "model_to_screen_matrix");
 
-    m_surfel_pass2_shader.depth_epsilon_vs_loc          = glGetUniformLocation(m_surfel_pass2_shader.program, "depth_epsilon");
     m_surfel_pass2_shader.depth_texture_loc          = glGetUniformLocation(m_surfel_pass2_shader.program, "depth_texture");
     m_surfel_pass2_shader.near_plane_loc             = glGetUniformLocation(m_surfel_pass2_shader.program, "near_plane");
     m_surfel_pass2_shader.far_plane_loc              = glGetUniformLocation(m_surfel_pass2_shader.program, "far_plane");
@@ -1265,9 +1258,9 @@ void LamureRenderer::initUniforms()
     m_surfel_pass2_shader.max_radius_loc             = glGetUniformLocation(m_surfel_pass2_shader.program, "max_radius");
     m_surfel_pass2_shader.min_radius_loc             = glGetUniformLocation(m_surfel_pass2_shader.program, "min_radius");
     m_surfel_pass2_shader.max_screen_size_loc             = glGetUniformLocation(m_surfel_pass2_shader.program, "max_screen_size");
-    m_surfel_pass2_shader.min_screen_size_loc             = glGetUniformLocation(m_surfel_pass2_shader.program, "min_screen_size");
-    m_surfel_pass2_shader.scale_radius_loc           = glGetUniformLocation(m_surfel_pass2_shader.program, "scale_radius");
-    m_surfel_pass2_shader.max_radius_cut_loc = glGetUniformLocation(m_surfel_pass2_shader.program, "max_radius_cut");
+    m_surfel_pass2_shader.min_screen_size_loc      = glGetUniformLocation(m_surfel_pass2_shader.program, "min_screen_size");
+    m_surfel_pass2_shader.scale_radius_loc         = glGetUniformLocation(m_surfel_pass2_shader.program, "scale_radius");
+    m_surfel_pass2_shader.max_radius_cut_loc       = glGetUniformLocation(m_surfel_pass2_shader.program, "max_radius_cut");
     m_surfel_pass2_shader.scale_radius_gamma_loc   = glGetUniformLocation(m_surfel_pass2_shader.program, "scale_radius_gamma");
 
     m_surfel_pass2_shader.show_normals_loc           = glGetUniformLocation(m_surfel_pass2_shader.program, "show_normals");
@@ -1546,43 +1539,37 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         glUniform3fv(prog.heatmap_max_color_loc, 1, s.heatmap_color_max.data_array);
         break;
     }
-    //case ShaderType::SurfelMultipass: {
-    //    auto& prog1 = m_surfel_pass1_shader;
-    //    glUseProgram(prog1.program);
-    //    glUniform1f(prog1.max_radius_loc, s.max_radius);
-    //    glUniform1f(prog1.min_radius_loc, s.min_radius);
-    //    glUniform1f(prog1.min_screen_size_loc, s.min_screen_size);
-    //    glUniform1f(prog1.max_screen_size_loc, s.max_screen_size);
-    //    glUniform1f(prog1.scale_radius_loc, s.scale_radius * s.scale_element);
-    //    glUniform1f(prog1.max_radius_cut_loc, s.max_radius_cut);
-    //    glUniform1f(prog1.scale_radius_gamma_loc, s.scale_radius_gamma);
-    //    glUniform1f(prog1.scale_projection_loc, opencover::cover->getScale() * viewport.y * 0.5f * projection_matrix.data_array[5]);
-    //    glUniform1f(prog1.far_plane_loc, m_plugin->getRenderer()->getScmCamera()->far_plane_value());
+    case ShaderType::SurfelMultipass: {
+        auto& prog1 = m_surfel_pass1_shader;
+        glUseProgram(prog1.program);
+        glUniform1f(prog1.max_radius_loc, s.max_radius);
+        glUniform1f(prog1.min_radius_loc, s.min_radius);
+        glUniform1f(prog1.min_screen_size_loc, s.min_screen_size);
+        glUniform1f(prog1.max_screen_size_loc, s.max_screen_size);
+        glUniform1f(prog1.scale_radius_loc, s.scale_radius * s.scale_element);
+        glUniform1f(prog1.max_radius_cut_loc, s.max_radius_cut);
+        glUniform1f(prog1.scale_radius_gamma_loc, s.scale_radius_gamma);
+        glUniform1f(prog1.scale_projection_loc, opencover::cover->getScale() * viewport.y * 0.5f * projection_matrix.data_array[5]);
+        glUniform1f(prog1.far_plane_loc, m_plugin->getRenderer()->getScmCamera()->far_plane_value());
 
-    //    auto& prog2 = m_surfel_pass2_shader;
-    //    glUseProgram(prog2.program);
-    //    //coco->nearClip(), coco->farClip()
-    //    glUniform1f(prog2.near_plane_loc, m_plugin->getRenderer()->getScmCamera()->near_plane_value());
-    //    glUniform1f(prog2.max_radius_loc, s.max_radius);
-    //    glUniform1f(prog2.min_radius_loc, s.min_radius);
-    //    glUniform1f(prog2.min_screen_size_loc, s.min_screen_size);
-    //    glUniform1f(prog2.max_screen_size_loc, s.max_screen_size);
-    //    glUniform1f(prog2.scale_radius_loc, s.scale_radius * s.scale_element);
-    //    glUniform1f(prog2.max_radius_cut_loc, s.max_radius_cut);
-    //    glUniform1f(prog2.scale_radius_gamma_loc, s.scale_radius_gamma);
-    //    glUniform1f(prog2.scale_projection_loc, opencover::cover->getScale() * viewport.y * 0.5f * projection_matrix.data_array[5]);
-    //    glUniform1i(prog2.show_normals_loc, s.show_normals);
-    //    glUniform1i(prog2.show_radius_dev_loc, s.show_radius_deviation);
-    //    glUniform1i(prog2.show_output_sens_loc, s.show_output_sensitivity);
-    //    glUniform1i(prog2.show_accuracy_loc, s.show_accuracy);
-    //    glUniform1i(prog2.channel_loc, s.channel);
-    //    glUniform1i(prog2.heatmap_loc, s.heatmap);
-    //    glUniform1f(prog2.heatmap_min_loc, s.heatmap_min);
-    //    glUniform1f(prog2.heatmap_max_loc, s.heatmap_max);
-    //    glUniform3fv(prog2.heatmap_min_color_loc, 1, s.heatmap_color_min.data_array);
-    //    glUniform3fv(prog2.heatmap_max_color_loc, 1, s.heatmap_color_max.data_array);
-    //    break;
-    //}
+        auto& prog2 = m_surfel_pass2_shader;
+        glUseProgram(prog2.program);
+        //coco->nearClip(), coco->farClip()
+        glUniform1f(prog2.near_plane_loc, m_plugin->getRenderer()->getScmCamera()->near_plane_value());
+        glUniform1f(prog2.max_radius_loc, s.max_radius);
+        glUniform1f(prog2.min_radius_loc, s.min_radius);
+        glUniform1f(prog2.min_screen_size_loc, s.min_screen_size);
+        glUniform1f(prog2.max_screen_size_loc, s.max_screen_size);
+        glUniform1f(prog2.scale_radius_loc, s.scale_radius * s.scale_element);
+        glUniform1f(prog2.max_radius_cut_loc, s.max_radius_cut);
+        glUniform1f(prog2.scale_radius_gamma_loc, s.scale_radius_gamma);
+        glUniform1f(prog2.scale_projection_loc, opencover::cover->getScale() * viewport.y * 0.5f * projection_matrix.data_array[5]);
+        glUniform1i(prog2.show_normals_loc, s.show_normals);
+        glUniform1i(prog2.show_radius_dev_loc, s.show_radius_deviation);
+        glUniform1i(prog2.show_output_sens_loc, s.show_output_sensitivity);
+        glUniform1i(prog2.show_accuracy_loc, s.show_accuracy);
+        break;
+    }
     }
 }
 
@@ -1935,6 +1922,7 @@ unsigned int LamureRenderer::createShader(const std::string& vertexShader, const
     return 1;
 }
 
+
 unsigned int LamureRenderer::compileShader(unsigned int type, const std::string& source, uint8_t ctx_id)
 {
     osg::GLExtensions* gl_api = new osg::GLExtensions(ctx_id);
@@ -1958,36 +1946,93 @@ unsigned int LamureRenderer::compileShader(unsigned int type, const std::string&
     return id;
 }
 
+
 GLuint LamureRenderer::compileAndLinkShaders(std::string vs_source, std::string fs_source)
 {
     GLuint program = glCreateProgram();
     GLuint vs = compileShader(GL_VERTEX_SHADER, vs_source, 0);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, fs_source, 0);
+
+    if (!vs || !fs) {
+        std::cerr << "[Lamure] Shader compile failed (VS/FS). Abort link.\n";
+        if (program) glDeleteProgram(program);
+        if (vs) glDeleteShader(vs);
+        if (fs) glDeleteShader(fs);
+        return 0;
+    }
+
     glAttachShader(program, vs);
     glAttachShader(program, fs);
     glLinkProgram(program);
     glValidateProgram(program);
+
+    GLint linked = GL_FALSE, logLen = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLen);
+    if (logLen > 1) {
+        std::string log; log.resize(logLen);
+        GLsizei written = 0;
+        glGetProgramInfoLog(program, logLen, &written, log.data());
+        if (written > 0) std::cerr << "[Lamure] Program link log (VS/FS):\n" << log << std::endl;
+    }
+
     glDeleteShader(vs);
     glDeleteShader(fs);
+
+    if (!linked) {
+        std::cerr << "[Lamure] Program link FAILED (VS/FS).\n";
+        glDeleteProgram(program);
+        return 0;
+    }
     return program;
 }
+
+
 
 GLuint LamureRenderer::compileAndLinkShaders(std::string vs_source, std::string gs_source, std::string fs_source)
 {
     GLuint program = glCreateProgram();
-    GLuint vs = compileShader(GL_VERTEX_SHADER, vs_source, 0);
+    GLuint vs = compileShader(GL_VERTEX_SHADER,  vs_source, 0);
     GLuint gs = compileShader(GL_GEOMETRY_SHADER, gs_source, 0);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, fs_source, 0);
+
+    if (!vs || !gs || !fs) {
+        std::cerr << "[Lamure] Shader compile failed (VS/GS/FS). Abort link.\n";
+        if (program) glDeleteProgram(program);
+        if (vs) glDeleteShader(vs);
+        if (gs) glDeleteShader(gs);
+        if (fs) glDeleteShader(fs);
+        return 0;
+    }
+
     glAttachShader(program, vs);
     glAttachShader(program, gs);
     glAttachShader(program, fs);
     glLinkProgram(program);
     glValidateProgram(program);
+
+    GLint linked = GL_FALSE, logLen = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLen);
+    if (logLen > 1) {
+        std::string log; log.resize(logLen);
+        GLsizei written = 0;
+        glGetProgramInfoLog(program, logLen, &written, log.data());
+        if (written > 0) std::cerr << "[Lamure] Program link log (VS/GS/FS):\n" << log << std::endl;
+    }
+
     glDeleteShader(vs);
     glDeleteShader(gs);
     glDeleteShader(fs);
+
+    if (!linked) {
+        std::cerr << "[Lamure] Program link FAILED (VS/GS/FS).\n";
+        glDeleteProgram(program);
+        return 0;
+    }
     return program;
 }
+
 
 
 void LamureRenderer::initFrustumResources() {
@@ -2119,103 +2164,105 @@ void LamureRenderer::print_active_uniforms(GLuint programID, const std::string& 
 }
 
 
-void LamureRenderer::initPclResources(){
-    if(m_plugin->getUI()->getNotifyButton()->state()) std::cout<<"[Notify] initPclResources()\n";
 
-    int width=0,height=0;
-    if(osg::ref_ptr<osg::Camera> cam=getOsgCamera()){
-        if(osg::Viewport* vp=cam->getViewport()){ width=int(vp->width()); height=int(vp->height()); }
-    }
-    if(width<=0||height<=0){
-        const auto* tr=opencover::coVRConfig::instance()->windows[0].context->getTraits();
-        width=tr->width; height=tr->height;
+void LamureRenderer::initPclResources()
+{
+    if (m_plugin->getUI()->getNotifyButton()->state()) {
+        std::cout << "[Notify] initPclResources() " << std::endl;
     }
 
-    // Alte Ressourcen freigeben (nur vorhandene Handles)
-    if(m_pcl_resource.fbo){
-        if(m_pcl_resource.texture_color)   glDeleteTextures(1,&m_pcl_resource.texture_color);
-        if(m_pcl_resource.texture_normal)  glDeleteTextures(1,&m_pcl_resource.texture_normal);
-        if(m_pcl_resource.texture_position)glDeleteTextures(1,&m_pcl_resource.texture_position);
-        if(m_pcl_resource.depth_texture)   glDeleteTextures(1,&m_pcl_resource.depth_texture);
-        glDeleteFramebuffers(1,&m_pcl_resource.fbo);
-        m_pcl_resource.fbo=0; m_pcl_resource.texture_color=0; m_pcl_resource.texture_normal=0; m_pcl_resource.texture_position=0; m_pcl_resource.depth_texture=0;
+    const int height = opencover::coVRConfig::instance()->windows[0].context->getTraits()->height;
+    const int width  = opencover::coVRConfig::instance()->windows[0].context->getTraits()->width;
+
+    // Vorherige Ressourcen freigeben
+    if (m_pcl_resource.fbo != 0) {
+        glDeleteFramebuffers(1, &m_pcl_resource.fbo);
+        glDeleteTextures(1, &m_pcl_resource.texture_color);
+        glDeleteTextures(1, &m_pcl_resource.texture_normal);
+        glDeleteTextures(1, &m_pcl_resource.texture_position);
+        glDeleteTextures(1, &m_pcl_resource.depth_texture);
+        m_pcl_resource = {}; // nullt auch Handles
     }
 
-    // FBO anlegen
-    glGenFramebuffers(1,&m_pcl_resource.fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER,m_pcl_resource.fbo);
+    // FBO
+    glGenFramebuffers(1, &m_pcl_resource.fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_pcl_resource.fbo);
 
-    // COLOR: RGBA16F
-    glGenTextures(1,&m_pcl_resource.texture_color);
-    glBindTexture(GL_TEXTURE_2D,m_pcl_resource.texture_color);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA16F,width,height,0,GL_RGBA,GL_HALF_FLOAT,nullptr);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,m_pcl_resource.texture_color,0);
+    // COLOR: RGBA16F (A = sum(weight))
+    glGenTextures(1, &m_pcl_resource.texture_color);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_color);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_pcl_resource.texture_color, 0);
 
     // NORMAL: RGB16F
-    glGenTextures(1,&m_pcl_resource.texture_normal);
-    glBindTexture(GL_TEXTURE_2D,m_pcl_resource.texture_normal);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB16F,width,height,0,GL_RGB,GL_HALF_FLOAT,nullptr);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,m_pcl_resource.texture_normal,0);
+    glGenTextures(1, &m_pcl_resource.texture_normal);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_normal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_pcl_resource.texture_normal, 0);
 
     // POSITION: RGB16F
-    glGenTextures(1,&m_pcl_resource.texture_position);
-    glBindTexture(GL_TEXTURE_2D,m_pcl_resource.texture_position);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB16F,width,height,0,GL_RGB,GL_HALF_FLOAT,nullptr);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,m_pcl_resource.texture_position,0);
+    glGenTextures(1, &m_pcl_resource.texture_position);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.texture_position);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_pcl_resource.texture_position, 0);
 
-    // DEPTH: D24 (stabil und schnell)
-    glGenTextures(1,&m_pcl_resource.depth_texture);
-    glBindTexture(GL_TEXTURE_2D,m_pcl_resource.depth_texture);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,width,height,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_INT,nullptr);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_MODE,GL_NONE);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,m_pcl_resource.depth_texture,0);
+    // DEPTH: 32F (kann auch D24 sein, 32F ist ok)
+    glGenTextures(1, &m_pcl_resource.depth_texture);
+    glBindTexture(GL_TEXTURE_2D, m_pcl_resource.depth_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_pcl_resource.depth_texture, 0);
 
-    // Draw-Buffers
-    const GLenum bufs[3]={GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2};
-    glDrawBuffers(3,bufs);
+    // Standard-Draw-Buffers (Pass 2 setzt das dynamisch um)
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, drawBuffers);
 
     // Check
-    const GLenum status=glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if(status!=GL_FRAMEBUFFER_COMPLETE){
-        std::cerr<<"ERROR::FRAMEBUFFER incomplete ("<<std::hex<<status<<std::dec<<") "<<width<<"x"<<height<<"\n";
-    }else if(m_plugin->getUI()->getNotifyButton()->state()){
-        std::cout<<"[Notify] FBO ready "<<width<<"x"<<height<<"\n";
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
     }
 
-    // Unbind sauber
-    glBindTexture(GL_TEXTURE_2D,0);
-    glBindFramebuffer(GL_FRAMEBUFFER,0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Screen-Quad einmalig anlegen
-    if(m_pcl_resource.screen_quad_vao==0){
-        GLuint vao=0,vbo=0;
-        glGenVertexArrays(1,&vao);
+    // Screen-Quad (falls noch nicht vorhanden)
+    if (m_pcl_resource.screen_quad_vao == 0) {
+        GLuint vao, vbo;
+        glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
-        glGenBuffers(1,&vbo);
-        glBindBuffer(GL_ARRAY_BUFFER,vbo);
-        glBufferData(GL_ARRAY_BUFFER,sizeof(float)*m_pcl_resource.screen_quad_vertex.size(),m_pcl_resource.screen_quad_vertex.data(),GL_STATIC_DRAW);
+
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * m_pcl_resource.screen_quad_vertex.size(), m_pcl_resource.screen_quad_vertex.data(), GL_STATIC_DRAW);
+
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)0);
-        m_pcl_resource.screen_quad_vao=vao; m_pcl_resource.screen_quad_vbo=vbo;
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
+
+        m_pcl_resource.screen_quad_vao = vao;
+        m_pcl_resource.screen_quad_vbo = vbo;
+
         glBindVertexArray(0);
     }
 }
+
+
+
+
 
 
 bool LamureRenderer::ensurePclFboSizeUpToDate(){

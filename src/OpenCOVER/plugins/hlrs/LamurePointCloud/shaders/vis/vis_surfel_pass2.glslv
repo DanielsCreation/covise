@@ -111,11 +111,11 @@ void main() {
     vec3 vs_half_u = (model_view_matrix * vec4(ms_u * r_ws, 0.0)).xyz; // Radius!
     vec3 vs_half_v = (model_view_matrix * vec4(ms_v * r_ws, 0.0)).xyz;
 
-    // --- Pixel-RADIUS clamp + isotrope Skalierung ---
+    // --- Screenspace-CLAMP auf Pixel-DURCHMESSER + isotrope Skalierung ---
     float w0   = max(EPS, abs((projection_matrix * vec4(vs_center, 1.0)).w));
-    float Rpx  = (r_ws * scale_projection) / w0;                 // Pixel-RADIUS
-    float RpxC = clamp(Rpx, min_screen_size, max_screen_size);
-    float s    = (Rpx > EPS) ? (RpxC / Rpx) : 1.0;
+    float d_px = (2.0 * r_ws * scale_projection) / w0;          // Pixel-Durchmesser
+    float d_pxC = clamp(d_px, min_screen_size, max_screen_size); // Clamp (Durchmesser)
+    float s    = (d_px > EPS) ? (d_pxC / d_px) : 1.0;
 
     vs_half_u *= s;
     vs_half_v *= s;
