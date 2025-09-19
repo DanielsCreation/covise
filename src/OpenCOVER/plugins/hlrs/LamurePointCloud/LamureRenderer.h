@@ -160,7 +160,6 @@ private:
     struct SurfelShader {
         GLuint program{0};
         GLint  mvp_matrix_loc{-1};
-        GLint model_view_matrix_loc{-1};
         GLint  max_radius_loc{-1};
         GLint  min_radius_loc{-1};
         GLint max_screen_size_loc{-1};
@@ -176,7 +175,6 @@ private:
         GLuint program{0};
         GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
         GLint view_matrix_loc           {-1}; // mat4 view_matrix
-        GLint model_view_matrix_loc     {-1};
         GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
         GLint min_radius_loc            {-1}; // float min_radius
         GLint max_radius_loc            {-1}; // float max_radius
@@ -200,7 +198,6 @@ private:
         GLuint program{0};
         GLint mvp_matrix_loc            {-1}; // mat4 mvp_matrix
         GLint view_matrix_loc           {-1}; // mat4 view_matrix
-        GLint model_view_matrix_loc{-1};
         GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
         GLint max_radius_loc            {-1}; // float max_radius
         GLint max_screen_size_loc{-1};
@@ -232,7 +229,6 @@ private:
     struct SurfelProvShader {
         GLuint program{0};
         GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
-        GLint model_view_matrix_loc{-1};
         GLint view_matrix_loc           {-1}; // mat4 view_matrix
         GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
         GLint min_radius_loc            {-1}; // float min_radius
