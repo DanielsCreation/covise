@@ -1,14 +1,12 @@
-// Copyright (c) 2014-2018 Bauhaus-Universitaet Weimar
-// This Software is distributed under the Modified BSD License, see license.txt.
-//
-// Virtual Reality and Visualization Research Group 
-// Faculty of Media, Bauhaus-Universitaet Weimar
-// http://www.uni-weimar.de/medien/vr
-
 #version 420 core
 
-layout(early_fragment_tests) in;
+uniform float depth_range;
+uniform float flank_lift;
 
+uniform sampler2D depth_texture;      // Prepass depth (GL_NEAREST)
+uniform mat4      projection_matrix;  // P für NDC-Z-Vergleich
+
+// --- Gaussian Lookup Table ---
 const float gaussian[32] = float[](
   1.000000, 1.000000, 0.988235, 0.968627, 0.956862, 0.917647, 0.894117, 0.870588, 0.915686, 0.788235,
   0.749020, 0.690196, 0.654902, 0.619608, 0.552941, 0.513725, 0.490196, 0.458824, 0.392157, 0.356863,
@@ -16,56 +14,49 @@ const float gaussian[32] = float[](
   0.074510, 0.062745
 );
 
-in VertexData {
-  //output to fragment shader
-  vec3 pass_point_color;
-  vec3 pass_normal;
-  vec2 pass_uv_coords;
-  OPTIONAL_BEGIN
-    vec3 mv_vertex_position;
-  OPTIONAL_END
-} VertexIn;
+// --- In/Out Blocks ---
+in GsOut {
+    noperspective vec2 uv;   // -1..1
+    flat vec3 vs_center;
+    flat vec3 vs_half_u;
+    flat vec3 vs_half_v;
+    flat vec3 vs_normal;
+    flat vec3 albedo_rgb;
+} fs_in;
 
+layout(location = 0) out vec4 accumulated_colors;       // rgb = Σ(color*w), a = Σw
+layout(location = 1) out vec3 accumulated_normals;      // Σ(normal*w)
+layout(location = 2) out vec3 accumulated_vs_positions; // Σ(pos_vs*w)
 
-layout(location = 0) out vec4 accumulated_colors;
+// --- Stability Constant ---
+const float kEpsMin   = 1e-6; // Bleibt als Konstante
 
-OPTIONAL_BEGIN
-  layout(location = 1) out vec3 accumulated_normals;
-  layout(location = 2) out vec3 accumulated_vs_positions;
-OPTIONAL_END
+void main()
+{
+    vec2  uv = fs_in.uv;
+    float r2 = dot(uv, uv);
+    if (r2 > 1.0) discard;
 
-uniform vec2 win_size;
+    vec3 pos_vs = fs_in.vs_center + fs_in.vs_half_u * uv.x + fs_in.vs_half_v * uv.y;
 
-void main() {
-  vec2 uv_coords = VertexIn.pass_uv_coords;
+    vec4  clip = projection_matrix * vec4(pos_vs, 1.0);
+    float z01  = (clip.z / clip.w) * 0.5 + 0.5;
+    float z_scene = texelFetch(depth_texture, ivec2(gl_FragCoord.xy), 0).r;
 
-  if ( dot(uv_coords, uv_coords) > 1 )
-    discard;
+    // 1. Tiefentoleranz berechnen (mit neuem uniform)
+    float eps_ndc = max(kEpsMin, fwidth(z01)) * depth_range;
+    float dz = z01 - z_scene;
+    if (dz > eps_ndc) discard;
 
-  vec3 normal = VertexIn.pass_normal;
+    // 2. Gewichtung des Punkt-Profils berechnen
+    float r = sqrt(r2);
+    int idx = int(clamp(round(r * 31.0), 0.0, 31.0));
+    float w_gauss = gaussian[idx];
+    float w = mix(w_gauss, 1.0, flank_lift);
 
-  if( normal.z < 0 )
-    normal = normal * -1; 
-
-  normal = (normal + vec3(1.0, 1.0, 1.0)) / 2.0;
-  float weight = gaussian[int(round(length(uv_coords) * 31.0 ))];
-
-  accumulated_colors = vec4(VertexIn.pass_point_color * weight, weight);
-
-
-  OPTIONAL_BEGIN
-    vec3 adjustedNormal = vec3(0.0,0.0,0.0);
-    if (VertexIn.pass_normal.z < 0) {
-      adjustedNormal = VertexIn.pass_normal.xyz * -1;
-    }
-    else {
-      adjustedNormal = VertexIn.pass_normal.xyz;
-    }
-    accumulated_normals = vec3(adjustedNormal.xyz * weight);
-    accumulated_vs_positions = vec3(VertexIn.mv_vertex_position.xyz * weight);
-  OPTIONAL_END
-
-
-
+    // --- Final Output ---
+    accumulated_colors       = vec4(fs_in.albedo_rgb * w, w);
+    accumulated_normals      = fs_in.vs_normal * w;
+    accumulated_vs_positions = pos_vs * w;
 }
 

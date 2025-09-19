@@ -623,7 +623,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
         if (_plugin->getSettings().shader_type == LamureRenderer::ShaderType::SurfelMultipass && _initialized) {
             // ================= MULTI-PASS =================
-            auto&       res = _renderer->getPclResource();
+            auto& res = _renderer->getPclResource();
 
             GLint prev_fbo = 0;
             GLint prev_viewport[4] = {0,0,0,0};
@@ -654,7 +654,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 if (_renderer->getSurfelPass1Shader().far_plane_loc         >= 0) glUniform1f(_renderer->getSurfelPass1Shader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
                 if (_renderer->getSurfelPass1Shader().max_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().max_radius_loc,   s.max_radius);
                 if (_renderer->getSurfelPass1Shader().min_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().min_radius_loc,   s.min_radius);
-                if (_renderer->getSurfelPass1Shader().scale_radius_loc      >= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius/* * s.scale_element*/);
+                if (_renderer->getSurfelPass1Shader().scale_radius_loc      >= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius * s.scale_element);
                 if (_renderer->getSurfelPass1Shader().scale_radius_gamma_loc>= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_gamma_loc, s.scale_radius_gamma);
                 if (_renderer->getSurfelPass1Shader().max_radius_cut_loc    >= 0) glUniform1f(_renderer->getSurfelPass1Shader().max_radius_cut_loc, s.max_radius_cut);
                 if (_renderer->getSurfelPass1Shader().min_screen_size_loc   >= 0) glUniform1f(_renderer->getSurfelPass1Shader().min_screen_size_loc, s.min_screen_size);
@@ -717,7 +717,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
                 if (_renderer->getSurfelPass2Shader().viewport_loc           >= 0) glUniform2f(_renderer->getSurfelPass2Shader().viewport_loc, viewport.x, viewport.y);
                 if (_renderer->getSurfelPass2Shader().max_radius_loc         >= 0) glUniform1f(_renderer->getSurfelPass2Shader().max_radius_loc, s.max_radius);
                 if (_renderer->getSurfelPass2Shader().min_radius_loc         >= 0) glUniform1f(_renderer->getSurfelPass2Shader().min_radius_loc, s.min_radius);
-                if (_renderer->getSurfelPass2Shader().scale_radius_loc       >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_loc, s.scale_radius/* * s.scale_element*/);
+                if (_renderer->getSurfelPass2Shader().scale_radius_loc       >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_loc, s.scale_radius * s.scale_element);
                 if (_renderer->getSurfelPass2Shader().scale_radius_gamma_loc >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_gamma_loc, s.scale_radius_gamma);
                 if (_renderer->getSurfelPass2Shader().max_radius_cut_loc     >= 0) glUniform1f(_renderer->getSurfelPass2Shader().max_radius_cut_loc, s.max_radius_cut);
                 if (_renderer->getSurfelPass2Shader().coloring_loc           >= 0) glUniform1i(_renderer->getSurfelPass2Shader().coloring_loc, s.coloring);
@@ -2259,11 +2259,6 @@ void LamureRenderer::initPclResources()
         glBindVertexArray(0);
     }
 }
-
-
-
-
-
 
 bool LamureRenderer::ensurePclFboSizeUpToDate(){
     if(m_pcl_resource.fbo==0||m_pcl_resource.depth_texture==0) return false;

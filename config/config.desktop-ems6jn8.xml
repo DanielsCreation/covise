@@ -193,10 +193,10 @@
             <scale_radius value="0.05"/>
             <scale_radius_gamma value="0.5"/>
             <max_radius_cut value="1.45"/>
-            <max_radius value="10.0"/>
+            <max_radius value="1.0"/>
             <min_radius value="0.0"/>
             <max_screen_size value="10000.0"/>
-            <min_screen_size value="0.0"/>
+            <min_screen_size value="1.0"/>
             <scale_points value="1.0"/>
             <scale_surfel value="1.75"/>
 

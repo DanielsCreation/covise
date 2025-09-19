@@ -35,5 +35,7 @@ void main()
 
     // Debug-Modi umgehen Beleuchtung
     vec3 shaded = (lighting) ? shade_blinn_phong(pos_vs, normal_vs, albedo) : albedo;
+
+    // Voll deckende Ausgabe (keine Transparenz, kein Blend nötig)
     out_color = vec4(shaded, 1.0);
 }
