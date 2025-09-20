@@ -594,8 +594,6 @@ public:
     void initUniforms();
     void initPclResources();
     bool ensurePclFboSizeUpToDate();
-    void initPclResources(bool use_msaa, int msaa_samples);
-    void initPclResources(int msaaSamples);
 
     bool getRendering() { return m_rendering; };
     void setRendering(bool rendering) { m_rendering = rendering; };

@@ -32,6 +32,7 @@
 #include <fstream>
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
+#include <cover/coVRNavigationManager.h>
 
 std::string shader_root_path = LAMURE_SHADERS_DIR;
 std::string font_root_path = LAMURE_FONTS_DIR;
@@ -184,7 +185,7 @@ struct TextCullCallback : public osg::Drawable::CullCallback
                 << std::fixed << std::setprecision(2) 
                 << fpsAvg << "\n"
                 << _render_info->rendered_nodes << "\n"                
-                << _render_info->rendered_splats << "\n"                
+                << _render_info->rendered_primitives << "\n"                
                 << _render_info->rendered_bounding_boxes << "\n\n\n"
                 << pos.x << "\n"
                 << pos.y << "\n"
@@ -422,6 +423,139 @@ void print_mat4_flat(const float* data, const std::string& name)
     std::cout << "\n";
 }
 
+namespace {
+    struct MeasCtx {
+        bool active = false;
+        bool sampleThisFrame = false;
+        bool fullMode = false;
+        bool liteMode = false;
+    };
+
+    inline MeasCtx makeMeasCtx(Lamure* plugin) {
+        MeasCtx m;
+        auto* meas = plugin ? plugin->getMeasurement() : nullptr;
+        m.active = (meas && meas->isActive());
+        m.sampleThisFrame = m.active ? meas->isSampleFrame() : false;
+        auto& s = plugin->getSettings();
+        m.fullMode = m.active && s.measure_full;
+        m.liteMode = m.active && s.measure_light;
+        return m;
+    }
+
+    struct SDStats {
+        double sum_area_px = 0.0;     // akkumulierte Fläche aller Splats (px^2)
+        double screen_px   = 0.0;     // Breite*Höhe (px)
+        float  scale_proj  = 0.0f;    // opencover*H*0.5*P[1][1]
+        double k_orient    = 0.70;    // Orientierungsfaktor (Point=1.0, Surfel/Splat=0.7)
+    };
+
+    // Initialisiert SDStats nur, wenn in diesem Frame gesampelt wird
+    inline SDStats makeSDStats(const MeasCtx& meas,
+        const scm::math::vec2& viewport,
+        const scm::math::mat4& projection_matrix,
+        const Lamure::Settings& s) {
+        SDStats sd;
+        if (meas.sampleThisFrame) {
+            sd.scale_proj = opencover::cover->getScale() * viewport.y * 0.5f * projection_matrix.data_array[5];
+            sd.screen_px  = static_cast<double>(viewport.x) * static_cast<double>(viewport.y);
+            sd.k_orient   = s.point ? 1.0 : (s.surfel || s.splatting) ? 0.70 : 0.70;
+        }
+        return sd;
+    }
+
+    // Sammelt Flächenbeitrag eines Node (nur wenn gesampelt)
+    inline void accumulate_node_area_px(SDStats& sd,
+        const lamure::ren::bvh* bvh,
+        uint32_t node_id,
+        const scm::math::mat4& mvp,
+        const Lamure::Settings& s,
+        size_t surfels_per_node,
+        bool sampleThisFrame)
+    {
+        if (!sampleThisFrame) return;
+
+        constexpr float EPS = 1e-6f;
+
+        const auto& centroids = bvh->get_centroids();
+        const scm::math::vec4f c_ws4(centroids[node_id], 1.0f);
+        const scm::math::vec4f clip  = mvp * c_ws4;
+        const float w_abs = std::max(EPS, std::fabs(clip.w));
+
+        float r_raw = std::max(0.0f, bvh->get_avg_primitive_extent(node_id));
+        if (r_raw <= EPS) return;
+
+        float cut_scale = 1.0f;
+        if (s.max_radius_cut > 0.0f && r_raw > s.max_radius_cut) {
+            cut_scale = s.max_radius_cut / std::max(1e-6f, r_raw);
+            r_raw     = s.max_radius_cut;
+        }
+
+        const float gamma = (s.scale_radius_gamma > 0.0f) ? s.scale_radius_gamma : 1.0f;
+        float r_ws;
+        if      (gamma == 1.0f) r_ws = s.scale_radius * r_raw;
+        else if (gamma == 2.0f) r_ws = s.scale_radius * r_raw * r_raw;
+        else                    r_ws = s.scale_radius * std::pow(r_raw, gamma);
+
+        r_ws = std::clamp(r_ws, s.min_radius, s.max_radius);
+        if (r_ws <= EPS) return;
+
+        float d_px = (2.0f * r_ws * sd.scale_proj) / std::max(EPS, w_abs);
+        d_px = std::clamp(d_px, s.min_screen_size, s.max_screen_size);
+        if (d_px <= EPS) return;
+
+        const float area_one = (float(M_PI) * 0.25f * d_px * d_px * float(sd.k_orient)) * (cut_scale * cut_scale);
+        sd.sum_area_px += static_cast<double>(area_one) * static_cast<double>(surfels_per_node);
+    }
+
+    // Finalisiert und schreibt die SD-Metriken (nur wenn gesampelt)
+    inline void write_sd_metrics_if_sampled(const MeasCtx& meas,
+        const SDStats& sd,
+        uint64_t rendered_primitives,
+        Lamure::RenderInfo& out)
+    {
+        if (!meas.sampleThisFrame) return;
+
+        const double eps = 1e-9;
+
+        double density_raw    = 0.0;
+        double coverage_raw   = 0.0;
+        double coverage_px_raw= 0.0;
+        double overdraw_raw   = 0.0;
+
+        if (sd.screen_px > eps) {
+            density_raw     = sd.sum_area_px / sd.screen_px;
+            coverage_raw    = 1.0 - std::exp(-density_raw);
+            coverage_px_raw = coverage_raw * sd.screen_px;
+            if (coverage_px_raw > eps)
+                overdraw_raw = sd.sum_area_px / coverage_px_raw;
+        }
+
+        const double cap = std::max(0.0, 50.0);
+        const double density_cap   = (cap > eps) ? std::min(density_raw, cap) : density_raw;
+        const double coverage_cap  = 1.0 - std::exp(-density_cap);
+        const double coverage_px_cap = coverage_cap * sd.screen_px;
+        double overdraw_cap = 0.0;
+        if (coverage_px_cap > eps)
+            overdraw_cap = sd.sum_area_px / coverage_px_cap;
+
+        out.est_screen_px      = float(sd.screen_px);
+        out.est_sum_area_px    = float(sd.sum_area_px);
+        out.est_density        = float(density_cap);
+        out.est_coverage       = float(coverage_cap);
+        out.est_coverage_px    = float(coverage_px_cap);
+        out.est_overdraw       = float(overdraw_cap);
+
+        out.est_density_raw     = float(density_raw);
+        out.est_coverage_raw    = float(coverage_raw);
+        out.est_coverage_px_raw = float(coverage_px_raw);
+        out.est_overdraw_raw    = float(overdraw_raw);
+
+        out.avg_area_px_per_prim = (rendered_primitives > 0)
+            ? float(sd.sum_area_px / double(rendered_primitives)) : 0.0f;
+    }
+
+} // namespace
+
 struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 {
     PointsDrawCallback(Lamure* plugin)
@@ -435,6 +569,8 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
     {
         if (_renderer->getRendering()) { return; }
         _renderer->setRendering(true);
+        const MeasCtx meas = makeMeasCtx(_plugin);
+        const auto& settings     = _plugin->getSettings();
 
         GLState before = GLState::capture();
         glDisable(GL_CULL_FACE);
@@ -494,7 +630,8 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
         //scm::math::vec3 eye = scm::math::vec3f(_renderer->getScmCamera()->get_cam_pos());
 
         scm::math::vec2 viewport = scm::math::vec2f(opencover::coVRConfig::instance()->windows[0].context->getTraits()->width, opencover::coVRConfig::instance()->windows[0].context->getTraits()->height);
-        uint64_t rendered_splats = 0;
+        SDStats sd = makeSDStats(meas, viewport, projection_matrix, settings);
+        uint64_t rendered_primitives = 0;
         uint64_t rendered_nodes = 0;
 
         if (_plugin->getSettings().shader_type == LamureRenderer::ShaderType::SurfelMultipass && _initialized) {
@@ -559,10 +696,11 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
                 for (auto const &node_slot_aggregate : renderable) {
                     if (_renderer->getScmCamera()->cull_against_frustum(frustum, bbox[node_slot_aggregate.node_id_]) != 1) {
+                        accumulate_node_area_px(sd, bvh, node_slot_aggregate.node_id_, projection_matrix*model_view_matrix, settings, surfels_per_node, meas.sampleThisFrame);
                         glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST,
                             (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node,
                             surfels_per_node);
-                        rendered_splats += surfels_per_node;
+                        rendered_primitives += surfels_per_node;
                         ++rendered_nodes;
                     }
                 }
@@ -719,16 +857,19 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
 
                     if (_renderer->getScmCamera()->cull_against_frustum(frustum, bounding_box_vector[node_slot_aggregate.node_id_]) != 1) {
                         _renderer->setNodeUniforms(bvh, node_slot_aggregate.node_id_);
+                        accumulate_node_area_px(sd, bvh, node_slot_aggregate.node_id_, projection_matrix*model_view_matrix, settings, surfels_per_node, meas.sampleThisFrame);
                         glDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, (node_slot_aggregate.slot_id_) * (GLsizei)surfels_per_node, surfels_per_node);
-                        rendered_splats += surfels_per_node;
+                        rendered_primitives += surfels_per_node;
                         ++rendered_nodes;
                     }
                 }
             }
         }
 
-        _plugin->getRenderInfo().rendered_splats = rendered_splats;
+        _plugin->getRenderInfo().rendered_primitives = rendered_primitives;
         _plugin->getRenderInfo().rendered_nodes = rendered_nodes;
+        write_sd_metrics_if_sampled(meas, sd, rendered_primitives, _plugin->getRenderInfo());
+
         _renderer->setRendering(false);
 
         if (!_initialized) {
@@ -815,7 +956,7 @@ void LamureRenderer::init()
 
     ui->getPointcloudButton()->setCallback([this](bool state) { 
         m_pointcloud_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0); 
-        if (!state) m_plugin->getRenderInfo().rendered_splats = 0;
+        if (!state) m_plugin->getRenderInfo().rendered_primitives = 0;
         if (!state) m_plugin->getRenderInfo().rendered_nodes = 0;
         });
     ui->getBoundingboxButton()->setCallback([this](bool state) { 
