@@ -156,23 +156,8 @@
              <data_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_vis"/>
             
             <!-- Auswahl  -->
-            <initial_selection value="0"/>
+            <initial_selection value="0,1,2"/>
             
-            <!-- Budgets & LOD -->
-            <frame_div value="1"/>
-            <!-- <vram value="1024"/> -->
-            <!-- <ram value="4096"/> -->
-            <!-- <upload value="32"/> -->
-            <lod_error value="2.5"/>
-
-            <!-- Visuals -->
-            <show_pointcloud value="on"/>
-            <show_boundingbox value="off"/>
-            <show_frustum value="off"/>
-            <show_coord value="off"/>
-            <show_text value="off"/>
-            <show_sync value="on"/>
-            <show_notify value="off"/>
 
             <point_light_intensity value="0.6"/>
             <ambient_intensity value="0.6"/>
@@ -186,9 +171,8 @@
             <point value="on"/>
             <surfel value="off"/>
             <splatting value="off"/>
-            <lighting value="off"/>
-            <color value="off"/>
-            <color_mode value="accuracy"/> <!-- normals, accuracy, derivation, sensitivity -->
+            
+            <lod_error value="6.0"/>
 
             <scale_radius value="0.05"/>
             <scale_radius_gamma value="0.5"/>
@@ -199,9 +183,27 @@
             <min_screen_size value="1.0"/>
             <scale_points value="1.0"/>
             <scale_surfel value="1.75"/>
+            
+            <lighting value="off"/>
+            <color value="off"/>
+            <color_mode value="accuracy"/> <!-- normals, accuracy, derivation, sensitivity -->
+            
+            <!-- Visuals -->
+            <show_pointcloud value="on"/>
+            <show_boundingbox value="off"/>
+            <show_frustum value="off"/>
+            <show_coord value="off"/>
+            <show_text value="off"/>
+            <show_sync value="on"/>
+            <show_notify value="off"/>
+
+            <!-- Budgets -->
+            <frame_div value="1"/>
+            <!-- <vram value="1024"/> -->
+            <!-- <ram value="4096"/> -->
+            <!-- <upload value="32"/> -->
 
             <!-- Startpose -->
-
 
             <!-- Measurement Struktur: Segment  = dx,dy,dz | rx,ry,rz | v_trans | v_rot -->
             <!--
@@ -211,7 +213,6 @@
               -15,0,0|0,0,-90|0|22.5;
               0,45,-50|90,0,0|0|22.5;
             -->
-
             <measurement_segments value="
               0,-15,0|0,0,-90|0|22.5;
               15,0,0|0,0,-90|0|22.5;

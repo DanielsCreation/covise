@@ -492,9 +492,9 @@ namespace {
 
         const float gamma = (s.scale_radius_gamma > 0.0f) ? s.scale_radius_gamma : 1.0f;
         float r_ws;
-        if      (gamma == 1.0f) r_ws = s.scale_radius * r_raw;
-        else if (gamma == 2.0f) r_ws = s.scale_radius * r_raw * r_raw;
-        else                    r_ws = s.scale_radius * std::pow(r_raw, gamma);
+        if      (gamma == 1.0f) r_ws = s.scale_radius * s.scale_element * r_raw;
+        else if (gamma == 2.0f) r_ws = s.scale_radius * s.scale_element * r_raw * r_raw;
+        else                    r_ws = s.scale_radius * s.scale_element * std::pow(r_raw, gamma);
 
         r_ws = std::clamp(r_ws, s.min_radius, s.max_radius);
         if (r_ws <= EPS) return;
@@ -667,7 +667,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             if (_renderer->getSurfelPass1Shader().far_plane_loc         >= 0) glUniform1f(_renderer->getSurfelPass1Shader().far_plane_loc,  _renderer->getScmCamera()->far_plane_value());
             if (_renderer->getSurfelPass1Shader().max_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().max_radius_loc,   s.max_radius);
             if (_renderer->getSurfelPass1Shader().min_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass1Shader().min_radius_loc,   s.min_radius);
-            if (_renderer->getSurfelPass1Shader().scale_radius_loc      >= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius);
+            if (_renderer->getSurfelPass1Shader().scale_radius_loc      >= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_loc, s.scale_radius * s.scale_element);
             if (_renderer->getSurfelPass1Shader().scale_radius_gamma_loc  >= 0) glUniform1f(_renderer->getSurfelPass1Shader().scale_radius_gamma_loc,   s.scale_radius_gamma);
             if (_renderer->getSurfelPass1Shader().max_radius_cut_loc      >= 0) glUniform1f(_renderer->getSurfelPass1Shader().max_radius_cut_loc,   s.max_radius_cut);
             if (_renderer->getSurfelPass1Shader().projection_matrix_loc >= 0) glUniformMatrix4fv(_renderer->getSurfelPass1Shader().projection_matrix_loc, 1, GL_FALSE, projection_matrix.data_array);
@@ -730,7 +730,7 @@ struct PointsDrawCallback : public virtual osg::Drawable::DrawCallback
             if (_renderer->getSurfelPass2Shader().viewport_loc            >= 0) glUniform2f(_renderer->getSurfelPass2Shader().viewport_loc, viewport.x, viewport.y);
             if (_renderer->getSurfelPass2Shader().max_radius_loc          >= 0) glUniform1f(_renderer->getSurfelPass2Shader().max_radius_loc,   s.max_radius);
             if (_renderer->getSurfelPass2Shader().min_radius_loc          >= 0) glUniform1f(_renderer->getSurfelPass2Shader().min_radius_loc,   s.min_radius);
-            if (_renderer->getSurfelPass2Shader().scale_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_loc, s.scale_radius);
+            if (_renderer->getSurfelPass2Shader().scale_radius_loc        >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_loc, s.scale_radius * s.scale_element);
             if (_renderer->getSurfelPass2Shader().scale_radius_gamma_loc  >= 0) glUniform1f(_renderer->getSurfelPass2Shader().scale_radius_gamma_loc,   s.scale_radius_gamma);
             if (_renderer->getSurfelPass2Shader().max_radius_cut_loc      >= 0) glUniform1f(_renderer->getSurfelPass2Shader().max_radius_cut_loc,  s.max_radius_cut);
             if (_renderer->getSurfelPass2Shader().coloring_loc            >= 0) glUniform1f(_renderer->getSurfelPass2Shader().coloring_loc, s.coloring);     
@@ -1415,7 +1415,7 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         glUniform1f(prog.max_radius_loc, s.max_radius);
         glUniform1f(prog.min_screen_size_loc, s.min_screen_size);
         glUniform1f(prog.max_screen_size_loc, s.max_screen_size);
-        glUniform1f(prog.scale_radius_loc, s.scale_radius);
+        glUniform1f(prog.scale_radius_loc, s.scale_radius * s.scale_element);
         glUniform1f(prog.max_radius_cut_loc, s.max_radius_cut);
         glUniform1f(prog.scale_radius_gamma_loc, s.scale_radius_gamma);
         glUniform1f(prog.scale_projection_loc, opencover::cover->getScale() * viewport.y * 0.5f * projection_matrix.data_array[5]);
@@ -1439,7 +1439,7 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         glUniform1f(prog.max_radius_loc, s.max_radius);
         glUniform1f(prog.min_screen_size_loc, s.min_screen_size);
         glUniform1f(prog.max_screen_size_loc, s.max_screen_size);
-        glUniform1f(prog.scale_radius_loc, s.scale_radius);
+        glUniform1f(prog.scale_radius_loc, s.scale_radius * s.scale_element);
         glUniform1f(prog.max_radius_cut_loc, s.max_radius_cut);
         glUniform1f(prog.scale_radius_gamma_loc, s.scale_radius_gamma);
         glUniform2fv(prog.viewport_loc, 1, viewport.data_array);
@@ -1468,7 +1468,7 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         glUniform1f(prog.max_radius_loc,   s.max_radius);
         glUniform1f(prog.min_screen_size_loc, s.min_screen_size);
         glUniform1f(prog.max_screen_size_loc, s.max_screen_size);
-        glUniform1f(prog.scale_radius_loc, s.scale_radius);
+        glUniform1f(prog.scale_radius_loc, s.scale_radius * s.scale_element);
         glUniform1f(prog.max_radius_cut_loc, s.max_radius_cut);
         glUniform1f(prog.scale_radius_gamma_loc, s.scale_radius_gamma);
         glUniform2fv(prog.viewport_loc, 1, viewport.data_array);
@@ -1497,7 +1497,7 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         glUniform1f(prog.max_radius_loc, s.max_radius);
         glUniform1f(prog.min_screen_size_loc, s.min_screen_size);
         glUniform1f(prog.max_screen_size_loc, s.max_screen_size);
-        glUniform1f(prog.scale_radius_loc, s.scale_radius);
+        glUniform1f(prog.scale_radius_loc, s.scale_radius * s.scale_element);
         glUniform1f(prog.max_radius_cut_loc, s.max_radius_cut);
         glUniform1f(prog.scale_radius_gamma_loc, s.scale_radius_gamma);
         glUniform2fv(prog.viewport_loc, 1, viewport.data_array);
@@ -1521,7 +1521,7 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         glUniform1f(prog1.min_radius_loc, s.min_radius);
         glUniform1f(prog1.min_screen_size_loc, s.min_screen_size);
         glUniform1f(prog1.max_screen_size_loc, s.max_screen_size);
-        glUniform1f(prog1.scale_radius_loc, s.scale_radius);
+        glUniform1f(prog1.scale_radius_loc, s.scale_radius * s.scale_element);
         glUniform1f(prog1.max_radius_cut_loc, s.max_radius_cut);
         glUniform1f(prog1.scale_radius_gamma_loc, s.scale_radius_gamma);
         glUniform1f(prog1.scale_projection_loc, opencover::cover->getScale() * viewport.y * 0.5f * projection_matrix.data_array[5]);
@@ -1535,7 +1535,7 @@ void LamureRenderer::setFrameUniforms(const scm::math::mat4& projection_matrix, 
         glUniform1f(prog2.min_radius_loc, s.min_radius);
         glUniform1f(prog2.min_screen_size_loc, s.min_screen_size);
         glUniform1f(prog2.max_screen_size_loc, s.max_screen_size);
-        glUniform1f(prog2.scale_radius_loc, s.scale_radius);
+        glUniform1f(prog2.scale_radius_loc, s.scale_radius * s.scale_element);
         glUniform1f(prog2.max_radius_cut_loc, s.max_radius_cut);
         glUniform1f(prog2.scale_radius_gamma_loc, s.scale_radius_gamma);
         glUniform1f(prog2.scale_projection_loc, opencover::cover->getScale() * viewport.y * 0.5f * projection_matrix.data_array[5]);

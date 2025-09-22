@@ -2387,6 +2387,7 @@ void LamureMeasurement::printDebugStats(unsigned int num)
     std::cout << "-------------------------------" << std::endl;
 }
 
+
 void LamureMeasurement::appendPreprocessBuildLogsMarkdown(std::ostream& md)
 {
     auto& S = m_plugin->getSettings();
@@ -2518,4 +2519,3 @@ void LamureMeasurement::appendPreprocessBuildLogsMarkdown(std::ostream& md)
     md << "\n_Scanned " << totalDirs << " directories; aggregated "
         << totalFiles << " log files._\n";
 }
-

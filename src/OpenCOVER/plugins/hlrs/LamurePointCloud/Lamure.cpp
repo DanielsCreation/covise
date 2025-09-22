@@ -291,6 +291,7 @@ void Lamure::loadSettingsFromCovise(){
         };
     s.initial_selection = parseIndices(sel, s.models.size());
 
+
     // ---- Initial matrices ----
     {
         const std::string navKey  = std::string(root) + ".initial_navigation";
@@ -787,11 +788,12 @@ std::string Lamure::buildMeasurementOutputPath() const {
     return fs::absolute(out).string();
 }
 
+
 bool Lamure::writeSettingsJson(const Lamure::Settings& s, const std::string& outPath)
 {
     namespace fs = std::filesystem;
 
-    // --- kleine Helfer (alles lokal, keine statics) ---
+    // --- Helpers (lokal, ohne statics) ---
     auto esc = [](const std::string& str){
         std::string r; r.reserve(str.size()+8);
         for(char c: str){
@@ -806,13 +808,11 @@ bool Lamure::writeSettingsJson(const Lamure::Settings& s, const std::string& out
         }
         return r;
         };
-    auto v3f = [](const scm::math::vec3f& v){
-        std::ostringstream o; o<<'['<<v.x<<','<<v.y<<','<<v.z<<']'; return o.str();
+    auto v3f_scm = [](const scm::math::vec3f& v){
+        std::ostringstream o; o.setf(std::ios::fixed); o.precision(6);
+        o<<'['<<v.x<<','<<v.y<<','<<v.z<<']'; return o.str();
         };
-    auto ov3 = [](const osg::Vec3& v){
-        std::ostringstream o; o<<'['<<v.x()<<','<<v.y()<<','<<v.z()<<']'; return o.str();
-        };
-    auto mat4 = [](const osg::Matrixd& M){
+    auto mat4_osg = [](const osg::Matrixd& M){
         std::ostringstream o; o.setf(std::ios::fixed); o.precision(6);
         o<<"["
             <<"["<<M(0,0)<<","<<M(0,1)<<","<<M(0,2)<<","<<M(0,3)<<"],"
@@ -820,6 +820,34 @@ bool Lamure::writeSettingsJson(const Lamure::Settings& s, const std::string& out
             <<"["<<M(2,0)<<","<<M(2,1)<<","<<M(2,2)<<","<<M(2,3)<<"],"
             <<"["<<M(3,0)<<","<<M(3,1)<<","<<M(3,2)<<","<<M(3,3)<<"]"
             <<"]";
+        return o.str();
+        };
+    auto mat4_scm = [](const scm::math::mat4d& m){
+        // Wir interpretieren m[0..15] als 4x4 in der sichtbaren Reihenfolge:
+        // [ [m00 m01 m02 m03],
+        //   [m10 m11 m12 m13],
+        //   [m20 m21 m22 m23],
+        //   [m30 m31 m32 m33] ]
+        std::ostringstream o; o.setf(std::ios::fixed); o.precision(6);
+        o << "["
+            << "[" << m[0]  << "," << m[1]  << "," << m[2]  << "," << m[3]  << "],"
+            << "[" << m[4]  << "," << m[5]  << "," << m[6]  << "," << m[7]  << "],"
+            << "[" << m[8]  << "," << m[9]  << "," << m[10] << "," << m[11] << "],"
+            << "[" << m[12] << "," << m[13] << "," << m[14] << "," << m[15] << "]"
+            << "]";
+        return o.str();
+        };
+
+    // --- NEU: transforms-Map serialisieren mit obigem Helfer ---
+    auto mapTransforms = [&](const std::map<uint32_t, scm::math::mat4d>& m){
+        std::ostringstream o; o << '{';
+        bool first = true;
+        for (const auto& [id, mat] : m) {
+            if (!first) o << ',';
+            first = false;
+            o << '\"' << id << '\"' << ':' << mat4_scm(mat);
+        }
+        o << '}';
         return o.str();
         };
     auto segs = [](const std::vector<LamureMeasurement::Segment>& S){
@@ -846,8 +874,23 @@ bool Lamure::writeSettingsJson(const Lamure::Settings& s, const std::string& out
         for(size_t i=0;i<v.size();++i){ if(i) o<<','; o<<v[i]; }
         o<<']'; return o.str();
         };
+    auto vecF = [&](const std::vector<float>& v){
+        std::ostringstream o; o.setf(std::ios::fixed); o.precision(6);
+        o<<'[';
+        for(size_t i=0;i<v.size();++i){ if(i) o<<','; o<<v[i]; }
+        o<<']'; return o.str();
+        };
+    auto mapU32Str = [&](const std::map<uint32_t, std::string>& m){
+        std::ostringstream o; o<<'{';
+        bool first=true;
+        for(const auto& [id,txt] : m){
+            if(!first) o<<','; first=false;
+            o<<'\"'<<id<<'\"'<<":\"" << esc(txt) << '\"';
+        }
+        o<<'}'; return o.str();
+        };
 
-    // Zielordner anlegen
+    // Zielordner (non-fatal bei Fehlern)
     try {
         fs::path p(outPath);
         if (p.has_parent_path()) {
@@ -858,9 +901,7 @@ bool Lamure::writeSettingsJson(const Lamure::Settings& s, const std::string& out
                     << p.parent_path().string() << " : " << ec.message() << "\n";
             }
         }
-    } catch (...) {
-        // non-fatal
-    }
+    } catch (...) {}
 
     std::ofstream js(outPath, std::ios::out | std::ios::trunc);
     if (!js) {
@@ -868,113 +909,175 @@ bool Lamure::writeSettingsJson(const Lamure::Settings& s, const std::string& out
         return false;
     }
 
-    js << "{\n";
+    // Komma-sicher sammeln
+    std::vector<std::string> items; items.reserve(170);
+    auto add_raw = [&](const std::string& k, const std::string& v){ items.emplace_back("  \""+k+"\": "+v); };
+    auto add_str = [&](const std::string& k, const std::string& v){ items.emplace_back("  \""+k+"\": \""+esc(v)+"\""); };
+    auto add_bool= [&](const std::string& k, bool b){ items.emplace_back("  \""+k+"\": "+std::string(b?"true":"false")); };
+    auto add_i   = [&](const std::string& k, long long v){ items.emplace_back("  \""+k+"\": "+std::to_string(v)); };
+    auto add_f   = [&](const std::string& k, double v){
+        std::ostringstream o; o.setf(std::ios::fixed); o.precision(6); o<<v;
+        items.emplace_back("  \""+k+"\": "+o.str());
+        };
+
+    // --- Primitive bestimmen (Point/Surfel/Splat) ---
+    auto determinePrimitive = [&]()->std::string {
+        int cnt = (s.point?1:0) + (s.surfel?1:0) + (s.splatting?1:0);
+        if (cnt == 1) {
+            if (s.point)    return "Point";
+            if (s.surfel)   return "Surfel";
+            /*s.splatting*/ return "Splat";
+        }
+        if (cnt == 0) {
+            // Fallback: versuche aus s.shader zu raten, sonst "Point"
+            std::string sh = s.shader; 
+            std::string shLow = sh; std::transform(shLow.begin(), shLow.end(), shLow.begin(), ::tolower);
+            if (shLow.find("surfel") != std::string::npos) return "Surfel";
+            if (shLow.find("splat")  != std::string::npos) return "Splat";
+            if (shLow.find("point")  != std::string::npos) return "Point";
+            return "Point";
+        }
+        // Mehrere Flags aktiv – kennzeichne als "Mixed"
+        return "Mixed";
+        }();
 
     // Dateien / Namen
-    js << "  \"measurement_dir\": \""  << esc(s.measurement_dir)  << "\",\n";
-    js << "  \"measurement_name\": \"" << esc(s.measurement_name) << "\",\n";
+    add_str("measurement_dir",  s.measurement_dir);
+    add_str("measurement_name", s.measurement_name);
 
     // Modelle & Auswahl
-    js << "  \"models\": " << vecStr(s.models) << ",\n";
-    js << "  \"initial_selection\": " << vecU32(s.initial_selection) << ",\n";
+    add_raw("models",            vecStr(s.models));
+    add_raw("initial_selection", vecU32(s.initial_selection));
 
     // Budgets / LOD
-    js << "  \"frame_div\": " << s.frame_div << ",\n";
-    js << "  \"vram\": "      << s.vram      << ",\n";
-    js << "  \"ram\": "       << s.ram       << ",\n";
-    js << "  \"upload\": "    << s.upload    << ",\n";
-    js << "  \"lod_error\": " << s.lod_error << ",\n";
+    add_i ("frame_div", s.frame_div);
+    add_i ("vram",      s.vram);
+    add_i ("ram",       s.ram);
+    add_i ("upload",    s.upload);
+    add_bool("lod_update", s.lod_update);
+    add_f ("lod_error", s.lod_error);
 
-    // Flags
-    js << "  \"face_eye\": "             << (s.face_eye ? "true" : "false") << ",\n";
-    js << "  \"pvs_culling\": "          << (s.pvs_culling ? "true" : "false") << ",\n";
-    js << "  \"use_pvs\": "              << (s.use_pvs ? "true" : "false") << ",\n";
-    js << "  \"create_aux_resources\": " << (s.create_aux_resources ? "true" : "false") << ",\n";
+    // GUI / Travel
+    add_i ("gui",          s.gui);
+    add_i ("travel",       s.travel);
+    add_f ("travel_speed", s.travel_speed);
 
-    // Aux-Parameter
-    js << "  \"max_brush_size\": "     << s.max_brush_size << ",\n";
-    js << "  \"channel\": "            << s.channel << ",\n";
-    js << "  \"aux_point_size\": "     << s.aux_point_size << ",\n";
-    js << "  \"aux_point_distance\": " << s.aux_point_distance << ",\n";
-    js << "  \"aux_point_scale\": "    << s.aux_point_scale << ",\n";
-    js << "  \"aux_focal_length\": "   << s.aux_focal_length << ",\n";
+    // Shader / Primitive & Skalen
+    add_str("shader",      s.shader);
+    add_str("primitive",   determinePrimitive); // <<<< hier die gewünschte Ableitung
+    add_f ("scale_element",      s.scale_element);
+    add_f ("scale_point",        s.scale_point);
+    add_f ("scale_surfel",       s.scale_surfel);
+    add_f ("scale_radius",       s.scale_radius);
+    add_f ("radius_scale_gamma", s.scale_radius_gamma);
+    add_f ("min_radius",         s.min_radius);
+    add_f ("max_radius",         s.max_radius);
+    add_f ("min_screen_size",    s.min_screen_size);
+    add_f ("max_screen_size",    s.max_screen_size);
+    add_f ("max_radius_cut",     s.max_radius_cut);
 
-    // Visual toggles
-    js << "  \"show_pointcloud\": "        << (s.show_pointcloud ? "true":"false") << ",\n";
-    js << "  \"show_boundingbox\": "       << (s.show_boundingbox ? "true":"false") << ",\n";
-    js << "  \"show_frustum\": "           << (s.show_frustum ? "true":"false") << ",\n";
-    js << "  \"show_coord\": "             << (s.show_coord ? "true":"false") << ",\n";
-    js << "  \"show_text\": "              << (s.show_text ? "true":"false") << ",\n";
-    js << "  \"show_sync\": "              << (s.show_sync ? "true":"false") << ",\n";
-    js << "  \"show_notify\": "            << (s.show_notify ? "true":"false") << ",\n";
-    js << "  \"show_normals\": "           << (s.show_normals ? "true":"false") << ",\n";
-    js << "  \"show_accuracy\": "          << (s.show_accuracy ? "true":"false") << ",\n";
-    js << "  \"show_radius_deviation\": "  << (s.show_radius_deviation ? "true":"false") << ",\n";
-    js << "  \"show_output_sensitivity\": "<< (s.show_output_sensitivity ? "true":"false") << ",\n";
-    js << "  \"show_sparse\": "            << (s.show_sparse ? "true":"false") << ",\n";
-    js << "  \"show_views\": "             << (s.show_views ? "true":"false") << ",\n";
-    js << "  \"show_photos\": "            << (s.show_photos ? "true":"false") << ",\n";
-    js << "  \"show_octrees\": "           << (s.show_octrees ? "true":"false") << ",\n";
-    js << "  \"show_bvhs\": "              << (s.show_bvhs ? "true":"false") << ",\n";
-    js << "  \"show_pvs\": "               << (s.show_pvs ? "true":"false") << ",\n";
+    // Flags / Visual toggles
+    add_bool("provenance",              s.provenance);
+    add_bool("create_aux_resources",    s.create_aux_resources);
+    add_bool("face_eye",                s.face_eye);
+    add_i   ("vis",                     s.vis);
+    add_i   ("show_normals",            s.show_normals); // int32_t im Struct -> als Zahl schreiben
+    add_bool("show_accuracy",           s.show_accuracy);
+    add_bool("show_radius_deviation",   s.show_radius_deviation);
+    add_bool("show_output_sensitivity", s.show_output_sensitivity);
+    add_bool("show_sparse",             s.show_sparse);
+    add_bool("show_views",              s.show_views);
+    add_bool("show_photos",             s.show_photos);
+    add_bool("show_octrees",            s.show_octrees);
+    add_bool("show_bvhs",               s.show_bvhs);
+    add_bool("show_pvs",                s.show_pvs);
+    add_bool("pvs_culling",             s.pvs_culling);
+    add_bool("use_pvs",                 s.use_pvs);
+
+    // Kanal / Aux Parameter
+    add_i ("channel",            s.channel);
+    add_f ("aux_point_size",     s.aux_point_size);
+    add_f ("aux_point_distance", s.aux_point_distance);
+    add_f ("aux_point_scale",    s.aux_point_scale);
+    add_f ("aux_focal_length",   s.aux_focal_length);
+    add_i ("max_brush_size",     s.max_brush_size);
 
     // Lighting / ToneMapping
-    js << "  \"point_light_intensity\": " << s.point_light_intensity << ",\n";
-    js << "  \"ambient_intensity\": "     << s.ambient_intensity << ",\n";
-    js << "  \"specular_intensity\": "    << s.specular_intensity << ",\n";
-    js << "  \"shininess\": "             << s.shininess << ",\n";
-    js << "  \"gamma\": "                 << s.gamma << ",\n";
-    js << "  \"use_tone_mapping\": "      << (s.use_tone_mapping ? "true":"false") << ",\n";
-    js << "  \"point_light_pos\": "       << v3f(s.point_light_pos) << ",\n";
+    add_f   ("point_light_intensity", s.point_light_intensity);
+    add_f   ("ambient_intensity",     s.ambient_intensity);
+    add_f   ("specular_intensity",    s.specular_intensity);
+    add_f   ("shininess",             s.shininess);
+    add_f   ("gamma",                 s.gamma);
+    add_bool("use_tone_mapping",      s.use_tone_mapping);
+    add_raw ("point_light_pos",       v3f_scm(s.point_light_pos));
 
     // Heatmap
-    js << "  \"heatmap\": "           << (s.heatmap ? "true":"false") << ",\n";
-    js << "  \"heatmap_min\": "       << s.heatmap_min << ",\n";
-    js << "  \"heatmap_max\": "       << s.heatmap_max << ",\n";
-    js << "  \"heatmap_color_min\": " << v3f(s.heatmap_color_min) << ",\n";
-    js << "  \"heatmap_color_max\": " << v3f(s.heatmap_color_max) << ",\n";
-
-    // Shader / Radii
-    js << "  \"shader\": \""        << esc(s.shader) << "\",\n";
-    js << "  \"min_radius\": "      << s.min_radius << ",\n";
-    js << "  \"max_radius\": "      << s.max_radius << ",\n";
-    js << "  \"min_screen_size\": " << s.min_screen_size << ",\n";
-    js << "  \"max_screen_size\": " << s.max_screen_size << ",\n";
-    js << "  \"scale_radius\": "    << s.scale_radius << ",\n";
-    js << "  \"max_radius_cut\": "  << s.max_radius_cut << ",\n";
-    js << "  \"radius_scale_gamma\": " << s.scale_radius_gamma << ",\n";
-    js << "  \"scale_surfel\": "    << s.scale_surfel << ",\n";
+    add_bool("heatmap",           s.heatmap);
+    add_f   ("heatmap_min",       s.heatmap_min);
+    add_f   ("heatmap_max",       s.heatmap_max);
+    add_raw ("heatmap_color_min", v3f_scm(s.heatmap_color_min));
+    add_raw ("heatmap_color_max", v3f_scm(s.heatmap_color_max));
 
     // Multi-Pass
-    js << "  \"depth_range\": "   << s.depth_range << ",\n";
-    js << "  \"flank_lift\": "    << s.flank_lift << ",\n";
+    add_f ("depth_range", s.depth_range);
+    add_f ("flank_lift",  s.flank_lift);
 
-    // Pfade
-    js << "  \"pvs\": \""             << esc(s.pvs) << "\",\n";
-    js << "  \"background_image\": \""<< esc(s.background_image) << "\",\n";
+    // Pfade / Dateien
+    add_str("atlas_file",       s.atlas_file);
+    add_str("json",             s.json);
+    add_str("pvs",              s.pvs);
+    add_str("background_image", s.background_image);
 
-    // Provenance
-    js << "  \"provenance\": " << (s.provenance ? "true":"false") << ",\n";
-    js << "  \"json\": \""     << esc(s.json) << "\",\n";
+    // Farben / Background
+    add_raw("bvh_color",        vecF(s.bvh_color));
+    add_raw("frustum_color",    vecF(s.frustum_color));
+    add_raw("background_color", v3f_scm(s.background_color));
 
-    // Background color
-    js << "  \"background_color\": " << v3f(s.background_color) << ",\n";
+    // Sichtbarkeiten UI
+    add_bool("show_pointcloud",  s.show_pointcloud);
+    add_bool("show_boundingbox", s.show_boundingbox);
+    add_bool("show_frustum",     s.show_frustum);
+    add_bool("show_coord",       s.show_coord);
+    add_bool("show_text",        s.show_text);
+    add_bool("show_sync",        s.show_sync);
+    add_bool("show_notify",      s.show_notify);
 
     // Initial Matrices
-    js << "  \"use_initial_navigation\": " << (s.use_initial_navigation ? "true":"false") << ",\n";
-    js << "  \"use_initial_view\": "       << (s.use_initial_view ? "true":"false") << ",\n";
-    js << "  \"initial_navigation\": "     << mat4(s.initial_navigation) << ",\n";
-    js << "  \"initial_view\": "           << mat4(s.initial_view) << ",\n";
+    add_bool("use_initial_navigation", s.use_initial_navigation);
+    add_bool("use_initial_view",       s.use_initial_view);
+    add_bool("initial_tf_overrides",   s.initial_tf_overrides);
+    add_raw ("initial_navigation",     mat4_osg(s.initial_navigation));
+    add_raw ("initial_view",           mat4_osg(s.initial_view));
 
-    // Segmente
-    js << "  \"measurement_segments\": " << segs(s.measurement_segments) << ",\n";
+    // Pro-Modell Daten
+    add_raw("transforms", mapTransforms(s.transforms));
+    add_raw("aux",        mapU32Str(s.aux));
 
-    // Diverse
-    js << "  \"num_models\": " << s.num_models << "\n";
+    // Messpfade
+    add_raw("measurement_segments", segs(s.measurement_segments));
 
+    // Messungs-Modi/Flags
+    add_bool("measure_off",    s.measure_off);
+    add_bool("measure_light",  s.measure_light);
+    add_bool("measure_full",   s.measure_full);
+    add_i   ("measure_sample", s.measure_sample);
+
+    // Modelle (Meta)
+    add_i("num_models", s.num_models);
+
+    // Laufzeitobjekte nur als Zähler (keine Deep-Serialisierung)
+    add_i("octrees_count", static_cast<long long>(s.octrees.size()));
+    add_i("views_count",   static_cast<long long>(s.views.size()));
+
+    // --- Ausgabe ---
+    js << "{\n";
+    for(size_t i=0;i<items.size();++i){
+        js << items[i] << (i+1<items.size() ? ",\n" : "\n");
+    }
     js << "}\n";
     js.flush();
 
     std::cout << "[LamureUtil] Settings JSON written: " << outPath << "\n";
     return true;
 }
+
